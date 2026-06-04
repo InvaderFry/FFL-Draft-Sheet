@@ -54,6 +54,25 @@ def test_pos_index_limits_candidate_scan(seeded_map):
     assert {r.sleeper_id for r in players_mod._pos_index["WR"]} == {"2", "4"}
 
 
+def test_cross_position_falls_back_to_full_scan(monkeypatch):
+    """A source may classify a multi-position player differently than Sleeper.
+    The same-position pass misses them, so find_player must fall back to the
+    full map and still return the record."""
+    records = {
+        "10": _rec("10", "Taysom Hill", "TE", "NO"),   # Sleeper says TE
+        "11": _rec("11", "Patrick Mahomes", "QB", "KC"),
+    }
+    monkeypatch.setattr(players_mod, "_player_map", records)
+    monkeypatch.setattr(players_mod, "_name_index", players_mod._build_name_index(records))
+    monkeypatch.setattr(players_mod, "_pos_index", players_mod._build_pos_index(records))
+
+    # A scraper lists Taysom Hill as QB; no QB record exists, but the fallback
+    # full scan should still match the TE record by name+team.
+    rec = find_player("Taysom Hill", "QB", "NO")
+    assert rec is not None
+    assert rec.sleeper_id == "10"
+
+
 def test_no_match_returns_none(seeded_map):
     # Unknown player with no close match in that position.
     assert find_player("Zzzz Nobody", "QB", "XXX") is None

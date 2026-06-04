@@ -184,8 +184,15 @@ def find_player(name: str, pos: str, team: str) -> PlayerRecord | None:
     pos_upper = pos.upper()
     query = f"{name.lower().strip()} {pos_upper} {team.lower()}"
 
-    best_score = 0
-    best_rec: PlayerRecord | None = None
+    def _best_match(records: list[PlayerRecord]) -> tuple[int, PlayerRecord | None]:
+        best_score = 0
+        best_rec: PlayerRecord | None = None
+        for rec in records:
+            score = fuzz.WRatio(query, rec.name_key)
+            if score > best_score:
+                best_score = score
+                best_rec = rec
+        return best_score, best_rec
 
     # Fast path: exact name match
     exact = _name_index.get(name.lower().strip(), [])
@@ -194,16 +201,19 @@ def find_player(name: str, pos: str, team: str) -> PlayerRecord | None:
             if rec.position == pos_upper:
                 return rec
 
-    # Only fuzzy-match against same-position candidates — this keeps the scan
-    # to a few hundred records instead of the full ~11k-player map.
-    candidates = _pos_index.get(pos_upper, [])
-    for rec in candidates:
-        score = fuzz.WRatio(query, rec.name_key)
-        if score > best_score:
-            best_score = score
-            best_rec = rec
-
+    # Fuzzy-match same-position candidates first — this keeps the common case to
+    # a few hundred records instead of the full ~11k-player map.
+    best_score, best_rec = _best_match(_pos_index.get(pos_upper, []))
     if best_score >= 88:
         return best_rec
+
+    # Fallback: a source may classify a multi-position player differently than
+    # Sleeper (e.g. Taysom Hill QB vs TE, Cordarrelle Patterson RB vs WR), so the
+    # same-position pass misses them.  Only then pay for the full-map scan.
+    full_score, full_rec = _best_match(list(_player_map.values()) if _player_map else [])
+    if full_score >= 88:
+        return full_rec
+
+    best_score = max(best_score, full_score)
     logger.debug("No match for '%s' %s %s (best score=%d)", name, pos, team, best_score)
     return None
