@@ -18,7 +18,7 @@ import logging
 
 import numpy as np
 
-from app.config import LeagueConfig
+from app.config import LeagueConfig, POSITIONS
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +68,11 @@ def compute_baselines(
         Baseline points per position.
     """
     baselines: dict[str, float] = {}
-    positions = list(cfg.starters.keys())
 
-    for pos in positions:
+    # Only compute baselines for scored positions (config.POSITIONS is the single
+    # source of truth).  Kicker is a valid roster slot but has no projection
+    # source, so it is excluded here rather than emitting a bogus 0.0 baseline.
+    for pos in POSITIONS:
         curve = curves.get(pos, [14.0] * 80)
         br = baseline_rank(pos, cfg, curve)
         proj = pos_projections.get(pos, [])

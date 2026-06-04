@@ -91,3 +91,39 @@ def test_mutates_in_place():
 
 def test_empty_list():
     assert assign_tiers([]) == []
+
+
+# ---- degenerate: fewer distinct values than tier count -----------------------
+
+def test_few_distinct_values_each_get_own_contiguous_tier():
+    """With fewer distinct positive VALs than the tier cap, each distinct value
+    should map to its own contiguous tier (1=highest), with no skipped numbers."""
+    # 5 distinct positive values, many duplicate players, QB cap = 8
+    vals = [50, 50, 40, 40, 30, 20, 10, 10]
+    players = _make_qbs(vals)
+    result = assign_tiers(players)
+
+    tier_set = sorted({p.tier for p in result})
+    assert tier_set == [1, 2, 3, 4, 5]          # contiguous, exactly 5 distinct
+    # Highest value is tier 1, lowest positive is the last tier
+    by_val = {p.val: p.tier for p in result}
+    assert by_val[50] == 1
+    assert by_val[40] == 2
+    assert by_val[30] == 3
+    assert by_val[20] == 4
+    assert by_val[10] == 5
+    # Equal values share a tier
+    fifties = [p.tier for p in result if p.val == 50]
+    assert len(set(fifties)) == 1
+
+
+def test_few_distinct_values_with_sub_baseline():
+    """Sub-baseline (VAL=0) players join the last positive tier in the
+    degenerate branch and tier numbering stays contiguous."""
+    vals = [40, 30, 20, 0, 0]
+    players = _make_qbs(vals)
+    result = assign_tiers(players)
+    tier_set = sorted({p.tier for p in result})
+    assert tier_set == list(range(1, max(tier_set) + 1))  # no gaps
+    last_tier = max(p.tier for p in result)
+    assert all(p.tier == last_tier for p in result if p.val == 0)

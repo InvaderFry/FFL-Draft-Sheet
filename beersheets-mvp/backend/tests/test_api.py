@@ -100,6 +100,28 @@ def test_all_positions_populated(mock_adp, mock_players, mock_curves, mock_scrap
         assert len(positions[pos]) > 0
 
 
+# ---- kicker is accepted but not part of the scored board ---------------------
+
+@patch("app.main.scrape_all", new_callable=AsyncMock)
+@patch("app.main.load_attrition_curves")
+@patch("app.main.load_player_map")
+@patch("app.main.enrich_with_adp")
+def test_kicker_starters_accepted_but_no_k_position(mock_adp, mock_players, mock_curves, mock_scrape, client):
+    mock_scrape.return_value = _mock_scrape_result()  # QB/RB/WR/TE/DST only
+    mock_curves.return_value = _mock_attrition_curves()
+    mock_players.return_value = {}
+    mock_adp.side_effect = lambda rows, n_teams, ppr: (rows, False)
+
+    # K=1 must validate (forward-compat) but produce no K board.
+    resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
+                                           "TE": 1, "DST": 1, "K": 1, "flex_slots": 1})
+    assert resp.status_code == 200
+    positions = resp.json()["positions"]
+    assert "K" not in positions
+    for pos in ["QB", "RB", "WR", "TE", "DST"]:
+        assert pos in positions
+
+
 # ---- validation --------------------------------------------------------------
 
 def test_invalid_team_count_returns_422(client):

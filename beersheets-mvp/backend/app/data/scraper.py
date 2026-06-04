@@ -74,26 +74,28 @@ def _attach_sleeper_id(rows: list[dict]) -> list[dict]:
 ESPN_POS_MAP = {"QB": "QB", "RB": "RB", "WR": "WR", "TE": "TE", "DST": "DST"}
 ESPN_SLOT_MAP = {"QB": 0, "RB": 2, "WR": 4, "TE": 6, "DST": 16}
 
-async def _fetch_espn(client: httpx.AsyncClient, pos: str, cfg: ScoringConfig) -> list[dict]:
+async def _fetch_espn(client: httpx.AsyncClient, pos: str, cfg: LeagueConfig) -> list[dict]:
     slot = ESPN_SLOT_MAP.get(pos)
     if slot is None:
         return []
+    season = cfg.season
+    base_url = (
+        f"https://fantasy.espn.com/apis/v3/games/ffl/seasons/{season}"
+        f"/segments/0/leaguedefaults/3"
+    )
     results = []
     limit, offset = 40, 0
     try:
         while True:
-            url = (
-                f"https://fantasy.espn.com/apis/v3/games/ffl/seasons/2026"
-                f"/segments/0/leaguedefaults/3?view=kona_player_info"
-            )
             params = {
+                "view": "kona_player_info",
                 "scoringPeriodId": 0,
                 "slotCategoryId": slot,
                 "limit": limit,
                 "offset": offset,
             }
             headers = {"x-fantasy-filter": f'{{"players":{{"filterSlotIds":{{"value":[{slot}]}},"limit":{limit},"offset":{offset},"filterStatsForTopScorersScoringPeriodId":{{"value":0}},"sortPercOwned":{{"sortAsc":false,"sortPriority":1}}}}}}'}
-            resp = await client.get("https://fantasy.espn.com/apis/v3/games/ffl/seasons/2026/segments/0/leaguedefaults/3", params=params, headers=headers, timeout=15)
+            resp = await client.get(base_url, params=params, headers=headers, timeout=15)
             if resp.status_code != 200:
                 break
             data = resp.json()
@@ -103,18 +105,17 @@ async def _fetch_espn(client: httpx.AsyncClient, pos: str, cfg: ScoringConfig) -
             for p in players_data:
                 pi = p.get("playerPoolEntry", {}).get("player", {})
                 name = pi.get("fullName", "")
-                team_id = pi.get("proTeamId")
                 stats_list = pi.get("stats", [])
                 raw_stats: dict[str, float] = {}
                 for s in stats_list:
-                    if s.get("scoringPeriodId") == 0 and s.get("seasonId") == 2026:
+                    if s.get("scoringPeriodId") == 0 and s.get("seasonId") == season:
                         raw_stats = {str(k): v for k, v in s.get("stats", {}).items()}
                         break
                 # ESPN stat ID mapping (simplified)
                 mapped = _map_espn_stats(raw_stats)
                 if pos == "TE":
                     mapped["te_premium_eligible"] = True
-                pts = score(mapped, cfg)
+                pts = score(mapped, cfg.scoring)
                 results.append({
                     "source": "ESPN",
                     "player_name": name,
@@ -177,14 +178,14 @@ FP_POS_URLS = {
     "DST": "https://www.fantasypros.com/nfl/projections/dst.php?week=draft",
 }
 
-async def _fetch_fantasypros(client: httpx.AsyncClient, pos: str, cfg: ScoringConfig) -> list[dict]:
+async def _fetch_fantasypros(client: httpx.AsyncClient, pos: str, cfg: LeagueConfig) -> list[dict]:
     url = FP_POS_URLS.get(pos)
     if not url:
         return []
     try:
         resp = await client.get(url, timeout=20)
         resp.raise_for_status()
-        return _parse_fantasypros_html(resp.text, pos, cfg)
+        return _parse_fantasypros_html(resp.text, pos, cfg.scoring)
     except Exception as exc:
         logger.warning("FantasyPros scrape failed for %s: %s", pos, exc)
         return []
@@ -301,15 +302,15 @@ FFTODAY_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; BeerSheetsBot/1.0)"
 }
 
-async def _fetch_fftoday(client: httpx.AsyncClient, pos: str, cfg: ScoringConfig) -> list[dict]:
+async def _fetch_fftoday(client: httpx.AsyncClient, pos: str, cfg: LeagueConfig) -> list[dict]:
     pos_id = FFTODAY_POS_MAP.get(pos)
     if pos_id is None:
         return []
-    url = f"https://www.fftoday.com/rankings/playerproj.php?Season=2026&PosID={pos_id}&LeagueID=1"
+    url = f"https://www.fftoday.com/rankings/playerproj.php?Season={cfg.season}&PosID={pos_id}&LeagueID=1"
     try:
         resp = await client.get(url, headers=FFTODAY_HEADERS, timeout=20)
         resp.raise_for_status()
-        return _parse_fftoday_html(resp.text, pos, cfg)
+        return _parse_fftoday_html(resp.text, pos, cfg.scoring)
     except Exception as exc:
         logger.warning("FFToday scrape failed for %s: %s", pos, exc)
         return []
@@ -357,7 +358,7 @@ def _parse_fftoday_html(html: str, pos: str, cfg: ScoringConfig) -> list[dict]:
 
 NF_POS_MAP = {"QB": "qb", "RB": "rb", "WR": "wr", "TE": "te", "DST": "dst"}
 
-async def _fetch_numberfire(client: httpx.AsyncClient, pos: str, cfg: ScoringConfig) -> list[dict]:
+async def _fetch_numberfire(client: httpx.AsyncClient, pos: str, cfg: LeagueConfig) -> list[dict]:
     nf_pos = NF_POS_MAP.get(pos)
     if not nf_pos:
         return []
@@ -365,7 +366,7 @@ async def _fetch_numberfire(client: httpx.AsyncClient, pos: str, cfg: ScoringCon
     try:
         resp = await client.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
         resp.raise_for_status()
-        return _parse_numberfire_html(resp.text, pos, cfg)
+        return _parse_numberfire_html(resp.text, pos, cfg.scoring)
     except Exception as exc:
         logger.warning("NumberFire scrape failed for %s: %s", pos, exc)
         return []
@@ -445,7 +446,7 @@ async def scrape_position(pos: str, cfg: LeagueConfig, sources: list[str] | None
                 continue
 
             logger.info("Scraping %s %s…", src_name, pos)
-            rows = await fn(client, pos, cfg.scoring)
+            rows = await fn(client, pos, cfg)
             rows = _attach_sleeper_id(rows)
             if rows:
                 cache.set(ck, rows)

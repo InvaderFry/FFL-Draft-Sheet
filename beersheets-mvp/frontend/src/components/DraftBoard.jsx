@@ -2,15 +2,15 @@
  * U13 — DraftBoard
  *
  * Tab bar (QB / RB / WR / TE / DST / K) + active position's PlayerTable.
- * Switching tabs preserves draft state (all positions share one useDraftState hook).
+ * Draft state is owned by App and passed in as props, so the on-screen board
+ * and the print view stay in sync. Switching tabs preserves it.
  */
 
 import { useState } from 'react'
 import PlayerTable from './PlayerTable'
-import { useDraftState } from '../hooks/useDraftState'
 import styles from './DraftBoard.module.css'
 
-const TAB_ORDER = ['QB', 'RB', 'WR', 'TE', 'DST', 'K']
+const TAB_ORDER = ['QB', 'RB', 'WR', 'TE', 'DST']
 
 const POS_COLORS = {
   QB:  '#ef4444',
@@ -18,12 +18,18 @@ const POS_COLORS = {
   WR:  '#60a5fa',
   TE:  '#f59e0b',
   DST: '#a855f7',
-  K:   '#6b7280',
 }
 
-export default function DraftBoard({ sheetData, config, onPrint }) {
+export default function DraftBoard({
+  sheetData,
+  config,
+  onPrint,
+  isDrafted,
+  onToggle: toggle,
+  draftedCount: count = 0,
+  onClearDrafted: clear,
+}) {
   const [activePos, setActivePos] = useState('QB')
-  const { isDrafted, toggle, count, clear } = useDraftState()
 
   const { positions, metadata } = sheetData
   const players = positions[activePos] || []
@@ -79,8 +85,8 @@ export default function DraftBoard({ sheetData, config, onPrint }) {
       {/* Tab bar */}
       <div className={styles.tabs}>
         {TAB_ORDER.map(pos => {
-          const count = positions[pos]?.length || 0
-          if (count === 0) return null
+          const tabCount = positions[pos]?.length || 0
+          if (tabCount === 0) return null
           return (
             <button
               key={pos}
@@ -89,7 +95,7 @@ export default function DraftBoard({ sheetData, config, onPrint }) {
               onClick={() => setActivePos(pos)}
             >
               <span className={styles.tabPos}>{pos}</span>
-              <span className={styles.tabCount}>{count}</span>
+              <span className={styles.tabCount}>{tabCount}</span>
             </button>
           )
         })}

@@ -9,6 +9,12 @@ from typing import Annotated
 from pydantic import BaseModel, Field, model_validator
 
 
+# Positions the pipeline actually scrapes and scores.  This is the single source
+# of truth for "scored positions" — the scraper, attrition curves, baselines, and
+# player-map ingestion all derive from it.  Kicker (K) is accepted in LeagueConfig
+# for forward-compatibility but has no projection source yet, so it is excluded.
+POSITIONS = ["QB", "RB", "WR", "TE", "DST"]
+
 # --------------------------------------------------------------------------- #
 # Per-position tier count constants (R6)
 # --------------------------------------------------------------------------- #
@@ -18,10 +24,7 @@ N_TIERS_BY_POS: dict[str, int] = {
     "WR": 12,
     "TE": 8,
     "DST": 6,
-    "K": 6,
 }
-
-POSITIONS = ["QB", "RB", "WR", "TE", "DST", "K"]
 
 
 class ScoringConfig(BaseModel):
