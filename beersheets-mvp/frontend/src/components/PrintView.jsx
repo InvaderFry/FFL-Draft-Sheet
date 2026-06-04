@@ -14,16 +14,6 @@ import '../styles/print.css'
 
 const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'DST']
 
-const LABELS = {
-  player_name: 'NAME',
-  tm_bw:       'TM/BW',
-  ecr_fmt:     'ECR',
-  floor:       'F',
-  val:         'VAL',
-  ceil:        'C',
-  ps_pct:      'PS',
-}
-
 function fmtVal(v) {
   if (v == null || isNaN(v)) return '—'
   if (v < 0) return `(${Math.abs(v).toFixed(1)})`

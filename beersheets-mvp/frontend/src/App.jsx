@@ -2,9 +2,12 @@
  * App.jsx — BeerSheets MVP
  *
  * State machine:
- *   idle    → user fills LeagueForm → loading → success (DraftBoard shown) | error
+ *   idle → user fills LeagueForm → loading → ready (DraftBoard shown)
+ *                                          ↘ error (message shown, back on the form)
  *
- * PrintView is always rendered (but hidden) so window.print() captures it.
+ * A single useDraftState instance is shared by the interactive DraftBoard and
+ * the (always-mounted, print-only) PrintView so crossed-off players appear in
+ * both the on-screen board and the printed sheet.
  */
 
 import { useState, useCallback } from 'react'
@@ -18,16 +21,26 @@ export default function App() {
   const [phase, setPhase] = useState('idle')  // 'idle' | 'loading' | 'ready'
   const [sheetData, setSheetData] = useState(null)
   const [config, setConfig] = useState(null)
-  const { isDrafted, toggle } = useDraftState()
+  const [error, setError] = useState(null)
+  const draft = useDraftState()
 
   const handleSheet = useCallback((data, cfg) => {
     setSheetData(data)
     setConfig(cfg)
+    setError(null)
     setPhase('ready')
   }, [])
 
   const handleLoading = useCallback((isLoading) => {
-    if (isLoading) setPhase('loading')
+    if (isLoading) {
+      setError(null)
+      setPhase('loading')
+    }
+  }, [])
+
+  const handleError = useCallback((message) => {
+    setError(message || 'Failed to generate sheet. Please try again.')
+    setPhase('idle')
   }, [])
 
   const handlePrint = useCallback(() => {
@@ -37,7 +50,10 @@ export default function App() {
   const handleReset = useCallback(() => {
     setPhase('idle')
     setSheetData(null)
-  }, [])
+    setConfig(null)
+    setError(null)
+    draft.clear()
+  }, [draft])
 
   return (
     <div className={styles.app}>
@@ -67,7 +83,12 @@ export default function App() {
                 Value-Based Drafting · Man-games baseline · Jenks tiers · Auction values
               </p>
             </div>
-            <LeagueForm onSheet={handleSheet} onLoading={handleLoading} />
+            <LeagueForm
+              onSheet={handleSheet}
+              onLoading={handleLoading}
+              onError={handleError}
+              error={error}
+            />
           </div>
         )}
 
@@ -85,6 +106,10 @@ export default function App() {
               sheetData={sheetData}
               config={config}
               onPrint={handlePrint}
+              isDrafted={draft.isDrafted}
+              onToggle={draft.toggle}
+              draftedCount={draft.count}
+              onClearDrafted={draft.clear}
             />
           </div>
         )}
@@ -95,7 +120,7 @@ export default function App() {
         <PrintView
           sheetData={sheetData}
           config={config}
-          isDrafted={isDrafted}
+          isDrafted={draft.isDrafted}
         />
       )}
     </div>

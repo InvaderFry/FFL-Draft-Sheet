@@ -56,9 +56,19 @@ npm run dev
 
 ### Tests
 
+Backend (pytest):
+
 ```bash
 cd backend
 PYTHONPATH=. pytest tests/ -v
+```
+
+Frontend (Vitest + Testing Library) and lint:
+
+```bash
+cd frontend
+npm test        # unit + component tests (jsdom)
+npm run lint    # eslint
 ```
 
 ---
@@ -88,6 +98,10 @@ PYTHONPATH=. pytest tests/ -v
 ```
 
 **Response:** Player rows per position with `val`, `floor`, `ceil`, `ps_pct`, `ecr_fmt`, `tier`, `tier_is_even`.
+
+> **Note:** `K` (kicker) is accepted in the request for forward-compatibility but is
+> not yet scored — there is no kicker projection source wired in, so the response
+> contains no `K` position block. See the Stage 2 roadmap.
 
 Full schema auto-generated at `/docs`.
 
@@ -203,6 +217,7 @@ price[i] = $1 + (val[i] / Σ val) × discretionary
 - Real-time auction inflation as players go off the board
 - Dynasty / keeper / IDP support
 - Superflex / 2QB flex allocation
+- Kicker (K) projection source + scoring
 - GMM tier method (Boris Chen style) as alternative
 - Mobile PWA / offline caching
 - DST Strength of Schedule grid

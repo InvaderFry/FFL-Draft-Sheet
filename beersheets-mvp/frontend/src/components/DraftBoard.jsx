@@ -2,12 +2,12 @@
  * U13 — DraftBoard
  *
  * Tab bar (QB / RB / WR / TE / DST / K) + active position's PlayerTable.
- * Switching tabs preserves draft state (all positions share one useDraftState hook).
+ * Draft state is owned by App and passed in as props, so the on-screen board
+ * and the print view stay in sync. Switching tabs preserves it.
  */
 
 import { useState } from 'react'
 import PlayerTable from './PlayerTable'
-import { useDraftState } from '../hooks/useDraftState'
 import styles from './DraftBoard.module.css'
 
 const TAB_ORDER = ['QB', 'RB', 'WR', 'TE', 'DST', 'K']
@@ -21,9 +21,19 @@ const POS_COLORS = {
   K:   '#6b7280',
 }
 
-export default function DraftBoard({ sheetData, config, onPrint }) {
+export default function DraftBoard({
+  sheetData,
+  config,
+  onPrint,
+  isDrafted,
+  onToggle,
+  draftedCount = 0,
+  onClearDrafted,
+}) {
   const [activePos, setActivePos] = useState('QB')
-  const { isDrafted, toggle, count, clear } = useDraftState()
+  const count = draftedCount
+  const toggle = onToggle
+  const clear = onClearDrafted
 
   const { positions, metadata } = sheetData
   const players = positions[activePos] || []

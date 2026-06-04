@@ -68,22 +68,35 @@ def assign_tiers(players: list[PlayerVBD]) -> list[PlayerVBD]:
             p.tier_is_even = (k % 2 == 0)
         return players
 
-    # Clamp k to available unique positive values
     unique_positive = sorted(set(positive_vals))
-    effective_k = max(2, min(k, len(unique_positive)))
 
-    breaks = _jenks_breaks(positive_vals, effective_k)
+    # Degenerate case: at most `k` distinct positive values.  Jenks/digitize can
+    # produce non-contiguous tier numbers here, so map each distinct value to its
+    # own tier band directly (highest value → tier 1).
+    if len(unique_positive) <= k:
+        rank_of_value = {
+            v: tier for tier, v in enumerate(sorted(unique_positive, reverse=True), start=1)
+        }
+        last_tier = len(unique_positive)
+        for p in players:
+            t = rank_of_value.get(p.val, last_tier) if p.val > 0 else last_tier
+            p.tier = t
+            p.tier_is_even = (t % 2 == 0)
+        return players
+
+    # General case: more distinct values than tiers → Jenks natural breaks.
+    breaks = _jenks_breaks(positive_vals, k)
 
     # Assign tiers: break[0] < val ≤ break[1] → tier_class 1, etc.
     # We want tier 1 = highest VAL, so we reverse the digitize output.
     def val_to_tier(v: float) -> int:
         if v <= 0:
-            return effective_k  # sub-baseline → last tier
+            return k  # sub-baseline → last tier
         # np.digitize: returns index of the bucket (1-indexed from left = low)
-        bucket = int(np.digitize(v, breaks[1:-1]))  # 0..effective_k-1
-        # Reverse so bucket 0 (lowest) → tier effective_k (worst)
-        #              bucket effective_k-1 (highest) → tier 1 (best)
-        return effective_k - bucket
+        bucket = int(np.digitize(v, breaks[1:-1]))  # 0..k-1
+        # Reverse so bucket 0 (lowest) → tier k (worst)
+        #              bucket k-1 (highest) → tier 1 (best)
+        return k - bucket
 
     for p in players:
         t = val_to_tier(p.val)

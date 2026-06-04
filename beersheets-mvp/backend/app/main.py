@@ -8,7 +8,6 @@ Endpoints:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from typing import Any
@@ -37,10 +36,14 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# NOTE: the API is stateless and uses no cookies/auth, so credentials are not
+# allowed.  This lets us safely use the "*" wildcard origin — the CORS spec
+# forbids combining `Access-Control-Allow-Origin: *` with credentials, and
+# browsers reject such responses.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000", "*"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -130,7 +133,6 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
     curves = load_attrition_curves(cfg.season)
 
     # 4. Build mean-points-by-rank for baseline computation
-    from app.config import ScoringConfig
     pos_projections: dict[str, list[float]] = {}
     for pos in POSITIONS:
         rows = raw_by_pos.get(pos, [])

@@ -30,6 +30,7 @@ POSITIONS_OF_INTEREST = {"QB", "RB", "WR", "TE", "DST", "K", "DEF"}
 
 _player_map: dict[str, "PlayerRecord"] | None = None
 _name_index: dict[str, list["PlayerRecord"]] = {}
+_pos_index: dict[str, list["PlayerRecord"]] = {}
 
 
 @dataclass
@@ -114,11 +115,19 @@ def _build_name_index(records: dict[str, PlayerRecord]) -> dict[str, list[Player
     return idx
 
 
+def _build_pos_index(records: dict[str, PlayerRecord]) -> dict[str, list[PlayerRecord]]:
+    """Group records by position so fuzzy matching only scans same-position candidates."""
+    idx: dict[str, list[PlayerRecord]] = {}
+    for rec in records.values():
+        idx.setdefault(rec.position, []).append(rec)
+    return idx
+
+
 def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
     """
     Return the full Sleeper player map.  Results are cached (file cache + module-level).
     """
-    global _player_map, _name_index
+    global _player_map, _name_index, _pos_index
 
     if _player_map is not None and not force_refresh:
         return _player_map
@@ -131,6 +140,7 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
             # Reconstruct dataclasses from dicts
             _player_map = {sid: PlayerRecord(**v) for sid, v in cached.items()}
             _name_index = _build_name_index(_player_map)
+            _pos_index = _build_pos_index(_player_map)
             return _player_map
 
     # Fetch from Sleeper
@@ -143,6 +153,7 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
         logger.error("Sleeper API fetch failed: %s", exc)
         _player_map = {}
         _name_index = {}
+        _pos_index = {}
         return _player_map
 
     records = _parse_sleeper_response(raw)
@@ -154,6 +165,7 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
 
     _player_map = records
     _name_index = _build_name_index(_player_map)
+    _pos_index = _build_pos_index(_player_map)
     return _player_map
 
 
@@ -169,19 +181,22 @@ def find_player(name: str, pos: str, team: str) -> PlayerRecord | None:
     Returns the best match if score ≥ 88, else None.
     """
     load_player_map()
-    query = f"{name.lower().strip()} {pos.upper()} {team.lower()}"
+    pos_upper = pos.upper()
+    query = f"{name.lower().strip()} {pos_upper} {team.lower()}"
 
     best_score = 0
     best_rec: PlayerRecord | None = None
-    candidates = list(_player_map.values()) if _player_map else []
 
     # Fast path: exact name match
     exact = _name_index.get(name.lower().strip(), [])
     if exact:
         for rec in exact:
-            if rec.position == pos.upper():
+            if rec.position == pos_upper:
                 return rec
 
+    # Only fuzzy-match against same-position candidates — this keeps the scan
+    # to a few hundred records instead of the full ~11k-player map.
+    candidates = _pos_index.get(pos_upper, [])
     for rec in candidates:
         score = fuzz.WRatio(query, rec.name_key)
         if score > best_score:

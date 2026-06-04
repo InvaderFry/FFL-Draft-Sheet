@@ -15,7 +15,7 @@ import json
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +26,7 @@ CACHE_DIR = Path(os.environ.get("CACHE_DIR", "cache"))
 
 def _ttl_seconds() -> int:
     """Return cache TTL in seconds based on current date."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     # Preseason: July 1 – September 15
     if (now.month == 7) or (now.month == 8) or (now.month == 9 and now.day <= 15):
         return 12 * 3600

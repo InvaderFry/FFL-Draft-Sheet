@@ -34,9 +34,8 @@ function loadSaved() {
   return DEFAULT_SETTINGS
 }
 
-export default function LeagueForm({ onSheet, onLoading }) {
+export default function LeagueForm({ onSheet, onLoading, onError, error }) {
   const [settings, setSettings] = useState(loadSaved)
-  const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const [validationError, setValidationError] = useState({})
 
@@ -89,7 +88,6 @@ export default function LeagueForm({ onSheet, onLoading }) {
     }
 
     setLoading(true)
-    setError(null)
     onLoading(true)
     try {
       const res = await fetch(`${API_URL}/api/sheet`, {
@@ -104,7 +102,10 @@ export default function LeagueForm({ onSheet, onLoading }) {
       const data = await res.json()
       onSheet(data, payload)
     } catch (err) {
-      setError(err.message || 'Failed to generate sheet. Please try again.')
+      // Surface the error to App, which keeps the form mounted so the message
+      // is actually shown (and the user can retry) instead of hanging on the
+      // loading spinner.
+      onError(err.message || 'Failed to generate sheet. Please try again.')
     } finally {
       setLoading(false)
       onLoading(false)

@@ -21,7 +21,10 @@ N_TIERS_BY_POS: dict[str, int] = {
     "K": 6,
 }
 
-POSITIONS = ["QB", "RB", "WR", "TE", "DST", "K"]
+# Positions the pipeline actually scrapes and scores.  Kicker (K) is accepted
+# in LeagueConfig for forward-compatibility but has no projection source yet,
+# so it is intentionally excluded from the processing pipeline.
+POSITIONS = ["QB", "RB", "WR", "TE", "DST"]
 
 
 class ScoringConfig(BaseModel):
