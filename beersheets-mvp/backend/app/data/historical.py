@@ -16,12 +16,12 @@ from datetime import date
 import numpy as np
 
 from app import cache
+from app.config import POSITIONS
 
 logger = logging.getLogger(__name__)
 
 MAX_RANK = 80
 DEFAULT_GAMES = 14.0
-POSITIONS = ["QB", "RB", "WR", "TE", "DST", "K"]
 
 _GSIS_TO_POS_KEY = {
     "QB": "qb",
@@ -94,7 +94,7 @@ def _build_curves_from_nfl_data(season: int) -> dict[str, list[float]]:
         df["fpts"] = 0.0
 
     for pos in POSITIONS:
-        if pos == "DST" or pos == "K":
+        if pos == "DST":
             # Limited historical data; use fallback
             curves[pos] = _fallback_curve()
             continue

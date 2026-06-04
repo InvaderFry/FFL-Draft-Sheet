@@ -75,6 +75,23 @@ def test_cross_position_falls_back_to_full_scan(monkeypatch):
     assert rec.sleeper_id == "10"
 
 
+def test_dst_does_not_fall_back_to_other_positions(monkeypatch):
+    """A team defense is never cross-listed at another position, so a DST miss
+    must NOT match a same-named non-DST player via the fallback scan."""
+    records = {
+        # Decoy non-DST namesake that DOES clear the 88 fuzzy threshold (~90),
+        # so the test fails if the DST fallback is not skipped.
+        "20": _rec("20", "San Francisco 49ers", "WR", "SF"),
+    }
+    name_idx, pos_idx = players_mod._build_indexes(records)
+    monkeypatch.setattr(players_mod, "_player_map", records)
+    monkeypatch.setattr(players_mod, "_name_index", name_idx)
+    monkeypatch.setattr(players_mod, "_pos_index", pos_idx)
+
+    # No DST record exists; fallback is skipped for DST, so this stays unmatched.
+    assert find_player("San Francisco 49ers", "DST", "SF") is None
+
+
 def test_no_match_returns_none(seeded_map):
     # Unknown player with no close match in that position.
     assert find_player("Zzzz Nobody", "QB", "XXX") is None

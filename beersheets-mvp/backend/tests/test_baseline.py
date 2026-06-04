@@ -1,19 +1,13 @@
 """Tests for engine/baseline.py (U6)."""
 
 import pytest
-from app.config import LeagueConfig
 from app.engine.baseline import games_needed, baseline_rank, compute_baselines
 
 
 @pytest.fixture
-def canonical_cfg():
+def canonical_cfg(make_league):
     """12-team, 0.5 PPR, 1QB/2RB/3WR/1TE/1FLEX (RB50/WR40/TE10), 14 weeks."""
-    return LeagueConfig(
-        n_teams=12,
-        fantasy_weeks=14,
-        QB=1, RB=2, WR=3, TE=1, DST=1, K=0,
-        flex_slots=1, flex_rb=0.5, flex_wr=0.4, flex_te=0.1,
-    )
+    return make_league()
 
 
 @pytest.fixture
@@ -60,11 +54,9 @@ def test_baseline_rank_within_expected_range(canonical_cfg, flat_curve):
         assert br >= 1
 
 
-def test_baseline_rank_fewer_teams_reduces_rank():
-    cfg10 = LeagueConfig(n_teams=10, QB=1, RB=2, WR=3, TE=1, DST=1, K=0,
-                         flex_slots=1, flex_rb=0.5, flex_wr=0.4, flex_te=0.1)
-    cfg12 = LeagueConfig(n_teams=12, QB=1, RB=2, WR=3, TE=1, DST=1, K=0,
-                         flex_slots=1, flex_rb=0.5, flex_wr=0.4, flex_te=0.1)
+def test_baseline_rank_fewer_teams_reduces_rank(make_league):
+    cfg10 = make_league(n_teams=10)
+    cfg12 = make_league(n_teams=12)
     curve = [14.0] * 80
     assert baseline_rank("RB", cfg10, curve) < baseline_rank("RB", cfg12, curve)
 
@@ -75,11 +67,9 @@ def test_baseline_rank_curve_too_short(canonical_cfg):
     assert br == 5   # capped at last rank
 
 
-def test_superflex_pushes_qb_baseline_deeper():
-    cfg_sf = LeagueConfig(n_teams=12, QB=2, RB=2, WR=3, TE=1, DST=1, K=0,
-                          flex_slots=1, flex_rb=0.5, flex_wr=0.4, flex_te=0.1)
-    cfg_1qb = LeagueConfig(n_teams=12, QB=1, RB=2, WR=3, TE=1, DST=1, K=0,
-                           flex_slots=1, flex_rb=0.5, flex_wr=0.4, flex_te=0.1)
+def test_superflex_pushes_qb_baseline_deeper(make_league):
+    cfg_sf = make_league(QB=2)
+    cfg_1qb = make_league(QB=1)
     curve = [14.0] * 80
     assert baseline_rank("QB", cfg_sf, curve) > baseline_rank("QB", cfg_1qb, curve)
 

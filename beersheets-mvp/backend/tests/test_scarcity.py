@@ -1,9 +1,9 @@
 """Tests for engine/scarcity.py (U9)."""
 
 import pytest
-from app.config import LeagueConfig
 from app.engine.vbd import PlayerVBD
 from app.engine.scarcity import assign_positional_scarcity, assign_auction_prices
+from tests.factories import build_league
 
 
 def _make_rb(name, val):
@@ -17,11 +17,7 @@ def _make_rb(name, val):
 
 
 def _canonical_cfg(auction=False, budget=200, n_teams=12):
-    return LeagueConfig(
-        n_teams=n_teams, fantasy_weeks=14, auction_mode=auction, auction_budget=budget,
-        QB=1, RB=2, WR=3, TE=1, DST=1, K=0,
-        flex_slots=1, flex_rb=0.5, flex_wr=0.4, flex_te=0.1,
-    )
+    return build_league(n_teams=n_teams, auction_mode=auction, auction_budget=budget)
 
 
 # ---- positional scarcity -----------------------------------------------------
@@ -81,10 +77,6 @@ def test_auction_disabled_leaves_prices_none():
 
 def test_10team_200_budget_spot_check():
     """10-team, $200 budget, 15 roster spots: discretionary = $2000 - $150 = $1850."""
-    cfg = LeagueConfig(
-        n_teams=10, fantasy_weeks=14, auction_mode=True, auction_budget=200,
-        QB=1, RB=2, WR=3, TE=1, DST=1, K=0,
-        flex_slots=1, flex_rb=0.5, flex_wr=0.4, flex_te=0.1,
-    )
+    cfg = build_league(n_teams=10, auction_mode=True, auction_budget=200)
     expected_disc = cfg.n_teams * cfg.auction_budget - cfg.n_rostered
     assert expected_disc > 0

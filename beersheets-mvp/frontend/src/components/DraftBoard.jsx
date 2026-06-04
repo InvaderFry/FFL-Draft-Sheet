@@ -18,7 +18,6 @@ const POS_COLORS = {
   WR:  '#60a5fa',
   TE:  '#f59e0b',
   DST: '#a855f7',
-  K:   '#6b7280',
 }
 
 export default function DraftBoard({

@@ -21,12 +21,15 @@ import httpx
 from rapidfuzz import fuzz
 
 from app import cache
+from app.config import POSITIONS
 
 logger = logging.getLogger(__name__)
 
 SLEEPER_PLAYERS_URL = "https://api.sleeper.app/v1/players/nfl"
 CACHE_KEY = "sleeper_players"
-POSITIONS_OF_INTEREST = {"QB", "RB", "WR", "TE", "DST", "K", "DEF"}
+# Ingest the scored positions (config.POSITIONS) plus Sleeper's "DEF" spelling,
+# which _parse_sleeper_response normalises to "DST".
+POSITIONS_OF_INTEREST = set(POSITIONS) | {"DEF"}
 
 _player_map: dict[str, "PlayerRecord"] | None = None
 _name_index: dict[str, list["PlayerRecord"]] = {}
@@ -208,11 +211,18 @@ def find_player(name: str, pos: str, team: str) -> PlayerRecord | None:
 
     # Fallback: a source may classify a multi-position player differently than
     # Sleeper (e.g. Taysom Hill QB vs TE, Cordarrelle Patterson RB vs WR), so the
-    # same-position pass misses them.  Only then pay for the full-map scan.
-    full_score, full_rec = _best_match(list(_player_map.values()) if _player_map else [])
-    if full_score >= 88:
-        return full_rec
+    # same-position pass misses them.  Scan only the OTHER position buckets (the
+    # same-position bucket already failed above) and keep the better result.
+    # A team defense is never cross-listed, so skip this for DST.
+    if pos_upper != "DST":
+        for other_pos, recs in _pos_index.items():
+            if other_pos == pos_upper:
+                continue
+            score, rec = _best_match(recs)
+            if score > best_score:
+                best_score, best_rec = score, rec
+        if best_score >= 88:
+            return best_rec
 
-    best_score = max(best_score, full_score)
     logger.debug("No match for '%s' %s %s (best score=%d)", name, pos, team, best_score)
     return None
