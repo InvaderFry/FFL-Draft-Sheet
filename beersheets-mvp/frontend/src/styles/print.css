@@ -1,0 +1,175 @@
+/*
+ * U14 — Print stylesheet
+ *
+ * @media print: hides the nav, settings form, tab bar, and web-UI elements;
+ * shows .print-only content in a compact multi-column BeerSheets-style layout.
+ *
+ * Key requirements:
+ *   - Portrait → landscape
+ *   - 8pt font for density
+ *   - Tier shading preserved (-webkit-print-color-adjust: exact)
+ *   - ECR blue/orange coloring preserved
+ *   - Drafted rows shown with strikethrough
+ */
+
+/* ---- Hiding .print-only in screen mode ---- */
+.print-only {
+  display: none !important;
+}
+
+@media print {
+
+  /* Show the print sheet, hide everything else */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Hide all non-print content */
+  body > #root > *:not(.print-only) {
+    display: none !important;
+  }
+
+  /* Force print colors */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    size: landscape;
+    margin: 8mm 6mm;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-family: 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
+    font-size: 8pt;
+  }
+
+  /* ---- Print sheet layout ---- */
+  .print-sheet {
+    width: 100%;
+  }
+
+  .print-title {
+    font-size: 11pt;
+    font-weight: 700;
+    border-bottom: 2px solid #000;
+    padding-bottom: 2pt;
+    margin-bottom: 3pt;
+    display: flex;
+    align-items: baseline;
+    gap: 12pt;
+  }
+
+  .print-baselines {
+    font-size: 8pt;
+    font-weight: 400;
+    color: #444;
+  }
+
+  .print-date {
+    margin-left: auto;
+    font-size: 7pt;
+    color: #888;
+    font-weight: 400;
+  }
+
+  .print-legend {
+    font-size: 6.5pt;
+    color: #555;
+    margin-bottom: 4pt;
+  }
+
+  /* Multi-column grid: QB | RB | WR | TE | DST */
+  .print-columns {
+    display: flex;
+    gap: 6pt;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .print-pos-block {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .print-pos-header {
+    font-size: 9pt;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: #1c1c1c;
+    color: #fff;
+    padding: 2pt 4pt;
+    margin-bottom: 1pt;
+  }
+
+  /* Table */
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7pt;
+  }
+
+  .print-table thead th {
+    font-size: 6pt;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-bottom: 1pt solid #000;
+    padding: 1pt 2pt;
+    background: #f0f0f0 !important;
+  }
+
+  .print-table tbody td {
+    padding: 1.2pt 2pt;
+    border-bottom: 0.25pt solid #e8e8e8;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Tier shading */
+  .tier-odd  { background: #ffffff !important; }
+  .tier-even { background: #e8e8e8 !important; }
+
+  /* Tier boundary */
+  .tier-odd  + .tier-even td,
+  .tier-even + .tier-odd td {
+    border-top: 0.75pt solid #bbb;
+  }
+
+  /* Drafted rows */
+  .drafted {
+    opacity: 0.45 !important;
+    background: #f8f8f8 !important;
+  }
+  .name-drafted {
+    text-decoration: line-through;
+    color: #888;
+  }
+
+  /* Column widths */
+  .col-name { max-width: 80pt; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+  .col-tmbw { text-align: left; color: #555; font-size: 6.5pt; }
+  .col-ecr  { text-align: center; font-weight: 600; }
+  .col-num  { text-align: right; font-family: 'DM Mono', 'Courier New', monospace; }
+  .col-val  { font-weight: 700; }
+
+  /* ECR colors persist in print */
+  [style*="color: var(--c-ecr-blue)"]   { color: blue !important; }
+  [style*="color: var(--c-ecr-orange)"] { color: darkorange !important; }
+
+  /* Footer */
+  .print-footer {
+    margin-top: 4pt;
+    font-size: 6pt;
+    color: #999;
+    border-top: 0.5pt solid #ccc;
+    padding-top: 2pt;
+    text-align: center;
+  }
+}

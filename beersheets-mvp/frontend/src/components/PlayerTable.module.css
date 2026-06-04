@@ -1,0 +1,132 @@
+.tableWrap {
+  overflow-x: auto;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-data);
+  font-size: 12px;
+}
+
+.table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.table thead th {
+  background: var(--c-surface2);
+  color: var(--c-text-muted);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 6px;
+  border-bottom: 2px solid var(--c-amber);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.table tbody tr {
+  cursor: pointer;
+  transition: filter 0.1s;
+}
+
+.table tbody tr:hover {
+  filter: brightness(1.2);
+}
+
+/* Alternating tier shading */
+.tierOdd {
+  background: var(--c-tier-odd);
+}
+.tierEven {
+  background: var(--c-tier-even);
+}
+
+/* Drafted state */
+.drafted {
+  opacity: 0.45;
+  background: var(--c-drafted-bg) !important;
+}
+.draftedName {
+  text-decoration: line-through;
+  color: var(--c-text-dim);
+}
+
+/* Columns */
+.selCol {
+  width: 20px;
+  text-align: center;
+  padding: 0 4px;
+}
+.draftedDot {
+  color: var(--c-red);
+  font-size: 10px;
+}
+
+.nameCell {
+  padding: 5px 8px;
+  color: var(--c-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.teamCell {
+  padding: 5px 4px;
+  white-space: nowrap;
+  color: var(--c-text-muted);
+  font-size: 11px;
+}
+.team { font-weight: 600; }
+.bye  {
+  display: inline-block;
+  margin-left: 3px;
+  color: var(--c-text-dim);
+  font-size: 10px;
+}
+
+.ecrCell {
+  padding: 5px 6px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.numCell {
+  padding: 5px 8px;
+  text-align: right;
+  color: var(--c-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.valCell {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.auctionCell {
+  color: var(--c-green);
+  font-weight: 600;
+}
+
+/* Tier boundary separator */
+.table tbody tr:first-child td {
+  border-top: none;
+}
+
+/* Subtle separator between tiers */
+.tierOdd + .tierEven td,
+.tierEven + .tierOdd td {
+  border-top: 1px solid var(--c-border2);
+}

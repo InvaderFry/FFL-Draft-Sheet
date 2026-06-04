@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: ffl-draft-sheet-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    envVars:
+      - key: CACHE_DIR
+        value: /app/cache
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    disk:
+      name: cache
+      mountPath: /app/cache
+      sizeGB: 1
+    healthCheckPath: /health
+    numInstances: 1
+    plan: free
+    autoDeploy: true
+    branch: main

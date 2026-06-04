@@ -1,0 +1,110 @@
+/* =========================================================
+   FFL Draft Sheet — Global Styles
+   Aesthetic: Analytics-dark sports dashboard
+   Fonts: Barlow Condensed (display/headers) + DM Mono (data) + Barlow (body)
+   ========================================================= */
+
+:root {
+  /* Core palette */
+  --c-bg:        #0d1117;
+  --c-surface:   #161b22;
+  --c-surface2:  #1c2230;
+  --c-border:    #30363d;
+  --c-border2:   #21262d;
+
+  /* Text */
+  --c-text:      #e6edf3;
+  --c-text-muted: #8b949e;
+  --c-text-dim:  #484f58;
+
+  /* Accent */
+  --c-amber:     #d97706;
+  --c-amber-dim: #92400e;
+  --c-green:     #22c55e;
+  --c-red:       #ef4444;
+
+  /* ECR colors (blue = ADP earlier, orange = ADP later) */
+  --c-ecr-blue:   #60a5fa;
+  --c-ecr-orange: #fb923c;
+
+  /* Tier shading */
+  --c-tier-odd:  #161b22;
+  --c-tier-even: #1c2230;
+
+  /* Drafted state */
+  --c-drafted-bg:   #0d1117;
+  --c-drafted-text: #484f58;
+
+  /* Typography */
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-body:    'Barlow', sans-serif;
+  --font-data:    'DM Mono', monospace;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a {
+  color: var(--c-ecr-blue);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+input, select {
+  font-family: var(--font-body);
+  background: var(--c-surface2);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--c-amber);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--c-bg); }
+::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c-text-dim); }

@@ -1,0 +1,137 @@
+.board {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--c-bg);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.metaTag {
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: 11px;
+  color: var(--c-text-muted);
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.draftCount {
+  font-size: 12px;
+  color: var(--c-text-muted);
+}
+
+.clearBtn {
+  background: none;
+  border: none;
+  color: var(--c-ecr-orange);
+  font-size: 12px;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.printBtn {
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-text);
+  font-size: 12px;
+  padding: 4px 12px;
+  transition: background 0.15s;
+}
+.printBtn:hover {
+  background: var(--c-border);
+}
+
+/* Baselines */
+.baselines {
+  display: flex;
+  gap: var(--space-3);
+  padding: 4px var(--space-4);
+  background: var(--c-surface2);
+  border-bottom: 1px solid var(--c-border2);
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--c-text-muted);
+  font-family: var(--font-data);
+}
+
+.baselineItem {
+  white-space: nowrap;
+}
+
+.baselinePos {
+  font-weight: 700;
+  color: var(--c-amber);
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: var(--space-2) var(--space-4) 0;
+  background: var(--c-surface);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--c-text-muted);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s, border-bottom-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.tab:hover {
+  color: var(--c-text);
+}
+
+.tabActive {
+  color: var(--c-text);
+  border-bottom-color: var(--c-amber); /* overridden inline by pos color */
+}
+
+.tabPos {
+  font-weight: 800;
+}
+
+.tabCount {
+  font-size: 11px;
+  color: var(--c-text-dim);
+  font-weight: 400;
+}
