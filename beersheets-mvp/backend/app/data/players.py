@@ -107,20 +107,21 @@ def _bridge_gsis_ids(records: dict[str, PlayerRecord]) -> None:
         logger.warning("Could not load nflverse ID crosswalk: %s", exc)
 
 
-def _build_name_index(records: dict[str, PlayerRecord]) -> dict[str, list[PlayerRecord]]:
-    idx: dict[str, list[PlayerRecord]] = {}
+def _build_indexes(
+    records: dict[str, PlayerRecord],
+) -> tuple[dict[str, list[PlayerRecord]], dict[str, list[PlayerRecord]]]:
+    """
+    Build both lookup indexes in a single pass over the records:
+      - name_index: full_name (lowercased) → records, for the exact-name fast path
+      - pos_index:  position → records, so fuzzy matching can scan same-position
+                    candidates instead of the full ~11k-player map
+    """
+    name_idx: dict[str, list[PlayerRecord]] = {}
+    pos_idx: dict[str, list[PlayerRecord]] = {}
     for rec in records.values():
-        key = rec.full_name.lower().strip()
-        idx.setdefault(key, []).append(rec)
-    return idx
-
-
-def _build_pos_index(records: dict[str, PlayerRecord]) -> dict[str, list[PlayerRecord]]:
-    """Group records by position so fuzzy matching only scans same-position candidates."""
-    idx: dict[str, list[PlayerRecord]] = {}
-    for rec in records.values():
-        idx.setdefault(rec.position, []).append(rec)
-    return idx
+        name_idx.setdefault(rec.full_name.lower().strip(), []).append(rec)
+        pos_idx.setdefault(rec.position, []).append(rec)
+    return name_idx, pos_idx
 
 
 def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
@@ -139,8 +140,7 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
             logger.info("Player map loaded from file cache (%d players)", len(cached))
             # Reconstruct dataclasses from dicts
             _player_map = {sid: PlayerRecord(**v) for sid, v in cached.items()}
-            _name_index = _build_name_index(_player_map)
-            _pos_index = _build_pos_index(_player_map)
+            _name_index, _pos_index = _build_indexes(_player_map)
             return _player_map
 
     # Fetch from Sleeper
@@ -164,8 +164,7 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
     logger.info("Player map: %d players cached", len(records))
 
     _player_map = records
-    _name_index = _build_name_index(_player_map)
-    _pos_index = _build_pos_index(_player_map)
+    _name_index, _pos_index = _build_indexes(_player_map)
     return _player_map
 
 

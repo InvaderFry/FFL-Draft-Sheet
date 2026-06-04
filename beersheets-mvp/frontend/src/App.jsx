@@ -22,7 +22,7 @@ export default function App() {
   const [sheetData, setSheetData] = useState(null)
   const [config, setConfig] = useState(null)
   const [error, setError] = useState(null)
-  const draft = useDraftState()
+  const { isDrafted, toggle, count: draftedCount, clear: clearDrafted } = useDraftState()
 
   const handleSheet = useCallback((data, cfg) => {
     setSheetData(data)
@@ -52,8 +52,8 @@ export default function App() {
     setSheetData(null)
     setConfig(null)
     setError(null)
-    draft.clear()
-  }, [draft])
+    clearDrafted()
+  }, [clearDrafted])
 
   return (
     <div className={styles.app}>
@@ -106,10 +106,10 @@ export default function App() {
               sheetData={sheetData}
               config={config}
               onPrint={handlePrint}
-              isDrafted={draft.isDrafted}
-              onToggle={draft.toggle}
-              draftedCount={draft.count}
-              onClearDrafted={draft.clear}
+              isDrafted={isDrafted}
+              onToggle={toggle}
+              draftedCount={draftedCount}
+              onClearDrafted={clearDrafted}
             />
           </div>
         )}
@@ -120,7 +120,7 @@ export default function App() {
         <PrintView
           sheetData={sheetData}
           config={config}
-          isDrafted={draft.isDrafted}
+          isDrafted={isDrafted}
         />
       )}
     </div>

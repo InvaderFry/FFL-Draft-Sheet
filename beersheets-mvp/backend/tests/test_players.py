@@ -29,8 +29,9 @@ def seeded_map(monkeypatch):
         "4": _rec("4", "Tyreek Hill", "WR", "MIA"),
     }
     monkeypatch.setattr(players_mod, "_player_map", records)
-    monkeypatch.setattr(players_mod, "_name_index", players_mod._build_name_index(records))
-    monkeypatch.setattr(players_mod, "_pos_index", players_mod._build_pos_index(records))
+    name_idx, pos_idx = players_mod._build_indexes(records)
+    monkeypatch.setattr(players_mod, "_name_index", name_idx)
+    monkeypatch.setattr(players_mod, "_pos_index", pos_idx)
     return records
 
 
@@ -63,8 +64,9 @@ def test_cross_position_falls_back_to_full_scan(monkeypatch):
         "11": _rec("11", "Patrick Mahomes", "QB", "KC"),
     }
     monkeypatch.setattr(players_mod, "_player_map", records)
-    monkeypatch.setattr(players_mod, "_name_index", players_mod._build_name_index(records))
-    monkeypatch.setattr(players_mod, "_pos_index", players_mod._build_pos_index(records))
+    name_idx, pos_idx = players_mod._build_indexes(records)
+    monkeypatch.setattr(players_mod, "_name_index", name_idx)
+    monkeypatch.setattr(players_mod, "_pos_index", pos_idx)
 
     # A scraper lists Taysom Hill as QB; no QB record exists, but the fallback
     # full scan should still match the TE record by name+team.

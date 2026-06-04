@@ -10,7 +10,7 @@ import { useState } from 'react'
 import PlayerTable from './PlayerTable'
 import styles from './DraftBoard.module.css'
 
-const TAB_ORDER = ['QB', 'RB', 'WR', 'TE', 'DST', 'K']
+const TAB_ORDER = ['QB', 'RB', 'WR', 'TE', 'DST']
 
 const POS_COLORS = {
   QB:  '#ef4444',
@@ -26,14 +26,11 @@ export default function DraftBoard({
   config,
   onPrint,
   isDrafted,
-  onToggle,
-  draftedCount = 0,
-  onClearDrafted,
+  onToggle: toggle,
+  draftedCount: count = 0,
+  onClearDrafted: clear,
 }) {
   const [activePos, setActivePos] = useState('QB')
-  const count = draftedCount
-  const toggle = onToggle
-  const clear = onClearDrafted
 
   const { positions, metadata } = sheetData
   const players = positions[activePos] || []
@@ -89,8 +86,8 @@ export default function DraftBoard({
       {/* Tab bar */}
       <div className={styles.tabs}>
         {TAB_ORDER.map(pos => {
-          const count = positions[pos]?.length || 0
-          if (count === 0) return null
+          const tabCount = positions[pos]?.length || 0
+          if (tabCount === 0) return null
           return (
             <button
               key={pos}
@@ -99,7 +96,7 @@ export default function DraftBoard({
               onClick={() => setActivePos(pos)}
             >
               <span className={styles.tabPos}>{pos}</span>
-              <span className={styles.tabCount}>{count}</span>
+              <span className={styles.tabCount}>{tabCount}</span>
             </button>
           )
         })}

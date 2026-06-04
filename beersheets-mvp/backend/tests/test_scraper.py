@@ -4,12 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.config import LeagueConfig
 from app.data import scraper
-
-
-def _league(season=2026):
-    return LeagueConfig(season=season, QB=1, RB=2, WR=3, TE=1, DST=1, K=0, flex_slots=1)
 
 
 def _mock_client(captured):
@@ -30,29 +25,29 @@ def _mock_client(captured):
 
 
 @pytest.mark.asyncio
-async def test_fftoday_url_uses_config_season():
+async def test_fftoday_url_uses_config_season(make_league):
     captured = {}
     client = _mock_client(captured)
-    rows = await scraper._fetch_fftoday(client, "RB", _league(season=2027))
+    rows = await scraper._fetch_fftoday(client, "RB", make_league(season=2027))
     assert rows == []
     assert "Season=2027" in captured["url"]
 
 
 @pytest.mark.asyncio
-async def test_espn_url_uses_config_season():
+async def test_espn_url_uses_config_season(make_league):
     captured = {}
     client = _mock_client(captured)
-    rows = await scraper._fetch_espn(client, "RB", _league(season=2028))
+    rows = await scraper._fetch_espn(client, "RB", make_league(season=2028))
     assert rows == []
     assert "/seasons/2028/" in captured["url"]
 
 
 @pytest.mark.asyncio
-async def test_adapters_accept_full_league_config():
+async def test_adapters_accept_full_league_config(make_league):
     """Every adapter must accept a LeagueConfig (not just ScoringConfig)."""
     captured = {}
     client = _mock_client(captured)
-    cfg = _league()
+    cfg = make_league()
     for fn in scraper.ADAPTERS.values():
         rows = await fn(client, "RB", cfg)
         assert rows == []  # empty responses parse to no rows, no exceptions

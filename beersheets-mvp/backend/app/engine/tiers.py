@@ -68,16 +68,14 @@ def assign_tiers(players: list[PlayerVBD]) -> list[PlayerVBD]:
             p.tier_is_even = (k % 2 == 0)
         return players
 
-    unique_positive = sorted(set(positive_vals))
+    unique_desc = sorted(set(positive_vals), reverse=True)
 
     # Degenerate case: at most `k` distinct positive values.  Jenks/digitize can
     # produce non-contiguous tier numbers here, so map each distinct value to its
     # own tier band directly (highest value → tier 1).
-    if len(unique_positive) <= k:
-        rank_of_value = {
-            v: tier for tier, v in enumerate(sorted(unique_positive, reverse=True), start=1)
-        }
-        last_tier = len(unique_positive)
+    if len(unique_desc) <= k:
+        rank_of_value = {v: tier for tier, v in enumerate(unique_desc, start=1)}
+        last_tier = len(unique_desc)
         for p in players:
             t = rank_of_value.get(p.val, last_tier) if p.val > 0 else last_tier
             p.tier = t
