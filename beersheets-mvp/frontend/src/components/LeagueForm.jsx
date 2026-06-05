@@ -5,10 +5,11 @@
  * Persists last-used settings in localStorage for convenience.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import styles from './LeagueForm.module.css'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
+const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || ''
 
 const DEFAULT_SETTINGS = {
   n_teams: 12,
@@ -38,11 +39,18 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
   const [settings, setSettings] = useState(loadSaved)
   const [loading, setLoading] = useState(false)
   const [validationError, setValidationError] = useState({})
+  const [clearStatus, setClearStatus] = useState(null) // null | 'clearing' | 'cleared' | 'error'
+  const clearTimerRef = useRef(null)
 
   // Persist settings
   useEffect(() => {
     try { localStorage.setItem('beersheet_settings', JSON.stringify(settings)) } catch (_) {}
   }, [settings])
+
+  // Cancel any pending clear-status reset on unmount to avoid setState on detached instance
+  useEffect(() => {
+    return () => { if (clearTimerRef.current) clearTimeout(clearTimerRef.current) }
+  }, [])
 
   function update(field, value) {
     setSettings(s => ({ ...s, [field]: value }))
@@ -59,6 +67,22 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
     if (Math.abs(flexSum - 1.0) > 0.01)
       errs.flex = `Flex allocations must sum to 1.0 (currently ${flexSum.toFixed(2)})`
     return errs
+  }
+
+  async function handleClearCache() {
+    if (clearTimerRef.current) clearTimeout(clearTimerRef.current)
+    setClearStatus('clearing')
+    const headers = {}
+    if (ADMIN_SECRET) headers['X-Admin-Token'] = ADMIN_SECRET
+    try {
+      const res = await fetch(`${API_URL}/admin/cache/clear`, { method: 'POST', headers })
+      if (!res.ok) throw new Error(`Server error ${res.status}`)
+      setClearStatus('cleared')
+    } catch (_) {
+      setClearStatus('error')
+    } finally {
+      clearTimerRef.current = setTimeout(() => setClearStatus(null), 3000)
+    }
   }
 
   async function handleSubmit(e) {
@@ -202,13 +226,26 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
 
       {error && <p className={styles.error}>{error}</p>}
 
-      <button type="submit" className={styles.submitBtn} disabled={loading}>
-        {loading ? (
-          <span className={styles.spinner}>⟳ Generating sheet…</span>
-        ) : (
-          '⚡ Generate Draft Sheet'
-        )}
-      </button>
+      <div className={styles.buttonRow}>
+        <button type="submit" className={styles.submitBtn} disabled={loading}>
+          {loading ? (
+            <span className={styles.spinner}>⟳ Generating sheet…</span>
+          ) : (
+            '⚡ Generate Draft Sheet'
+          )}
+        </button>
+        <button
+          type="button"
+          className={styles.clearBtn}
+          disabled={clearStatus === 'clearing'}
+          onClick={handleClearCache}
+        >
+          {clearStatus === 'clearing' ? 'Clearing…' :
+           clearStatus === 'cleared'  ? '✓ Cleared' :
+           clearStatus === 'error'    ? '✗ Failed'  :
+           'Clear Cache'}
+        </button>
+      </div>
     </form>
   )
 }

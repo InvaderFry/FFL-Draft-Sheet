@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -250,43 +251,7 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
             continue
         # Column layout differs slightly by position
         try:
-            if pos == "QB":
-                # Name, Team, Cmp, Att, Yds, TDs, Ints, Rush Att, Rush Yds, Rush TDs, FL, Pts
-                name_team = cells[0]
-                name, team = _split_fp_name_team(name_team)
-                stats = {
-                    "pass_yds": _f(cells[3]),
-                    "pass_td":  _f(cells[4]),
-                    "interception": _f(cells[5]),
-                    "rush_yds": _f(cells[7]),
-                    "rush_td":  _f(cells[8]),
-                    "fumble_lost": _f(cells[9]),
-                }
-            elif pos in ("RB",):
-                name_team = cells[0]
-                name, team = _split_fp_name_team(name_team)
-                stats = {
-                    "rush_yds": _f(cells[2]),
-                    "rush_td":  _f(cells[3]),
-                    "rec":      _f(cells[4]),
-                    "rec_yds":  _f(cells[5]),
-                    "rec_td":   _f(cells[6]),
-                    "fumble_lost": _f(cells[7]),
-                }
-            elif pos in ("WR", "TE"):
-                name_team = cells[0]
-                name, team = _split_fp_name_team(name_team)
-                stats = {
-                    "rec":      _f(cells[2]),
-                    "rec_yds":  _f(cells[3]),
-                    "rec_td":   _f(cells[4]),
-                    "rush_yds": _f(cells[5]) if len(cells) > 7 else 0,
-                    "rush_td":  _f(cells[6]) if len(cells) > 8 else 0,
-                    "fumble_lost": _f(cells[-2]),
-                }
-                if pos == "TE":
-                    stats["te_premium_eligible"] = True
-            elif pos == "DST":
+            if pos == "DST":
                 name = cells[0].split(" ")[0] + " D/ST"
                 team = cells[0].split(" ")[0]
                 stats = {
@@ -298,7 +263,53 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
                     "dst_pa":         _f(cells[6]),
                 }
             else:
-                continue
+                # Extract name from <a> element and team from the sibling text.
+                # selectolax.text() concatenates adjacent inline elements without
+                # spaces ("Josh AllenBUF"), so we target elements explicitly like
+                # the NumberFire adapter does instead of splitting concatenated text.
+                first_td = row.css("td")[0]
+                name_el = first_td.css_first("a")
+                if name_el:
+                    name = name_el.text(strip=True)
+                    full = first_td.text(strip=True)
+                    rest = full[len(name):].strip() if full.startswith(name) else ""
+                    team_word = rest.split()[0] if rest else ""
+                    team = team_word if (2 <= len(team_word) <= 3 and team_word.isupper()) else ""
+                else:
+                    name, team = _split_fp_name_team(cells[0])
+
+                if pos == "QB":
+                    # Name, Team, Cmp, Att, Yds, TDs, Ints, Rush Att, Rush Yds, Rush TDs, FL, Pts
+                    stats = {
+                        "pass_yds": _f(cells[3]),
+                        "pass_td":  _f(cells[4]),
+                        "interception": _f(cells[5]),
+                        "rush_yds": _f(cells[7]),
+                        "rush_td":  _f(cells[8]),
+                        "fumble_lost": _f(cells[9]),
+                    }
+                elif pos in ("RB",):
+                    stats = {
+                        "rush_yds": _f(cells[2]),
+                        "rush_td":  _f(cells[3]),
+                        "rec":      _f(cells[4]),
+                        "rec_yds":  _f(cells[5]),
+                        "rec_td":   _f(cells[6]),
+                        "fumble_lost": _f(cells[7]),
+                    }
+                elif pos in ("WR", "TE"):
+                    stats = {
+                        "rec":      _f(cells[2]),
+                        "rec_yds":  _f(cells[3]),
+                        "rec_td":   _f(cells[4]),
+                        "rush_yds": _f(cells[5]) if len(cells) > 7 else 0,
+                        "rush_td":  _f(cells[6]) if len(cells) > 8 else 0,
+                        "fumble_lost": _f(cells[-2]),
+                    }
+                    if pos == "TE":
+                        stats["te_premium_eligible"] = True
+                else:
+                    continue
 
             pts = score(stats, cfg)
             results.append({
@@ -315,11 +326,31 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
     return results
 
 
+_TEAM_RE = re.compile(r'([A-Z]{2,3})$')
+
+_NFL_TEAMS = frozenset({
+    "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE",
+    "DAL", "DEN", "DET", "GB",  "HOU", "IND", "JAC", "KC",
+    "LA",  "LAC", "LV",  "MIA", "MIN", "NE",  "NO",  "NYG",
+    "NYJ", "PHI", "PIT", "SEA", "SF",  "TB",  "TEN", "WAS",
+})
+
+
 def _split_fp_name_team(text: str) -> tuple[str, str]:
-    """'Patrick Mahomes KC' → ('Patrick Mahomes', 'KC')"""
+    """'Patrick Mahomes KC' or 'Patrick MahomesKC' → ('Patrick Mahomes', 'KC')"""
+    # Space-separated: "Patrick Mahomes KC"
     parts = text.rsplit(" ", 1)
     if len(parts) == 2 and len(parts[1]) <= 3 and parts[1].isupper():
         return parts[0], parts[1]
+    # Concatenated (selectolax omits spaces between inline elements): "Josh AllenBUF".
+    # Validate against known NFL team codes to avoid misidentifying name suffixes.
+    m = _TEAM_RE.search(text)
+    if m:
+        team = m.group(1)
+        if team in _NFL_TEAMS:
+            name = text[:-len(team)].rstrip()
+            if name:
+                return name, team
     return text, ""
 
 

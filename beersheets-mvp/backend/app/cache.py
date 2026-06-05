@@ -80,3 +80,16 @@ def clear() -> None:
     if CACHE_DIR.exists():
         for f in CACHE_DIR.glob("*.json"):
             f.unlink(missing_ok=True)
+
+
+def clear_projections() -> None:
+    """Delete only daily projection and sheet cache entries.
+
+    Leaves stable caches (player map, ADP, attrition curves) intact so the
+    next sheet generation only re-scrapes fresh projection data rather than
+    refetching every upstream dataset.
+    """
+    if CACHE_DIR.exists():
+        for pattern in ("proj_*.json", "sheet_*.json"):
+            for f in CACHE_DIR.glob(pattern):
+                f.unlink(missing_ok=True)
