@@ -21,7 +21,7 @@ const COLUMNS = [
 
 export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auctionMode, wrapStyle }) {
   const cols = auctionMode
-    ? [...COLUMNS, { key: 'auction_price', label: '$', align: 'right', width: '36px' }]
+    ? [...COLUMNS, { key: 'auction_price', label: '$', align: 'right', width: '42px' }]
     : COLUMNS
 
   return (
