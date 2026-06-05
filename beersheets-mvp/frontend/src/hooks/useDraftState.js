@@ -6,39 +6,26 @@
  * State persists for the lifetime of the session (React state; not localStorage).
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 
-/**
- * @returns {{
- *   drafted: Set<string>,
- *   toggle: (sleeperId: string) => void,
- *   isDrafted: (sleeperId: string) => boolean,
- *   clear: () => void,
- *   count: number,
- * }}
- */
 export function useDraftState() {
-  const [drafted, setDrafted] = useState(() => new Set())
+  // Ordered array of {id, name, pos}, newest first
+  const [draftedList, setDraftedList] = useState([])
 
-  const toggle = useCallback((sleeperId) => {
-    if (!sleeperId) return
-    setDrafted((prev) => {
-      const next = new Set(prev)
-      if (next.has(sleeperId)) {
-        next.delete(sleeperId)
-      } else {
-        next.add(sleeperId)
-      }
-      return next
-    })
+  const drafted = useMemo(() => new Set(draftedList.map(p => p.id)), [draftedList])
+
+  const toggle = useCallback((id, name, pos) => {
+    if (!id) return
+    setDraftedList(prev =>
+      prev.some(p => p.id === id)
+        ? prev.filter(p => p.id !== id)
+        : [{ id, name, pos }, ...prev]
+    )
   }, [])
 
-  const isDrafted = useCallback(
-    (sleeperId) => drafted.has(sleeperId),
-    [drafted],
-  )
+  const isDrafted = useCallback((id) => drafted.has(id), [drafted])
 
-  const clear = useCallback(() => setDrafted(new Set()), [])
+  const clear = useCallback(() => setDraftedList([]), [])
 
-  return { drafted, toggle, isDrafted, clear, count: drafted.size }
+  return { draftedList, toggle, isDrafted, clear, count: draftedList.length }
 }
