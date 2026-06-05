@@ -5,6 +5,26 @@
    ========================================================= */
 
 :root {
+  /* Fallback palette (dark) — applied when data-theme is not yet set or the FOUC script fails */
+  --c-bg:        #0d1117;
+  --c-surface:   #161b22;
+  --c-surface2:  #1c2230;
+  --c-border:    #30363d;
+  --c-border2:   #21262d;
+  --c-text:      #e6edf3;
+  --c-text-muted: #8b949e;
+  --c-text-dim:  #484f58;
+  --c-amber:     #d97706;
+  --c-amber-dim: #92400e;
+  --c-green:     #22c55e;
+  --c-red:       #ef4444;
+  --c-ecr-blue:   #60a5fa;
+  --c-ecr-orange: #fb923c;
+  --c-tier-odd:  #161b22;
+  --c-tier-even: #1c2230;
+  --c-drafted-bg:   #0d1117;
+  --c-drafted-text: #484f58;
+
   /* Typography */
   --font-display: 'Barlow Condensed', sans-serif;
   --font-body:    'Barlow', sans-serif;
