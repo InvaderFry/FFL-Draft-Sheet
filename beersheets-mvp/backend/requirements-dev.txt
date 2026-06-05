@@ -1,0 +1,6 @@
+# Extends the production requirements. Only direct test deps are pinned here;
+# transitive deps are resolved by pip at install time. If CI breaks on a day
+# with no intentional dep change, run `pip-compile` to generate a lock file.
+-r requirements.txt
+pytest==8.3.3
+pytest-asyncio==0.24.0
