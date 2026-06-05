@@ -15,9 +15,17 @@ import LeagueForm from './components/LeagueForm'
 import DraftBoard from './components/DraftBoard'
 import PrintView from './components/PrintView'
 import { useDraftState } from './hooks/useDraftState'
+import { useTheme } from './context/ThemeContext'
 import styles from './App.module.css'
 
+const THEMES = [
+  { id: 'dark',      label: 'Dark' },
+  { id: 'macchiato', label: 'Macchiato' },
+  { id: 'latte',     label: 'Latte' },
+]
+
 export default function App() {
+  const { theme, setTheme } = useTheme()
   const [phase, setPhase] = useState('idle')  // 'idle' | 'loading' | 'ready'
   const [sheetData, setSheetData] = useState(null)
   const [config, setConfig] = useState(null)
@@ -65,11 +73,24 @@ export default function App() {
             <span className={styles.logoText}>FFL Draft Sheet</span>
             <span className={styles.logoBadge}>Free VBD</span>
           </div>
-          {phase === 'ready' && (
-            <button className={styles.resetBtn} onClick={handleReset}>
-              ← New Sheet
-            </button>
-          )}
+          <div className={styles.headerRight}>
+            <div className={styles.themeToggle}>
+              {THEMES.map(t => (
+                <button
+                  key={t.id}
+                  className={`${styles.themeBtn} ${theme === t.id ? styles.themeBtnActive : ''}`}
+                  onClick={() => setTheme(t.id)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            {phase === 'ready' && (
+              <button className={styles.resetBtn} onClick={handleReset}>
+                ← New Sheet
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
