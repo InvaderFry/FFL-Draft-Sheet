@@ -277,10 +277,14 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
                     if 2 <= len(team_word) <= 3 and team_word.isupper():
                         team = team_word
                     else:
-                        # Anchor may only wrap a partial name; derive both name and
-                        # team from the full cell text using the validated-team-code
-                        # fallback so neither is left truncated.
-                        name, team = _split_fp_name_team(full)
+                        # Anchor may only wrap a partial name; try to extract a
+                        # validated team code from the full cell text. Only replace
+                        # `name` when the fallback actually found a team — if it
+                        # couldn't, keep the anchor-extracted fragment rather than
+                        # overwriting it with raw concatenated cell text.
+                        corrected_name, team = _split_fp_name_team(full)
+                        if corrected_name != full:
+                            name = corrected_name
                 else:
                     name, team = _split_fp_name_team(cells[0])
 

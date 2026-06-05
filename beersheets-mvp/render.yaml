@@ -9,6 +9,8 @@ services:
         value: /app/cache
       - key: PYTHONUNBUFFERED
         value: "1"
+      - key: ADMIN_SECRET
+        sync: false  # set this manually in the Render dashboard before using Clear Cache
     disk:
       name: cache
       mountPath: /app/cache
