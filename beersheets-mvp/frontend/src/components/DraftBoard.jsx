@@ -10,7 +10,7 @@ import { useState, useMemo } from 'react'
 import PlayerTable from './PlayerTable'
 import CombinedView from './CombinedView'
 import Legend from './Legend'
-import { POS_COLORS } from '../utils/posColors'
+import { useTheme } from '../context/ThemeContext'
 import styles from './DraftBoard.module.css'
 
 const TAB_ORDER = ['ALL', 'QB', 'RB', 'WR', 'TE', 'DST']
@@ -71,6 +71,7 @@ export default function DraftBoard({
   draftedCount: count = 0,
   onClearDrafted: clear,
 }) {
+  const { posColors } = useTheme()
   const [activePos, setActivePos] = useState('ALL')
   const [sourceDetailsOpen, setSourceDetailsOpen] = useState(false)
 
@@ -214,7 +215,7 @@ export default function DraftBoard({
               <button
                 key="ALL"
                 className={`${styles.tab} ${activePos === 'ALL' ? styles.tabActive : ''}`}
-                style={activePos === 'ALL' ? { borderBottomColor: POS_COLORS.ALL } : {}}
+                style={activePos === 'ALL' ? { borderBottomColor: posColors.ALL } : {}}
                 onClick={() => setActivePos('ALL')}
               >
                 <span className={styles.tabPos}>ALL</span>
@@ -227,7 +228,7 @@ export default function DraftBoard({
             <button
               key={pos}
               className={`${styles.tab} ${activePos === pos ? styles.tabActive : ''}`}
-              style={activePos === pos ? { borderBottomColor: POS_COLORS[pos] } : {}}
+              style={activePos === pos ? { borderBottomColor: posColors[pos] } : {}}
               onClick={() => setActivePos(pos)}
             >
               <span className={styles.tabPos}>{pos}</span>

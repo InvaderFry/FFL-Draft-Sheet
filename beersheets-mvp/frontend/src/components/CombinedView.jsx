@@ -1,5 +1,5 @@
 import PlayerTable from './PlayerTable'
-import { POS_COLORS } from '../utils/posColors'
+import { useTheme } from '../context/ThemeContext'
 import styles from './CombinedView.module.css'
 
 // Each entry is one grid column; 'split' columns stack their positions 50/50.
@@ -17,6 +17,7 @@ const tableStyle = {
 }
 
 export default function CombinedView({ positions, nTeams, isDrafted, onToggle, auctionMode }) {
+  const { posColors } = useTheme()
   return (
     <div className={styles.grid}>
       {COMBINED_COLUMNS.map(col => (
@@ -26,7 +27,7 @@ export default function CombinedView({ positions, nTeams, isDrafted, onToggle, a
         >
           {col.positions.map(pos => (
             <div key={pos} className={styles.section}>
-              <div className={styles.posHeader} style={{ color: POS_COLORS[pos] }}>{pos}</div>
+              <div className={styles.posHeader} style={{ color: posColors[pos] }}>{pos}</div>
               <PlayerTable
                 players={positions[pos] || []}
                 nTeams={nTeams}
