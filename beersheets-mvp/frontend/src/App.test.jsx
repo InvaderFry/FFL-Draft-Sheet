@@ -39,6 +39,41 @@ const SHEET = {
   },
 }
 
+const SOURCE_STATUS_SHEET = {
+  ...SHEET,
+  metadata: {
+    ...SHEET.metadata,
+    sources_used: ['FantasyPros', 'ESPN'],
+    sources_dropped: ['FFToday'],
+    source_statuses: [
+      {
+        source: 'FantasyPros',
+        status: 'used',
+        used: true,
+        positions: ['QB', 'RB'],
+        reason: null,
+        failures: [],
+      },
+      {
+        source: 'ESPN',
+        status: 'partial',
+        used: true,
+        positions: ['QB'],
+        reason: null,
+        failures: [{ position: 'TE', reason: 'timeout' }],
+      },
+      {
+        source: 'FFToday',
+        status: 'unavailable',
+        used: false,
+        positions: [],
+        reason: 'HTTP 403',
+        failures: [{ position: 'RB', reason: 'HTTP 403' }],
+      },
+    ],
+  },
+}
+
 beforeEach(() => {
   window.localStorage.clear()
 })
@@ -131,5 +166,83 @@ describe('App — error handling', () => {
     await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
 
     expect(await screen.findByText('baseline blew up')).toBeInTheDocument()
+  })
+})
+
+describe('App — source details', () => {
+  it('opens a source details panel with used and unavailable sources', async () => {
+    const user = userEvent.setup()
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => SOURCE_STATUS_SHEET })
+
+    const { container } = render(<App />)
+    await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
+
+    const board = container.querySelector('main')
+    const sourceButton = await within(board).findByRole('button', { name: /2 sources/i })
+    expect(sourceButton).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(sourceButton)
+
+    expect(sourceButton).toHaveAttribute('aria-expanded', 'true')
+    const panel = within(board).getByRole('region', { name: /source details/i })
+    expect(within(panel).getByText('FantasyPros')).toBeInTheDocument()
+    expect(within(panel).getByText('ESPN')).toBeInTheDocument()
+    expect(within(panel).getByText(/TE: timeout/)).toBeInTheDocument()
+    expect(within(panel).getByText('FFToday')).toBeInTheDocument()
+    expect(within(panel).getByText('HTTP 403')).toBeInTheDocument()
+  })
+
+  it('falls back to legacy source metadata', async () => {
+    const user = userEvent.setup()
+    const legacySheet = {
+      ...SHEET,
+      metadata: {
+        ...SHEET.metadata,
+        sources_used: ['FantasyPros'],
+        sources_dropped: ['NumberFire'],
+      },
+    }
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => legacySheet })
+
+    const { container } = render(<App />)
+    await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
+    const board = container.querySelector('main')
+
+    await user.click(await within(board).findByRole('button', { name: /1 source/i }))
+
+    const panel = within(board).getByRole('region', { name: /source details/i })
+    expect(within(panel).getByText('FantasyPros')).toBeInTheDocument()
+    expect(within(panel).getByText('NumberFire')).toBeInTheDocument()
+  })
+
+  it('shows zero available sources without implying a successful source count', async () => {
+    const user = userEvent.setup()
+    const emptySourceSheet = {
+      ...SHEET,
+      metadata: {
+        ...SHEET.metadata,
+        sources_used: [],
+        sources_dropped: ['FantasyPros'],
+        source_statuses: [{
+          source: 'FantasyPros',
+          status: 'unavailable',
+          used: false,
+          positions: [],
+          reason: '0 rows',
+          failures: [{ position: 'QB', reason: '0 rows' }],
+        }],
+      },
+    }
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => emptySourceSheet })
+
+    const { container } = render(<App />)
+    await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
+    const board = container.querySelector('main')
+
+    await user.click(await within(board).findByRole('button', { name: /0 sources/i }))
+
+    const panel = within(board).getByRole('region', { name: /source details/i })
+    expect(within(panel).getByText('No sources contributed rows.')).toBeInTheDocument()
+    expect(within(panel).getByText('0 rows')).toBeInTheDocument()
   })
 })

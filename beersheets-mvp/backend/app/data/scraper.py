@@ -13,7 +13,7 @@ Each adapter:
   - Is async (httpx.AsyncClient)
   - Returns List[dict] with keys: source, player_name, pos, team, sleeper_id, **stats
   - Sleeps 2s between page fetches (rate-limit courtesy)
-  - On any error: logs warning, returns []  (caller tolerates missing sources)
+  - On any error: raises exception (caught by scrape_position, which records a SourceOutcome)
 
 The scraper reads/writes a per-source × per-position × per-date file cache so
 live sites are only hit once per TTL window.
@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -36,6 +37,34 @@ from app.engine.scoring import score
 logger = logging.getLogger(__name__)
 
 _SLEEP = 2.0  # seconds between page fetches per site
+
+
+@dataclass(frozen=True)
+class SourceOutcome:
+    source: str
+    position: str
+    rows: int
+    reason: str | None = None
+
+
+class ScrapeRows(list):
+    """List of projection rows with per-source outcomes attached."""
+
+    def __init__(self, rows: list[dict] | None = None, outcomes: list[SourceOutcome] | None = None):
+        super().__init__(rows or [])
+        self.outcomes = outcomes or []
+
+
+class ScrapeResult(dict):
+    """Position-keyed projection rows with all per-position source outcomes."""
+
+    def __init__(
+        self,
+        rows_by_position: dict[str, list[dict]] | None = None,
+        outcomes: list[SourceOutcome] | None = None,
+    ):
+        super().__init__(rows_by_position or {})
+        self.outcomes = outcomes or []
 
 
 # --------------------------------------------------------------------------- #
@@ -67,6 +96,16 @@ def _attach_sleeper_id(rows: list[dict]) -> list[dict]:
     return rows
 
 
+def _sanitize_failure_reason(exc: Exception) -> str:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"HTTP {exc.response.status_code}"
+    if isinstance(exc, (httpx.TimeoutException, TimeoutError)):
+        return "timeout"
+    if isinstance(exc, httpx.RequestError):
+        return "fetch error"
+    return "parse error"
+
+
 # --------------------------------------------------------------------------- #
 # ESPN adapter
 # --------------------------------------------------------------------------- #
@@ -85,19 +124,20 @@ async def _fetch_espn(client: httpx.AsyncClient, pos: str, cfg: LeagueConfig) ->
     )
     results = []
     limit, offset = 40, 0
-    try:
-        while True:
-            params = {
-                "view": "kona_player_info",
-                "scoringPeriodId": 0,
-                "slotCategoryId": slot,
-                "limit": limit,
-                "offset": offset,
-            }
-            headers = {"x-fantasy-filter": f'{{"players":{{"filterSlotIds":{{"value":[{slot}]}},"limit":{limit},"offset":{offset},"filterStatsForTopScorersScoringPeriodId":{{"value":0}},"sortPercOwned":{{"sortAsc":false,"sortPriority":1}}}}}}'}
-            resp = await client.get(base_url, params=params, headers=headers, timeout=15)
-            if resp.status_code != 200:
-                break
+    while True:
+        params = {
+            "view": "kona_player_info",
+            "scoringPeriodId": 0,
+            "slotCategoryId": slot,
+            "limit": limit,
+            "offset": offset,
+        }
+        headers = {"x-fantasy-filter": f'{{"players":{{"filterSlotIds":{{"value":[{slot}]}},"limit":{limit},"offset":{offset},"filterStatsForTopScorersScoringPeriodId":{{"value":0}},"sortPercOwned":{{"sortAsc":false,"sortPriority":1}}}}}}'}
+        resp = await client.get(base_url, params=params, headers=headers, timeout=15)
+        if resp.status_code != 200:
+            logger.warning("ESPN returned %s for %s offset %s; stopping pagination", resp.status_code, pos, offset)
+            break
+        try:
             data = resp.json()
             players_data = data.get("players", [])
             if not players_data:
@@ -129,9 +169,10 @@ async def _fetch_espn(client: httpx.AsyncClient, pos: str, cfg: LeagueConfig) ->
             offset += limit
             if len(players_data) < limit:
                 break
-            await asyncio.sleep(_SLEEP)
-    except Exception as exc:
-        logger.warning("ESPN scrape failed for %s: %s", pos, exc)
+        except Exception as exc:
+            logger.warning("ESPN parse error for %s at offset %s: %s", pos, offset, exc)
+            break
+        await asyncio.sleep(_SLEEP)
     return results
 
 
@@ -182,13 +223,9 @@ async def _fetch_fantasypros(client: httpx.AsyncClient, pos: str, cfg: LeagueCon
     url = FP_POS_URLS.get(pos)
     if not url:
         return []
-    try:
-        resp = await client.get(url, timeout=20)
-        resp.raise_for_status()
-        return _parse_fantasypros_html(resp.text, pos, cfg.scoring)
-    except Exception as exc:
-        logger.warning("FantasyPros scrape failed for %s: %s", pos, exc)
-        return []
+    resp = await client.get(url, timeout=20)
+    resp.raise_for_status()
+    return _parse_fantasypros_html(resp.text, pos, cfg.scoring)
 
 
 def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dict]:
@@ -307,13 +344,9 @@ async def _fetch_fftoday(client: httpx.AsyncClient, pos: str, cfg: LeagueConfig)
     if pos_id is None:
         return []
     url = f"https://www.fftoday.com/rankings/playerproj.php?Season={cfg.season}&PosID={pos_id}&LeagueID=1"
-    try:
-        resp = await client.get(url, headers=FFTODAY_HEADERS, timeout=20)
-        resp.raise_for_status()
-        return _parse_fftoday_html(resp.text, pos, cfg.scoring)
-    except Exception as exc:
-        logger.warning("FFToday scrape failed for %s: %s", pos, exc)
-        return []
+    resp = await client.get(url, headers=FFTODAY_HEADERS, timeout=20)
+    resp.raise_for_status()
+    return _parse_fftoday_html(resp.text, pos, cfg.scoring)
 
 
 def _parse_fftoday_html(html: str, pos: str, cfg: ScoringConfig) -> list[dict]:
@@ -363,13 +396,9 @@ async def _fetch_numberfire(client: httpx.AsyncClient, pos: str, cfg: LeagueConf
     if not nf_pos:
         return []
     url = f"https://www.numberfire.com/nfl/fantasy/fantasy-football-projections/{nf_pos}"
-    try:
-        resp = await client.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-        resp.raise_for_status()
-        return _parse_numberfire_html(resp.text, pos, cfg.scoring)
-    except Exception as exc:
-        logger.warning("NumberFire scrape failed for %s: %s", pos, exc)
-        return []
+    resp = await client.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+    resp.raise_for_status()
+    return _parse_numberfire_html(resp.text, pos, cfg.scoring)
 
 
 def _parse_numberfire_html(html: str, pos: str, cfg: ScoringConfig) -> list[dict]:
@@ -422,20 +451,33 @@ ADAPTERS = {
 
 POSITIONS = ["QB", "RB", "WR", "TE", "DST"]
 
+SOURCE_POSITION_SUPPORT = {
+    "FantasyPros": set(FP_POS_URLS),
+    "FFToday": set(FFTODAY_POS_MAP),
+    "NumberFire": set(NF_POS_MAP),
+    "ESPN": set(ESPN_SLOT_MAP),
+}
 
-async def scrape_position(pos: str, cfg: LeagueConfig, sources: list[str] | None = None) -> list[dict]:
+
+async def scrape_position(pos: str, cfg: LeagueConfig, sources: list[str] | None = None) -> ScrapeRows:
     """
     Scrape all sources for a given position.  Returns a list of:
         {"source", "player_name", "pos", "team", "sleeper_id", "points", **raw_stats}
-    Missing sources are silently dropped.
+    Missing sources are dropped from rows and recorded in `rows.outcomes`.
     """
     sources = sources or list(ADAPTERS.keys())
     all_rows: list[dict] = []
+    outcomes: list[SourceOutcome] = []
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
         for src_name in sources:
             fn = ADAPTERS.get(src_name)
             if fn is None:
+                outcomes.append(SourceOutcome(src_name, pos, 0, "unsupported"))
+                continue
+
+            if pos not in SOURCE_POSITION_SUPPORT.get(src_name, set(POSITIONS)):
+                outcomes.append(SourceOutcome(src_name, pos, 0, "unsupported"))
                 continue
 
             ck = _cache_key(src_name, pos)
@@ -443,30 +485,46 @@ async def scrape_position(pos: str, cfg: LeagueConfig, sources: list[str] | None
             if cached is not None:
                 logger.info("Projection cache hit: %s %s (%d rows)", src_name, pos, len(cached))
                 all_rows.extend(cached)
+                outcomes.append(SourceOutcome(src_name, pos, len(cached), None if cached else "0 rows"))
                 continue
 
             logger.info("Scraping %s %s…", src_name, pos)
-            rows = await fn(client, pos, cfg)
-            rows = _attach_sleeper_id(rows)
+            try:
+                rows = await fn(client, pos, cfg)
+                rows = _attach_sleeper_id(rows)
+            except Exception as exc:
+                reason = _sanitize_failure_reason(exc)
+                logger.warning("%s scrape failed for %s: %s", src_name, pos, reason)
+                outcomes.append(SourceOutcome(src_name, pos, 0, reason))
+                await asyncio.sleep(_SLEEP)
+                continue
+
             if rows:
                 cache.set(ck, rows)
                 logger.info("  → %d rows", len(rows))
+                outcomes.append(SourceOutcome(src_name, pos, len(rows), None))
             else:
                 logger.warning("  → 0 rows (source may be down)")
+                outcomes.append(SourceOutcome(src_name, pos, 0, "0 rows"))
             all_rows.extend(rows)
             await asyncio.sleep(_SLEEP)
 
-    return all_rows
+    return ScrapeRows(all_rows, outcomes=outcomes)
 
 
-async def scrape_all(cfg: LeagueConfig, sources: list[str] | None = None) -> dict[str, list[dict]]:
+async def scrape_all(cfg: LeagueConfig, sources: list[str] | None = None) -> ScrapeResult:
     """Scrape all positions concurrently (one position per task)."""
     tasks = {pos: asyncio.create_task(scrape_position(pos, cfg, sources)) for pos in POSITIONS}
     results: dict[str, list[dict]] = {}
+    outcomes: list[SourceOutcome] = []
     for pos, task in tasks.items():
         try:
-            results[pos] = await task
+            rows = await task
+            results[pos] = list(rows)
+            outcomes.extend(rows.outcomes)
         except Exception as exc:
             logger.error("Scrape task failed for %s: %s", pos, exc)
             results[pos] = []
-    return results
+            for src in (sources or list(ADAPTERS)):
+                outcomes.append(SourceOutcome(src, pos, 0, "task error"))
+    return ScrapeResult(results, outcomes=outcomes)

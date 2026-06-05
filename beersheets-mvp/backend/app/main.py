@@ -14,12 +14,12 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.config import LeagueConfig, POSITIONS
 from app import cache
 from app.data.players import load_player_map
-from app.data.scraper import scrape_all
+from app.data.scraper import ADAPTERS, scrape_all
 from app.data.historical import load_attrition_curves
 from app.data.adp import enrich_with_adp
 from app.engine.baseline import compute_baselines
@@ -74,12 +74,27 @@ class PlayerRow(BaseModel):
     auction_price: float | None
 
 
+class SourceFailure(BaseModel):
+    position: str
+    reason: str
+
+
+class SourceStatus(BaseModel):
+    source: str
+    status: str
+    used: bool
+    positions: list[str]
+    reason: str | None = None
+    failures: list[SourceFailure] = Field(default_factory=list)
+
+
 class SheetMetadata(BaseModel):
     season: int
     n_teams: int
     ppr: float
     sources_used: list[str]
     sources_dropped: list[str]
+    source_statuses: list[SourceStatus] = Field(default_factory=list)
     baselines: dict[str, float]
     adp_available: bool
     cache_hit: bool
@@ -106,28 +121,108 @@ def _sheet_cache_key(cfg: LeagueConfig) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Source status aggregation
+# --------------------------------------------------------------------------- #
+
+def _outcome_value(outcome: Any, key: str, default: Any = None) -> Any:
+    return getattr(outcome, key, default)
+
+
+def _aggregate_source_metadata(raw_by_pos: dict[str, list[dict]]) -> tuple[list[str], list[str], list[dict]]:
+    all_sources: set[str] = set()
+    positions_by_source: dict[str, set[str]] = {}
+    failures_by_source: dict[str, list[dict]] = {}
+
+    if not hasattr(raw_by_pos, "outcomes"):
+        for pos, rows in raw_by_pos.items():
+            for row in rows:
+                source = row.get("source", "unknown")
+                all_sources.add(source)
+                positions_by_source.setdefault(source, set()).add(pos)
+
+    for outcome in getattr(raw_by_pos, "outcomes", []):
+        source = _outcome_value(outcome, "source")
+        position = _outcome_value(outcome, "position")
+        rows = int(_outcome_value(outcome, "rows", 0) or 0)
+        reason = _outcome_value(outcome, "reason")
+        if not source:
+            continue
+        all_sources.add(source)
+        if rows > 0 and position:
+            positions_by_source.setdefault(source, set()).add(position)
+        elif reason and position:
+            failures_by_source.setdefault(source, []).append({
+                "position": position,
+                "reason": reason,
+            })
+
+    source_statuses: list[dict] = []
+    for source in sorted(all_sources):
+        positions = sorted(positions_by_source.get(source, set()))
+        failures = failures_by_source.get(source, [])
+        used = bool(positions)
+        if used and failures:
+            status = "partial"
+        elif used:
+            status = "used"
+        else:
+            status = "unavailable"
+
+        reason = None
+        if status == "unavailable":
+            reason = failures[0]["reason"] if failures else "0 rows"
+
+        source_statuses.append({
+            "source": source,
+            "status": status,
+            "used": used,
+            "positions": positions,
+            "reason": reason,
+            "failures": failures,
+        })
+
+    sources_used = [entry["source"] for entry in source_statuses if entry["used"]]
+    sources_dropped = [entry["source"] for entry in source_statuses if not entry["used"]]
+    return sources_used, sources_dropped, source_statuses
+
+
+def _legacy_source_statuses(sources_used: list[str], sources_dropped: list[str]) -> list[dict]:
+    return [
+        {
+            "source": source,
+            "status": "used",
+            "used": True,
+            "positions": [],
+            "reason": None,
+            "failures": [],
+        }
+        for source in sources_used
+    ] + [
+        {
+            "source": source,
+            "status": "unavailable",
+            "used": False,
+            "positions": [],
+            "reason": "0 rows",
+            "failures": [],
+        }
+        for source in sources_dropped
+    ]
+
+
+# --------------------------------------------------------------------------- #
 # Core pipeline
 # --------------------------------------------------------------------------- #
 
 async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
     t0 = time.perf_counter()
-    sources_used: list[str] = []
-    sources_dropped: list[str] = []
 
     # 1. Load player map (for bye weeks + ID bridging)
     player_map = load_player_map()
 
     # 2. Scrape projections for all positions
     raw_by_pos = await scrape_all(cfg)
-
-    # Determine which sources delivered data
-    seen_sources: set[str] = set()
-    for rows in raw_by_pos.values():
-        for row in rows:
-            seen_sources.add(row.get("source", "unknown"))
-    from app.data.scraper import ADAPTERS
-    sources_used = sorted(seen_sources)
-    sources_dropped = [s for s in ADAPTERS if s not in seen_sources]
+    sources_used, sources_dropped, source_statuses = _aggregate_source_metadata(raw_by_pos)
 
     # 3. Load attrition curves
     curves = load_attrition_curves(cfg.season)
@@ -189,6 +284,7 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
             "ppr": ppr,
             "sources_used": sources_used,
             "sources_dropped": sources_dropped,
+            "source_statuses": source_statuses,
             "baselines": {k: round(v, 1) for k, v in baselines.items()},
             "adp_available": adp_available,
             "cache_hit": False,
@@ -211,7 +307,13 @@ async def generate_sheet(cfg: LeagueConfig) -> SheetResponse:
     ck = _sheet_cache_key(cfg)
     cached = cache.get(ck)
     if cached is not None:
-        cached["metadata"]["cache_hit"] = True
+        metadata = cached["metadata"]
+        metadata["cache_hit"] = True
+        if "source_statuses" not in metadata:
+            metadata["source_statuses"] = _legacy_source_statuses(
+                metadata.get("sources_used", []),
+                metadata.get("sources_dropped", []),
+            )
         return SheetResponse(**cached)
 
     try:
