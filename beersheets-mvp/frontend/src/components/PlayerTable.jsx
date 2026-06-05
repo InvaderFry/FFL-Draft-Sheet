@@ -10,13 +10,13 @@ import { ecrColor, ecrColorStyle } from '../utils/ecrColor'
 import styles from './PlayerTable.module.css'
 
 const COLUMNS = [
-  { key: 'player_name', label: 'NAME',   align: 'left'                   },
-  { key: 'tm_bw',       label: 'TM/BW',  align: 'left',  width: '52px'  },
-  { key: 'ecr_fmt',     label: 'ECR',    align: 'center', width: '46px' },
-  { key: 'floor',       label: 'F',      align: 'right',  width: '38px' },
-  { key: 'val',         label: 'VAL',    align: 'right',  width: '38px' },
-  { key: 'ceil',        label: 'C',      align: 'right',  width: '38px' },
-  { key: 'ps_pct',      label: 'PS%',    align: 'right',  width: '38px' },
+  { key: 'player_name', label: 'NAME',   align: 'left',   width: '130px' },
+  { key: 'tm_bw',       label: 'TM/BW',  align: 'left',   width: '64px'  },
+  { key: 'ecr_fmt',     label: 'ECR',    align: 'center', width: '52px'  },
+  { key: 'floor',       label: 'F',      align: 'right',  width: '44px'  },
+  { key: 'val',         label: 'VAL',    align: 'right',  width: '44px'  },
+  { key: 'ceil',        label: 'C',      align: 'right',  width: '44px'  },
+  { key: 'ps_pct',      label: 'PS%',    align: 'right',  width: '44px'  },
 ]
 
 export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auctionMode, wrapStyle }) {
