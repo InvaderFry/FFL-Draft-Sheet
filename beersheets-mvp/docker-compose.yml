@@ -13,7 +13,6 @@ services:
     environment:
       - CACHE_DIR=/app/cache
       - PYTHONUNBUFFERED=1
-      - ADMIN_SECRET=${ADMIN_SECRET:-dev-admin}  # set ADMIN_SECRET in shell or .env to override
     # Dev override: --reload (single-worker) intentionally replaces the
     # production CMD's --workers 2. Do not add --workers here; it is
     # incompatible with --reload and masks multi-worker bugs locally.
