@@ -210,7 +210,9 @@ export default function DraftBoard({
       <div className={styles.tabs}>
         {TAB_ORDER.map(pos => {
           if (pos === 'ALL') {
-            const hasSkillPositions = ['QB', 'RB', 'WR', 'TE'].some(p => (positions[p]?.length || 0) > 0)
+            const hasSkillPositions = ['QB', 'RB', 'WR', 'TE'].some(p =>
+              (positions[p] || []).some(player => !isDrafted(player.sleeper_id || player.player_name))
+            )
             if (!hasSkillPositions) return null
             return (
               <button
@@ -224,7 +226,7 @@ export default function DraftBoard({
             )
           }
           const tabCount = (positions[pos] || []).filter(p => !isDrafted(p.sleeper_id || p.player_name)).length
-          if ((positions[pos]?.length || 0) === 0) return null
+          if (tabCount === 0) return null
           return (
             <button
               key={pos}

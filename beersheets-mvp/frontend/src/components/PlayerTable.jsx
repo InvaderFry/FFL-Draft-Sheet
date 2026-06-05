@@ -31,7 +31,6 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
       <table className={styles.table}>
         <thead>
           <tr>
-            <th className={styles.selCol}></th>
             {cols.map(col => (
               <th key={col.key} style={{ textAlign: col.align, width: col.width }}>
                 {col.label}
@@ -40,19 +39,18 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
           </tr>
         </thead>
         <tbody>
-          {visible.map((player) => {
+          {visible.map((player, idx) => {
             const tierClass = player.tier_is_even ? styles.tierEven : styles.tierOdd
             const ecr = ecrColor(player.adp_rank, player.ecr_rank, nTeams)
             const ecrStyle = { color: ecrColorStyle(ecr) }
 
             return (
               <tr
-                key={player.sleeper_id || player.player_name}
+                key={player.sleeper_id || `${player.player_name}-${idx}`}
                 className={tierClass}
                 onClick={() => onToggle(player.sleeper_id || player.player_name, player.player_name, player.pos)}
                 title="Click to mark as drafted"
               >
-                <td className={styles.selCol}></td>
                 <td className={styles.nameCell}>
                   {player.player_name}
                 </td>

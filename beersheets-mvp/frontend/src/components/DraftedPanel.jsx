@@ -1,8 +1,6 @@
 import styles from './DraftedPanel.module.css'
 
 export default function DraftedPanel({ draftedList, onToggle }) {
-  if (draftedList.length === 0) return null
-
   return (
     <div className={styles.panel}>
       <div className={styles.header}>DRAFTED</div>
