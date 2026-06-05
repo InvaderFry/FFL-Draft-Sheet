@@ -1,6 +1,7 @@
 /* App shell */
 .app {
   height: 100vh;
+  height: 100dvh; /* dynamic viewport height — avoids iOS Safari address-bar clipping */
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -79,6 +80,7 @@
 .main {
   flex: 1;
   min-height: 0;
+  overflow-y: auto; /* allows form/loading views to scroll on short screens */
   display: flex;
   flex-direction: column;
 }
