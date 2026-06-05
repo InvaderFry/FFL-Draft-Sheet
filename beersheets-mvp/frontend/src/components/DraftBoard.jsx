@@ -241,24 +241,27 @@ export default function DraftBoard({
       <Legend auctionMode={auctionMode} />
 
       {/* Player table */}
-      {activePos === 'ALL' ? (
-        <CombinedView
-          positions={positions}
-          nTeams={nTeams}
-          isDrafted={isDrafted}
-          onToggle={toggle}
-          auctionMode={auctionMode}
-        />
-      ) : (
-        <PlayerTable
-          key={activePos}
-          players={players}
-          nTeams={nTeams}
-          isDrafted={isDrafted}
-          onToggle={toggle}
-          auctionMode={auctionMode}
-        />
-      )}
+      <div className={styles.tableArea}>
+        {activePos === 'ALL' ? (
+          <CombinedView
+            positions={positions}
+            nTeams={nTeams}
+            isDrafted={isDrafted}
+            onToggle={toggle}
+            auctionMode={auctionMode}
+          />
+        ) : (
+          <PlayerTable
+            key={activePos}
+            players={players}
+            nTeams={nTeams}
+            isDrafted={isDrafted}
+            onToggle={toggle}
+            auctionMode={auctionMode}
+            wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
+          />
+        )}
+      </div>
     </div>
   )
 }
