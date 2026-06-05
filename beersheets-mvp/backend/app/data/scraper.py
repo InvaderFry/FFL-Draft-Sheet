@@ -277,9 +277,10 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
                     if 2 <= len(team_word) <= 3 and team_word.isupper():
                         team = team_word
                     else:
-                        # Anchor may only wrap a partial name; derive team from the
-                        # full cell text using the validated-team-code fallback.
-                        _, team = _split_fp_name_team(full)
+                        # Anchor may only wrap a partial name; derive both name and
+                        # team from the full cell text using the validated-team-code
+                        # fallback so neither is left truncated.
+                        name, team = _split_fp_name_team(full)
                 else:
                     name, team = _split_fp_name_team(cells[0])
 
@@ -309,6 +310,8 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
                         "rec_td":   _f(cells[4]),
                         "rush_yds": _f(cells[5]) if len(cells) > 7 else 0,
                         "rush_td":  _f(cells[6]) if len(cells) > 8 else 0,
+                        # cells[-2] is fumble_lost when len>=9: FP puts [rush_td, fumble, pts]
+                        # at the tail; guard matches rush_td so both columns arrive together.
                         "fumble_lost": _f(cells[-2]) if len(cells) > 8 else 0,
                     }
                     if pos == "TE":
