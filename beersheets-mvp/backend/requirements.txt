@@ -6,10 +6,8 @@ pandas==2.2.3
 # nfl-data-py 0.3.x is not compatible with numpy 2.x (it relies on APIs removed
 # in numpy 2.0), so pin to the latest 1.26 release, which pandas 2.2 supports.
 numpy==1.26.4
-jenkspy==0.3.3
+jenkspy==0.4.1
 nfl-data-py==0.3.1
 selectolax==0.3.21
 rapidfuzz==3.9.7
 python-dotenv==1.0.1
-pytest==8.3.3
-pytest-asyncio==0.24.0

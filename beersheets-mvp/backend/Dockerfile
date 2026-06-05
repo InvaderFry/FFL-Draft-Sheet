@@ -3,14 +3,13 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (curl is used by the HEALTHCHECK)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libc6-dev \
     curl \
  && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies first (better caching)
+# For local dev / CI, install requirements-dev.txt instead.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
