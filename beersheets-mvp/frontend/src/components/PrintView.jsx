@@ -44,12 +44,16 @@ export default function PrintView({ sheetData, config, isDrafted }) {
         <span className="print-date">{new Date().toLocaleDateString()}</span>
       </div>
 
-      {/* ECR legend */}
+      {/* Column legend */}
       <div className="print-legend">
-        ECR: round|pick &nbsp;·&nbsp;
-        <span style={{ color: 'blue' }}>Blue</span> = ADP &gt;1 round earlier &nbsp;·&nbsp;
-        <span style={{ color: 'darkorange' }}>Orange</span> = ADP &gt;1 round later &nbsp;·&nbsp;
-        Shading = tiers (alternating)
+        <strong>F</strong> = Floor (mean−σ−baseline) &nbsp;·&nbsp;
+        <strong>VAL</strong> = Value above baseline &nbsp;·&nbsp;
+        <strong>C</strong> = Ceiling (mean+σ−baseline) &nbsp;·&nbsp;
+        <strong>PS%</strong> = positional value remaining after pick &nbsp;·&nbsp;
+        <strong>ECR</strong>: Rnd|Pick &nbsp;·&nbsp;
+        <span style={{ color: 'blue' }}>Blue</span> = experts rank &gt;1 round earlier than ADP &nbsp;·&nbsp;
+        <span style={{ color: 'darkorange' }}>Orange</span> = &gt;1 round later &nbsp;·&nbsp;
+        Shading = value tiers
       </div>
 
       {/* Position blocks */}

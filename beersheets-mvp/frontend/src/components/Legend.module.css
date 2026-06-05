@@ -1,0 +1,62 @@
+.legend {
+  padding: 0 12px 6px;
+}
+
+.toggle {
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #888;
+  cursor: pointer;
+  padding: 4px 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.toggle:hover {
+  color: #555;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 24px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: #f8f9fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.entry {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.abbrev {
+  font-family: 'DM Mono', 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: #1a1a1a;
+  min-width: 40px;
+  flex-shrink: 0;
+}
+
+.text {
+  color: #444;
+}
+
+.full {
+  font-weight: 600;
+  color: #222;
+}

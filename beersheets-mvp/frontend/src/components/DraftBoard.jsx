@@ -8,6 +8,7 @@
 
 import { useState, useMemo } from 'react'
 import PlayerTable from './PlayerTable'
+import Legend from './Legend'
 import styles from './DraftBoard.module.css'
 
 const TAB_ORDER = ['QB', 'RB', 'WR', 'TE', 'DST']
@@ -227,6 +228,9 @@ export default function DraftBoard({
           )
         })}
       </div>
+
+      {/* Column legend */}
+      <Legend auctionMode={auctionMode} />
 
       {/* Player table */}
       <PlayerTable
