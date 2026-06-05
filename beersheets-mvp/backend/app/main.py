@@ -13,7 +13,7 @@ import os
 import time
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -298,19 +298,16 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
 # Endpoints
 # --------------------------------------------------------------------------- #
 
-def _admin_auth(x_admin_token: str | None = Header(None)) -> None:
-    secret = os.getenv("ADMIN_SECRET")
-    if not secret or x_admin_token != secret:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "version": "0.1.0"}
 
 
+# No auth required — this cache holds only public, regeneratable data
+# (scraped projections, ADP, and draft sheets). A secret the owner
+# never has is more harmful than an open endpoint.
 @app.post("/api/cache/clear")
-async def clear_cache(_: None = Depends(_admin_auth)) -> dict:
+async def clear_cache() -> dict:
     cache.clear_projections()
     return {"status": "cleared"}
 

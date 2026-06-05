@@ -77,15 +77,10 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
   }
 
   async function handleClearCache() {
-    const token = window.prompt('Enter admin token to clear cache:')
-    if (token === null || !token.trim()) return  // cancelled or empty
     if (clearTimerRef.current) clearTimeout(clearTimerRef.current)
     setClearStatus('clearing')
     try {
-      const res = await fetch(`${API_URL}/api/cache/clear`, {
-        method: 'POST',
-        headers: { 'X-Admin-Token': token },
-      })
+      const res = await fetch(`${API_URL}/api/cache/clear`, { method: 'POST' })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       setClearStatus('cleared')
     } catch (_) {
