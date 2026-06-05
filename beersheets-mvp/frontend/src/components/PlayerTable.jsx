@@ -19,13 +19,13 @@ const COLUMNS = [
   { key: 'ps_pct',      label: 'PS%',    align: 'right',  width: '44px' },
 ]
 
-export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auctionMode }) {
+export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auctionMode, wrapStyle }) {
   const cols = auctionMode
     ? [...COLUMNS, { key: 'auction_price', label: '$', align: 'right', width: '40px' }]
     : COLUMNS
 
   return (
-    <div className={styles.tableWrap}>
+    <div className={styles.tableWrap} style={wrapStyle}>
       <table className={styles.table}>
         <thead>
           <tr>
