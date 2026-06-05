@@ -60,9 +60,9 @@
 
 /* Columns */
 .selCol {
-  width: 20px;
+  width: 16px;
   text-align: center;
-  padding: 0 4px;
+  padding: 0 2px;
 }
 .draftedDot {
   color: var(--c-red);
@@ -75,14 +75,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 160px;
   font-family: var(--font-body);
   font-size: 12.5px;
   font-weight: 500;
 }
 
 .teamCell {
-  padding: 5px 4px;
+  padding: 4px 3px;
   white-space: nowrap;
   color: var(--c-text-muted);
   font-size: 11px;
@@ -96,14 +95,14 @@
 }
 
 .ecrCell {
-  padding: 5px 6px;
+  padding: 5px 4px;
   text-align: center;
   font-weight: 500;
   font-size: 11px;
 }
 
 .numCell {
-  padding: 5px 8px;
+  padding: 5px 4px;
   text-align: right;
   color: var(--c-text-muted);
   font-variant-numeric: tabular-nums;
