@@ -83,13 +83,13 @@ def clear() -> None:
 
 
 def clear_projections() -> None:
-    """Delete only daily projection and sheet cache entries.
+    """Delete daily cache entries: projections, ADP, and sheets.
 
-    Leaves stable caches (player map, ADP, attrition curves) intact so the
-    next sheet generation only re-scrapes fresh projection data rather than
+    Leaves stable caches (player map, attrition curves) intact so the
+    next sheet generation only re-scrapes fresh daily data rather than
     refetching every upstream dataset.
     """
     if CACHE_DIR.exists():
-        for pattern in ("proj_*.json", "sheet_*.json"):
+        for pattern in ("proj_*.json", "sheet_*.json", "ffc_adp_*.json"):
             for f in CACHE_DIR.glob(pattern):
                 f.unlink(missing_ok=True)

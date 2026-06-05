@@ -300,7 +300,7 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
 
 def _admin_auth(x_admin_token: str | None = Header(None)) -> None:
     secret = os.getenv("ADMIN_SECRET")
-    if secret and x_admin_token != secret:
+    if not secret or x_admin_token != secret:
         raise HTTPException(status_code=403, detail="Forbidden")
 
 

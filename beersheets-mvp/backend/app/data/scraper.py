@@ -246,7 +246,8 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
 
     rows = table.css("tbody tr")
     for row in rows:
-        cells = [td.text(strip=True) for td in row.css("td")]
+        td_nodes = row.css("td")
+        cells = [td.text(strip=True) for td in td_nodes]
         if len(cells) < 6:
             continue
         # Column layout differs slightly by position
@@ -267,14 +268,24 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
                 # selectolax.text() concatenates adjacent inline elements without
                 # spaces ("Josh AllenBUF"), so we target elements explicitly like
                 # the NumberFire adapter does instead of splitting concatenated text.
-                first_td = row.css("td")[0]
+                first_td = td_nodes[0]
                 name_el = first_td.css_first("a")
                 if name_el:
                     name = name_el.text(strip=True)
-                    full = first_td.text(strip=True)
+                    full = cells[0]
                     rest = full[len(name):].strip() if full.startswith(name) else ""
                     team_word = rest.split()[0] if rest else ""
-                    team = team_word if (2 <= len(team_word) <= 3 and team_word.isupper()) else ""
+                    if 2 <= len(team_word) <= 3 and team_word.isupper():
+                        team = team_word
+                    else:
+                        # Anchor may only wrap a partial name; try to extract a
+                        # validated team code from the full cell text. Only replace
+                        # `name` when the fallback actually found a team — if it
+                        # couldn't, keep the anchor-extracted fragment rather than
+                        # overwriting it with raw concatenated cell text.
+                        corrected_name, team = _split_fp_name_team(full)
+                        if team:
+                            name = corrected_name
                 else:
                     name, team = _split_fp_name_team(cells[0])
 
@@ -304,7 +315,9 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
                         "rec_td":   _f(cells[4]),
                         "rush_yds": _f(cells[5]) if len(cells) > 7 else 0,
                         "rush_td":  _f(cells[6]) if len(cells) > 8 else 0,
-                        "fumble_lost": _f(cells[-2]),
+                        # cells[-2] is fumble_lost when len>=9: FP puts [rush_td, fumble, pts]
+                        # at the tail; guard matches rush_td so both columns arrive together.
+                        "fumble_lost": _f(cells[-2]) if len(cells) > 8 else 0,
                     }
                     if pos == "TE":
                         stats["te_premium_eligible"] = True
@@ -340,7 +353,7 @@ def _split_fp_name_team(text: str) -> tuple[str, str]:
     """'Patrick Mahomes KC' or 'Patrick MahomesKC' → ('Patrick Mahomes', 'KC')"""
     # Space-separated: "Patrick Mahomes KC"
     parts = text.rsplit(" ", 1)
-    if len(parts) == 2 and len(parts[1]) <= 3 and parts[1].isupper():
+    if len(parts) == 2 and len(parts[1]) <= 3 and parts[1].isupper() and parts[1] in _NFL_TEAMS:
         return parts[0], parts[1]
     # Concatenated (selectolax omits spaces between inline elements): "Josh AllenBUF".
     # Validate against known NFL team codes to avoid misidentifying name suffixes.

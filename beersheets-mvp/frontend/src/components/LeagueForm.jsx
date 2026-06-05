@@ -9,7 +9,6 @@ import { useState, useEffect, useRef } from 'react'
 import styles from './LeagueForm.module.css'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || ''
 
 const DEFAULT_SETTINGS = {
   n_teams: 12,
@@ -70,16 +69,23 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
     const flexSum = parseFloat(settings.flex_rb) + parseFloat(settings.flex_wr) + parseFloat(settings.flex_te) + parseFloat(settings.flex_qb)
     if (Math.abs(flexSum - 1.0) > 0.01)
       errs.flex = `Flex allocations must sum to 1.0 (currently ${flexSum.toFixed(2)})`
+    for (const f of ['pass_td','rush_td','rec_td','pass_yds','rush_yds','rec_yds','interception','fumble_lost','te_premium']) {
+      if (settings[f] === '' || isNaN(parseFloat(settings[f])))
+        errs[f] = 'Required'
+    }
     return errs
   }
 
   async function handleClearCache() {
+    const token = window.prompt('Enter admin token to clear cache:')
+    if (token === null || !token.trim()) return  // cancelled or empty
     if (clearTimerRef.current) clearTimeout(clearTimerRef.current)
     setClearStatus('clearing')
-    const headers = {}
-    if (ADMIN_SECRET) headers['X-Admin-Token'] = ADMIN_SECRET
     try {
-      const res = await fetch(`${API_URL}/api/cache/clear`, { method: 'POST', headers })
+      const res = await fetch(`${API_URL}/api/cache/clear`, {
+        method: 'POST',
+        headers: { 'X-Admin-Token': token },
+      })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       setClearStatus('cleared')
     } catch (_) {
@@ -192,46 +198,55 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
             <span>Pass TD pts</span>
             <input type="number" step={0.5} value={settings.pass_td}
               onChange={e => update('pass_td', e.target.value)} />
+            {validationError.pass_td && <span className={styles.fieldError}>{validationError.pass_td}</span>}
           </label>
           <label className={styles.field}>
             <span>Rush TD pts</span>
             <input type="number" step={0.5} value={settings.rush_td}
               onChange={e => update('rush_td', e.target.value)} />
+            {validationError.rush_td && <span className={styles.fieldError}>{validationError.rush_td}</span>}
           </label>
           <label className={styles.field}>
             <span>Rec TD pts</span>
             <input type="number" step={0.5} value={settings.rec_td}
               onChange={e => update('rec_td', e.target.value)} />
+            {validationError.rec_td && <span className={styles.fieldError}>{validationError.rec_td}</span>}
           </label>
           <label className={styles.field}>
             <span>Pts / pass yd</span>
             <input type="number" step={0.01} value={settings.pass_yds}
               onChange={e => update('pass_yds', e.target.value)} />
+            {validationError.pass_yds && <span className={styles.fieldError}>{validationError.pass_yds}</span>}
           </label>
           <label className={styles.field}>
             <span>Pts / rush yd</span>
             <input type="number" step={0.01} value={settings.rush_yds}
               onChange={e => update('rush_yds', e.target.value)} />
+            {validationError.rush_yds && <span className={styles.fieldError}>{validationError.rush_yds}</span>}
           </label>
           <label className={styles.field}>
             <span>Pts / rec yd</span>
             <input type="number" step={0.01} value={settings.rec_yds}
               onChange={e => update('rec_yds', e.target.value)} />
+            {validationError.rec_yds && <span className={styles.fieldError}>{validationError.rec_yds}</span>}
           </label>
           <label className={styles.field}>
             <span>Interception pts</span>
             <input type="number" step={0.5} value={settings.interception}
               onChange={e => update('interception', e.target.value)} />
+            {validationError.interception && <span className={styles.fieldError}>{validationError.interception}</span>}
           </label>
           <label className={styles.field}>
             <span>Fumble lost pts</span>
             <input type="number" step={0.5} value={settings.fumble_lost}
               onChange={e => update('fumble_lost', e.target.value)} />
+            {validationError.fumble_lost && <span className={styles.fieldError}>{validationError.fumble_lost}</span>}
           </label>
           <label className={styles.field}>
             <span>TE premium pts</span>
             <input type="number" step={0.25} value={settings.te_premium}
               onChange={e => update('te_premium', e.target.value)} />
+            {validationError.te_premium && <span className={styles.fieldError}>{validationError.te_premium}</span>}
           </label>
         </section>
 
