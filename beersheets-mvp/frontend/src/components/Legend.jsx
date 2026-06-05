@@ -3,7 +3,7 @@ import styles from './Legend.module.css'
 
 const BASE_ENTRIES = [
   { abbrev: 'TM/BW',  full: 'Team / Bye Week',        desc: 'NFL team abbreviation and the team\'s bye week number' },
-  { abbrev: 'ECR',    full: 'Expert Consensus Rank',   desc: 'Draft position shown as Round|Pick (e.g. 3|07). Blue = experts rank player >1 round earlier than ADP; Orange = >1 round later than ADP' },
+  { abbrev: 'ECR',    full: 'Expert Consensus Rank',   desc: 'Draft position shown as Round|Pick (e.g. 3|07). Blue = ADP >1 round earlier than experts (crowd reach); Orange = ADP >1 round later (hidden value)' },
   { abbrev: 'F',      full: 'Floor',                   desc: 'Projected points minus one standard deviation, above the positional baseline (pessimistic outcome)' },
   { abbrev: 'VAL',    full: 'Value',                   desc: 'Mean projected points above the positional replacement baseline — the core VBD metric' },
   { abbrev: 'C',      full: 'Ceiling',                 desc: 'Projected points plus one standard deviation, above the positional baseline (optimistic outcome)' },
@@ -16,8 +16,9 @@ const AUCTION_ENTRY = { abbrev: '$', full: 'Auction Price', desc: 'Estimated dol
 export default function Legend({ auctionMode }) {
   const [open, setOpen] = useState(false)
 
+  const tiersEntry = BASE_ENTRIES.find(e => e.abbrev === 'Tiers')
   const entries = auctionMode
-    ? [...BASE_ENTRIES.slice(0, -1), AUCTION_ENTRY, BASE_ENTRIES[BASE_ENTRIES.length - 1]]
+    ? [...BASE_ENTRIES.filter(e => e.abbrev !== 'Tiers'), AUCTION_ENTRY, tiersEntry]
     : BASE_ENTRIES
 
   return (
@@ -27,11 +28,12 @@ export default function Legend({ auctionMode }) {
         className={styles.toggle}
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
+        aria-controls="legend-grid"
       >
-        Column Guide {open ? '▲' : '▼'}
+        Column Guide <span aria-hidden="true">{open ? '▲' : '▼'}</span>
       </button>
       {open && (
-        <div className={styles.grid}>
+        <div id="legend-grid" className={styles.grid}>
           {entries.map(({ abbrev, full, desc }) => (
             <div key={abbrev} className={styles.entry}>
               <span className={styles.abbrev}>{abbrev}</span>

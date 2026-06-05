@@ -7,7 +7,7 @@
   border: none;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #888;
+  color: var(--c-text-muted);
   cursor: pointer;
   padding: 4px 0;
   letter-spacing: 0.04em;
@@ -15,7 +15,7 @@
 }
 
 .toggle:hover {
-  color: #555;
+  color: var(--c-text);
 }
 
 .grid {
@@ -24,9 +24,9 @@
   gap: 4px 24px;
   margin-top: 6px;
   padding: 10px 12px;
-  background: #f8f9fa;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
   font-size: 0.78rem;
   line-height: 1.45;
 }
@@ -44,19 +44,19 @@
 }
 
 .abbrev {
-  font-family: 'DM Mono', 'Courier New', monospace;
+  font-family: var(--font-data);
   font-weight: 700;
   font-size: 0.75rem;
-  color: #1a1a1a;
+  color: var(--c-text);
   min-width: 40px;
   flex-shrink: 0;
 }
 
 .text {
-  color: #444;
+  color: var(--c-text-muted);
 }
 
 .full {
   font-weight: 600;
-  color: #222;
+  color: var(--c-text);
 }

@@ -26,6 +26,7 @@ export default function PrintView({ sheetData, config, isDrafted }) {
   const { positions, metadata } = sheetData
   const nTeams = config?.n_teams || 12
   const pprLabel = config?.scoring?.rec === 1 ? 'PPR' : config?.scoring?.rec === 0.5 ? '0.5 PPR' : 'Standard'
+  const auctionMode = !!config?.auction_mode
 
   return (
     <div className="print-only print-sheet">
@@ -50,10 +51,11 @@ export default function PrintView({ sheetData, config, isDrafted }) {
         <strong>VAL</strong> = Value above baseline &nbsp;·&nbsp;
         <strong>C</strong> = Ceiling (mean+σ−baseline) &nbsp;·&nbsp;
         <strong>PS%</strong> = positional value remaining after pick &nbsp;·&nbsp;
+        {auctionMode && <><strong>$</strong> = auction price (share of VBD value) &nbsp;·&nbsp;</>}
         <strong>ECR</strong>: Rnd|Pick &nbsp;·&nbsp;
-        <span style={{ color: 'blue' }}>Blue</span> = experts rank &gt;1 round earlier than ADP &nbsp;·&nbsp;
-        <span style={{ color: 'darkorange' }}>Orange</span> = &gt;1 round later &nbsp;·&nbsp;
-        Shading = value tiers
+        <span style={{ color: 'blue' }}>Blue</span> = ADP &gt;1 round earlier than experts &nbsp;·&nbsp;
+        <span style={{ color: 'darkorange' }}>Orange</span> = ADP &gt;1 round later &nbsp;·&nbsp;
+        Shading = value tiers (alternating)
       </div>
 
       {/* Position blocks */}
@@ -73,7 +75,8 @@ export default function PrintView({ sheetData, config, isDrafted }) {
                     <th className="col-num">F</th>
                     <th className="col-num">VAL</th>
                     <th className="col-num">C</th>
-                    <th className="col-num">PS</th>
+                    <th className="col-num">PS%</th>
+                    {auctionMode && <th className="col-num">$</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -99,6 +102,11 @@ export default function PrintView({ sheetData, config, isDrafted }) {
                         <td className="col-num">
                           {player.ps_pct != null ? `${Math.round(player.ps_pct)}%` : '—'}
                         </td>
+                        {auctionMode && (
+                          <td className="col-num col-val">
+                            {player.auction_price != null ? `$${player.auction_price}` : '—'}
+                          </td>
+                        )}
                       </tr>
                     )
                   })}
