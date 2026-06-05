@@ -9,6 +9,7 @@
 import { useState, useMemo } from 'react'
 import PlayerTable from './PlayerTable'
 import CombinedView from './CombinedView'
+import DraftedPanel from './DraftedPanel'
 import Legend from './Legend'
 import { POS_COLORS } from '../utils/posColors'
 import styles from './DraftBoard.module.css'
@@ -70,6 +71,7 @@ export default function DraftBoard({
   onToggle: toggle,
   draftedCount: count = 0,
   onClearDrafted: clear,
+  draftedList = [],
 }) {
   const [activePos, setActivePos] = useState('ALL')
   const [sourceDetailsOpen, setSourceDetailsOpen] = useState(false)
@@ -221,8 +223,8 @@ export default function DraftBoard({
               </button>
             )
           }
-          const tabCount = positions[pos]?.length || 0
-          if (tabCount === 0) return null
+          const tabCount = (positions[pos] || []).filter(p => !isDrafted(p.sleeper_id || p.player_name)).length
+          if ((positions[pos]?.length || 0) === 0) return null
           return (
             <button
               key={pos}
@@ -240,27 +242,30 @@ export default function DraftBoard({
       {/* Column legend */}
       <Legend auctionMode={auctionMode} />
 
-      {/* Player table */}
-      <div className={styles.tableArea}>
-        {activePos === 'ALL' ? (
-          <CombinedView
-            positions={positions}
-            nTeams={nTeams}
-            isDrafted={isDrafted}
-            onToggle={toggle}
-            auctionMode={auctionMode}
-          />
-        ) : (
-          <PlayerTable
-            key={activePos}
-            players={players}
-            nTeams={nTeams}
-            isDrafted={isDrafted}
-            onToggle={toggle}
-            auctionMode={auctionMode}
-            wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
-          />
-        )}
+      {/* Player table + drafted panel */}
+      <div className={styles.contentRow}>
+        <div className={styles.tableArea}>
+          {activePos === 'ALL' ? (
+            <CombinedView
+              positions={positions}
+              nTeams={nTeams}
+              isDrafted={isDrafted}
+              onToggle={toggle}
+              auctionMode={auctionMode}
+            />
+          ) : (
+            <PlayerTable
+              key={activePos}
+              players={players}
+              nTeams={nTeams}
+              isDrafted={isDrafted}
+              onToggle={toggle}
+              auctionMode={auctionMode}
+              wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
+            />
+          )}
+        </div>
+        <DraftedPanel draftedList={draftedList} onToggle={toggle} />
       </div>
     </div>
   )

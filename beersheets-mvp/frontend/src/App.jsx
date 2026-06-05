@@ -22,7 +22,7 @@ export default function App() {
   const [sheetData, setSheetData] = useState(null)
   const [config, setConfig] = useState(null)
   const [error, setError] = useState(null)
-  const { isDrafted, toggle, count: draftedCount, clear: clearDrafted } = useDraftState()
+  const { isDrafted, toggle, count: draftedCount, clear: clearDrafted, draftedList } = useDraftState()
 
   const handleSheet = useCallback((data, cfg) => {
     setSheetData(data)
@@ -110,6 +110,7 @@ export default function App() {
               onToggle={toggle}
               draftedCount={draftedCount}
               onClearDrafted={clearDrafted}
+              draftedList={draftedList}
             />
           </div>
         )}

@@ -24,6 +24,8 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
     ? [...COLUMNS, { key: 'auction_price', label: '$', align: 'right', width: '42px' }]
     : COLUMNS
 
+  const visible = players.filter(p => !isDrafted(p.sleeper_id || p.player_name))
+
   return (
     <div className={styles.tableWrap} style={wrapStyle}>
       <table className={styles.table}>
@@ -38,23 +40,20 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
           </tr>
         </thead>
         <tbody>
-          {players.map((player, idx) => {
-            const drafted = isDrafted(player.sleeper_id || player.player_name)
+          {visible.map((player) => {
             const tierClass = player.tier_is_even ? styles.tierEven : styles.tierOdd
             const ecr = ecrColor(player.adp_rank, player.ecr_rank, nTeams)
             const ecrStyle = { color: ecrColorStyle(ecr) }
 
             return (
               <tr
-                key={player.sleeper_id || `${player.player_name}-${idx}`}
-                className={`${tierClass} ${drafted ? styles.drafted : ''}`}
-                onClick={() => onToggle(player.sleeper_id || player.player_name)}
-                title={drafted ? 'Click to undo draft' : 'Click to mark as drafted'}
+                key={player.sleeper_id || player.player_name}
+                className={tierClass}
+                onClick={() => onToggle(player.sleeper_id || player.player_name, player.player_name, player.pos)}
+                title="Click to mark as drafted"
               >
-                <td className={styles.selCol}>
-                  {drafted && <span className={styles.draftedDot}>✕</span>}
-                </td>
-                <td className={`${styles.nameCell} ${drafted ? styles.draftedName : ''}`}>
+                <td className={styles.selCol}></td>
+                <td className={styles.nameCell}>
                   {player.player_name}
                 </td>
                 <td className={styles.teamCell}>
