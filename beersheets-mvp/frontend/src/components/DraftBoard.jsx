@@ -10,18 +10,10 @@ import { useState, useMemo } from 'react'
 import PlayerTable from './PlayerTable'
 import CombinedView from './CombinedView'
 import Legend from './Legend'
+import { POS_COLORS } from '../utils/posColors'
 import styles from './DraftBoard.module.css'
 
 const TAB_ORDER = ['ALL', 'QB', 'RB', 'WR', 'TE', 'DST']
-
-const POS_COLORS = {
-  ALL: '#94a3b8',
-  QB:  '#ef4444',
-  RB:  '#22c55e',
-  WR:  '#60a5fa',
-  TE:  '#f59e0b',
-  DST: '#a855f7',
-}
 
 function buildSourceDetails(metadata) {
   const richStatuses = Array.isArray(metadata?.source_statuses) ? metadata.source_statuses : []
@@ -79,7 +71,7 @@ export default function DraftBoard({
   draftedCount: count = 0,
   onClearDrafted: clear,
 }) {
-  const [activePos, setActivePos] = useState('QB')
+  const [activePos, setActivePos] = useState('ALL')
   const [sourceDetailsOpen, setSourceDetailsOpen] = useState(false)
 
   const { positions, metadata } = sheetData

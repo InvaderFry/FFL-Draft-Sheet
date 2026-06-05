@@ -1,12 +1,13 @@
 import PlayerTable from './PlayerTable'
+import { POS_COLORS } from '../utils/posColors'
 import styles from './CombinedView.module.css'
 
-const POS_COLORS = {
-  QB: '#ef4444',
-  TE: '#f59e0b',
-  WR: '#60a5fa',
-  RB: '#22c55e',
-}
+// Each entry is one grid column; 'split' columns stack their positions 50/50.
+const COMBINED_COLUMNS = [
+  { type: 'split', positions: ['QB', 'TE'] },
+  { type: 'full',  positions: ['WR'] },
+  { type: 'full',  positions: ['RB'] },
+]
 
 const tableStyle = {
   maxHeight: 'none',
@@ -18,57 +19,26 @@ const tableStyle = {
 export default function CombinedView({ positions, nTeams, isDrafted, onToggle, auctionMode }) {
   return (
     <div className={styles.grid}>
-      {/* Left column: QB stacked over TE */}
-      <div className={styles.splitCol}>
-        <div className={styles.section}>
-          <div className={styles.posHeader} style={{ color: POS_COLORS.QB }}>QB</div>
-          <PlayerTable
-            players={positions.QB || []}
-            nTeams={nTeams}
-            isDrafted={isDrafted}
-            onToggle={onToggle}
-            auctionMode={auctionMode}
-            wrapStyle={tableStyle}
-          />
+      {COMBINED_COLUMNS.map(col => (
+        <div
+          key={col.positions[0]}
+          className={col.type === 'split' ? styles.splitCol : styles.fullCol}
+        >
+          {col.positions.map(pos => (
+            <div key={pos} className={styles.section}>
+              <div className={styles.posHeader} style={{ color: POS_COLORS[pos] }}>{pos}</div>
+              <PlayerTable
+                players={positions[pos] || []}
+                nTeams={nTeams}
+                isDrafted={isDrafted}
+                onToggle={onToggle}
+                auctionMode={auctionMode}
+                wrapStyle={tableStyle}
+              />
+            </div>
+          ))}
         </div>
-        <div className={styles.section}>
-          <div className={styles.posHeader} style={{ color: POS_COLORS.TE }}>TE</div>
-          <PlayerTable
-            players={positions.TE || []}
-            nTeams={nTeams}
-            isDrafted={isDrafted}
-            onToggle={onToggle}
-            auctionMode={auctionMode}
-            wrapStyle={tableStyle}
-          />
-        </div>
-      </div>
-
-      {/* Middle column: WR */}
-      <div className={styles.fullCol}>
-        <div className={styles.posHeader} style={{ color: POS_COLORS.WR }}>WR</div>
-        <PlayerTable
-          players={positions.WR || []}
-          nTeams={nTeams}
-          isDrafted={isDrafted}
-          onToggle={onToggle}
-          auctionMode={auctionMode}
-          wrapStyle={tableStyle}
-        />
-      </div>
-
-      {/* Right column: RB */}
-      <div className={styles.fullCol}>
-        <div className={styles.posHeader} style={{ color: POS_COLORS.RB }}>RB</div>
-        <PlayerTable
-          players={positions.RB || []}
-          nTeams={nTeams}
-          isDrafted={isDrafted}
-          onToggle={onToggle}
-          auctionMode={auctionMode}
-          wrapStyle={tableStyle}
-        />
-      </div>
+      ))}
     </div>
   )
 }
