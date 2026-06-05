@@ -17,6 +17,10 @@ const DEFAULT_SETTINGS = {
   flex_slots: 1,
   flex_rb: 0.5, flex_wr: 0.4, flex_te: 0.1, flex_qb: 0.0,
   ppr: '0.5',     // UI-only; maps to scoring.rec below
+  pass_td: 4, rush_td: 6, rec_td: 6,
+  pass_yds: 0.04, rush_yds: 0.1, rec_yds: 0.1,
+  interception: -2, fumble_lost: -2,
+  te_premium: 0,
   auction_mode: false,
   auction_budget: 200,
 }
@@ -84,7 +88,18 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
       flex_qb: parseFloat(settings.flex_qb),
       auction_mode: settings.auction_mode,
       auction_budget: parseInt(settings.auction_budget),
-      scoring: { rec },
+      scoring: {
+        rec,
+        pass_td: parseFloat(settings.pass_td),
+        rush_td: parseFloat(settings.rush_td),
+        rec_td: parseFloat(settings.rec_td),
+        pass_yds: parseFloat(settings.pass_yds),
+        rush_yds: parseFloat(settings.rush_yds),
+        rec_yds: parseFloat(settings.rec_yds),
+        interception: parseFloat(settings.interception),
+        fumble_lost: parseFloat(settings.fumble_lost),
+        te_premium: parseFloat(settings.te_premium),
+      },
     }
 
     setLoading(true)
@@ -131,10 +146,15 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
               {[12,13,14,15,16,17].map(n => <option key={n}>{n}</option>)}
             </select>
           </label>
+        </section>
+
+        {/* Scoring */}
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Scoring</h3>
           <div className={styles.field}>
-            <span>Scoring</span>
+            <span>Reception (PPR)</span>
             <div className={styles.radioGroup}>
-              {[['0', 'Standard'],['0.5', 'Half-PPR'],['1', 'Full PPR']].map(([v, label]) => (
+              {[['0', 'Std'],['0.5', 'Half'],['1', 'Full']].map(([v, label]) => (
                 <label key={v} className={styles.radio}>
                   <input type="radio" name="ppr" value={v}
                     checked={settings.ppr === v}
@@ -144,6 +164,51 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
               ))}
             </div>
           </div>
+          <label className={styles.field}>
+            <span>Pass TD pts</span>
+            <input type="number" step={0.5} value={settings.pass_td}
+              onChange={e => update('pass_td', e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>Rush TD pts</span>
+            <input type="number" step={0.5} value={settings.rush_td}
+              onChange={e => update('rush_td', e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>Rec TD pts</span>
+            <input type="number" step={0.5} value={settings.rec_td}
+              onChange={e => update('rec_td', e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>Pts / pass yd</span>
+            <input type="number" step={0.01} value={settings.pass_yds}
+              onChange={e => update('pass_yds', e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>Pts / rush yd</span>
+            <input type="number" step={0.01} value={settings.rush_yds}
+              onChange={e => update('rush_yds', e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>Pts / rec yd</span>
+            <input type="number" step={0.01} value={settings.rec_yds}
+              onChange={e => update('rec_yds', e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>Interception pts</span>
+            <input type="number" step={0.5} value={settings.interception}
+              onChange={e => update('interception', e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>Fumble lost pts</span>
+            <input type="number" step={0.5} value={settings.fumble_lost}
+              onChange={e => update('fumble_lost', e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>TE premium pts</span>
+            <input type="number" step={0.25} value={settings.te_premium}
+              onChange={e => update('te_premium', e.target.value)} />
+          </label>
         </section>
 
         {/* Roster */}
