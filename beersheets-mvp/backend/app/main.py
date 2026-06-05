@@ -302,6 +302,12 @@ async def health() -> dict:
     return {"status": "ok", "version": "0.1.0"}
 
 
+@app.post("/admin/cache/clear")
+async def clear_cache() -> dict:
+    cache.clear()
+    return {"status": "cleared"}
+
+
 @app.post("/api/sheet", response_model=SheetResponse)
 async def generate_sheet(cfg: LeagueConfig) -> SheetResponse:
     ck = _sheet_cache_key(cfg)

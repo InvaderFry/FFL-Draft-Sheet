@@ -97,8 +97,15 @@
   font-size: 13px;
 }
 
+.buttonRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
 .submitBtn {
-  align-self: center;
   padding: var(--space-3) var(--space-6);
   background: var(--c-amber);
   color: #000;
@@ -118,6 +125,30 @@
 }
 
 .submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.clearBtn {
+  padding: var(--space-3) var(--space-4);
+  background: transparent;
+  color: var(--c-text-muted);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.clearBtn:hover:not(:disabled) {
+  border-color: var(--c-text-muted);
+  color: var(--c-text);
+}
+
+.clearBtn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -315,11 +316,22 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
     return results
 
 
+_TEAM_RE = re.compile(r'([A-Z]{2,3})$')
+
+
 def _split_fp_name_team(text: str) -> tuple[str, str]:
-    """'Patrick Mahomes KC' → ('Patrick Mahomes', 'KC')"""
+    """'Patrick Mahomes KC' or 'Patrick MahomesKC' → ('Patrick Mahomes', 'KC')"""
+    # Space-separated: "Patrick Mahomes KC"
     parts = text.rsplit(" ", 1)
     if len(parts) == 2 and len(parts[1]) <= 3 and parts[1].isupper():
         return parts[0], parts[1]
+    # Concatenated (selectolax omits spaces between inline elements): "Josh AllenBUF"
+    m = _TEAM_RE.search(text)
+    if m:
+        team = m.group(1)
+        name = text[:-len(team)].rstrip()
+        if name:
+            return name, team
     return text, ""
 
 
