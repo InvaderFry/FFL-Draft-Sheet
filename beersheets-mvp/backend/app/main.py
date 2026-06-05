@@ -309,7 +309,7 @@ async def health() -> dict:
     return {"status": "ok", "version": "0.1.0"}
 
 
-@app.post("/admin/cache/clear")
+@app.post("/api/cache/clear")
 async def clear_cache(_: None = Depends(_admin_auth)) -> dict:
     cache.clear_projections()
     return {"status": "cleared"}
