@@ -79,7 +79,7 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
     const headers = {}
     if (ADMIN_SECRET) headers['X-Admin-Token'] = ADMIN_SECRET
     try {
-      const res = await fetch(`${API_URL}/admin/cache/clear`, { method: 'POST', headers })
+      const res = await fetch(`${API_URL}/api/cache/clear`, { method: 'POST', headers })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       setClearStatus('cleared')
     } catch (_) {
