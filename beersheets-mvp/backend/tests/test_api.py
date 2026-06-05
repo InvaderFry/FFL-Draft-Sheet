@@ -1,7 +1,6 @@
 """Integration tests for /api/sheet and /health endpoints (U10)."""
 
 import pytest
-import pytest_asyncio
 from fastapi.testclient import TestClient
 from unittest.mock import patch, AsyncMock, MagicMock
 
