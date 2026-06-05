@@ -6,7 +6,7 @@
  * and the print view stay in sync. Switching tabs preserves it.
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import PlayerTable from './PlayerTable'
 import styles from './DraftBoard.module.css'
 
@@ -20,6 +20,53 @@ const POS_COLORS = {
   DST: '#a855f7',
 }
 
+function buildSourceDetails(metadata) {
+  const richStatuses = Array.isArray(metadata?.source_statuses) ? metadata.source_statuses : []
+  if (richStatuses.length > 0) {
+    const entries = richStatuses.map((entry) => ({
+      source: entry.source,
+      status: entry.status || (entry.used ? 'used' : 'unavailable'),
+      used: entry.used || entry.status === 'used' || entry.status === 'partial',
+      positions: entry.positions || [],
+      reason: entry.reason || entry.failures?.[0]?.reason || null,
+      failures: entry.failures || [],
+    }))
+
+    return {
+      hasDetails: entries.length > 0,
+      used: entries.filter((entry) => entry.used),
+      unavailable: entries.filter((entry) => !entry.used),
+    }
+  }
+
+  const used = (metadata?.sources_used || []).map((source) => ({
+    source,
+    status: 'used',
+    used: true,
+    positions: [],
+    reason: null,
+    failures: [],
+  }))
+  const unavailable = (metadata?.sources_dropped || []).map((source) => ({
+    source,
+    status: 'unavailable',
+    used: false,
+    positions: [],
+    reason: null,
+    failures: [],
+  }))
+
+  return {
+    hasDetails: used.length > 0 || unavailable.length > 0,
+    used,
+    unavailable,
+  }
+}
+
+function sourceCountLabel(count) {
+  return `${count} source${count !== 1 ? 's' : ''}`
+}
+
 export default function DraftBoard({
   sheetData,
   config,
@@ -30,11 +77,14 @@ export default function DraftBoard({
   onClearDrafted: clear,
 }) {
   const [activePos, setActivePos] = useState('QB')
+  const [sourceDetailsOpen, setSourceDetailsOpen] = useState(false)
 
   const { positions, metadata } = sheetData
   const players = positions[activePos] || []
   const nTeams = config?.n_teams || 12
   const auctionMode = config?.auction_mode || false
+  const sourceDetails = useMemo(() => buildSourceDetails(metadata), [metadata])
+  const sourceCount = sourceDetails.used.length
 
   return (
     <div className={styles.board}>
@@ -44,10 +94,87 @@ export default function DraftBoard({
           <span className={styles.metaTag}>
             {nTeams}-team · {metadata?.ppr === 1 ? 'Full PPR' : metadata?.ppr === 0.5 ? 'Half PPR' : 'Standard'}
           </span>
-          {metadata?.sources_used?.length > 0 && (
-            <span className={styles.metaTag}>
-              {metadata.sources_used.length} source{metadata.sources_used.length !== 1 ? 's' : ''}
-            </span>
+          {sourceDetails.hasDetails && (
+            <div className={styles.sourceWrap}>
+              <button
+                type="button"
+                className={`${styles.metaTag} ${styles.sourceButton}`}
+                aria-expanded={sourceDetailsOpen}
+                aria-controls="source-details-panel"
+                onClick={() => setSourceDetailsOpen((open) => !open)}
+              >
+                {sourceCountLabel(sourceCount)}
+              </button>
+              {sourceDetailsOpen && (
+                <div
+                  id="source-details-panel"
+                  className={styles.sourcePanel}
+                  role="region"
+                  aria-label="Source details"
+                >
+                  <div className={styles.sourcePanelHeader}>
+                    <span>Source details</span>
+                    <button
+                      type="button"
+                      className={styles.sourceClose}
+                      onClick={() => setSourceDetailsOpen(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className={styles.sourceSection}>
+                    <div className={styles.sourceSectionTitle}>Used</div>
+                    {sourceDetails.used.length > 0 ? (
+                      <ul className={styles.sourceList}>
+                        {sourceDetails.used.map((entry) => (
+                          <li key={entry.source} className={styles.sourceItem}>
+                            <div className={styles.sourceLine}>
+                              <span className={styles.sourceName}>{entry.source}</span>
+                              {entry.status === 'partial' && (
+                                <span className={styles.partialPill}>Partial</span>
+                              )}
+                            </div>
+                            {entry.positions.length > 0 && (
+                              <div className={styles.sourceMeta}>{entry.positions.join(', ')}</div>
+                            )}
+                            {entry.failures.length > 0 && (
+                              <ul className={styles.warningList}>
+                                {entry.failures.map((failure) => (
+                                  <li key={`${entry.source}-${failure.position}-${failure.reason}`}>
+                                    {failure.position}: {failure.reason}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className={styles.emptySourceText}>No sources contributed rows.</p>
+                    )}
+                  </div>
+
+                  {sourceDetails.unavailable.length > 0 && (
+                    <div className={styles.sourceSection}>
+                      <div className={styles.sourceSectionTitle}>Unavailable</div>
+                      <ul className={styles.sourceList}>
+                        {sourceDetails.unavailable.map((entry) => (
+                          <li key={entry.source} className={styles.sourceItem}>
+                            <div className={styles.sourceLine}>
+                              <span className={styles.sourceName}>{entry.source}</span>
+                              {entry.reason && (
+                                <span className={styles.reasonText}>{entry.reason}</span>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
           {metadata?.generation_time_s && (
             <span className={styles.metaTag}>

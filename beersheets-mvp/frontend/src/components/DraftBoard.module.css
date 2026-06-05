@@ -34,6 +34,119 @@
   letter-spacing: 0.04em;
 }
 
+.sourceWrap {
+  position: relative;
+}
+
+.sourceButton {
+  cursor: pointer;
+}
+
+.sourceButton:hover,
+.sourceButton[aria-expanded="true"] {
+  color: var(--c-text);
+  border-color: var(--c-border2);
+}
+
+.sourcePanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  padding: var(--space-3);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
+  color: var(--c-text);
+  font-family: var(--font-data);
+}
+
+.sourcePanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sourceClose {
+  background: none;
+  border: none;
+  color: var(--c-text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.sourceSection + .sourceSection {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--c-border2);
+}
+
+.sourceSectionTitle {
+  margin-bottom: 6px;
+  color: var(--c-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sourceList,
+.warningList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sourceItem + .sourceItem {
+  margin-top: 8px;
+}
+
+.sourceLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.sourceName {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sourceMeta,
+.warningList,
+.emptySourceText,
+.reasonText {
+  color: var(--c-text-muted);
+  font-size: 11px;
+}
+
+.emptySourceText {
+  margin: 0;
+}
+
+.warningList {
+  margin-top: 4px;
+}
+
+.partialPill {
+  border: 1px solid var(--c-border2);
+  border-radius: var(--radius-sm);
+  color: var(--c-amber);
+  font-size: 10px;
+  padding: 1px 5px;
+}
+
 .draftCount {
   font-size: 12px;
   color: var(--c-text-muted);

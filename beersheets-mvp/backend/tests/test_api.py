@@ -6,6 +6,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 from app.main import app
 from app import cache
+from app.data.scraper import ScrapeResult, SourceOutcome
 
 
 @pytest.fixture(autouse=True)
@@ -49,7 +50,25 @@ def _mock_scrape_result():
                 "points": pts,
             })
         result[pos] = rows
-    return result
+    return ScrapeResult(result)
+
+
+def _mock_scrape_result_with_sources(sources):
+    result = {pos: [] for pos in ["QB", "RB", "WR", "TE", "DST"]}
+    outcomes = []
+    for pos in result:
+        for source in sources:
+            result[pos].append({
+                "source": source,
+                "player_name": f"{source}{pos}Player",
+                "pos": pos,
+                "team": "KC",
+                "sleeper_id": f"{source.lower()}_{pos.lower()}",
+                "espn_id": None,
+                "points": 100.0,
+            })
+            outcomes.append(SourceOutcome(source=source, position=pos, rows=1, reason=None))
+    return ScrapeResult(result, outcomes=outcomes)
 
 
 def _mock_attrition_curves():
@@ -154,6 +173,184 @@ def test_all_sources_down_returns_200_with_empty_positions(mock_adp, mock_player
     assert resp.status_code == 200
     meta = resp.json()["metadata"]
     assert meta["sources_used"] == []
+
+
+@patch("app.main.scrape_all", new_callable=AsyncMock)
+@patch("app.main.load_attrition_curves")
+@patch("app.main.load_player_map")
+@patch("app.main.enrich_with_adp")
+def test_sheet_metadata_includes_structured_used_source_statuses(mock_adp, mock_players, mock_curves, mock_scrape, client):
+    mock_scrape.return_value = _mock_scrape_result_with_sources(["FantasyPros", "ESPN"])
+    mock_curves.return_value = _mock_attrition_curves()
+    mock_players.return_value = {}
+    mock_adp.side_effect = lambda rows, n_teams, ppr: (rows, False)
+
+    resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
+                                           "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
+
+    assert resp.status_code == 200
+    meta = resp.json()["metadata"]
+    assert meta["sources_used"] == ["ESPN", "FantasyPros"]
+    statuses = {entry["source"]: entry for entry in meta["source_statuses"]}
+    assert statuses["FantasyPros"]["status"] == "used"
+    assert statuses["FantasyPros"]["used"] is True
+    assert statuses["FantasyPros"]["positions"] == ["DST", "QB", "RB", "TE", "WR"]
+    assert statuses["ESPN"]["status"] == "used"
+
+
+@patch("app.main.scrape_all", new_callable=AsyncMock)
+@patch("app.main.load_attrition_curves")
+@patch("app.main.load_player_map")
+@patch("app.main.enrich_with_adp")
+def test_sheet_metadata_includes_unavailable_source_reason(mock_adp, mock_players, mock_curves, mock_scrape, client):
+    rows = _mock_scrape_result()
+    outcomes = [
+        SourceOutcome(source="FantasyPros", position=pos, rows=1, reason=None)
+        for pos in ["QB", "RB", "WR", "TE", "DST"]
+    ] + [SourceOutcome(source="FFToday", position="RB", rows=0, reason="HTTP 403")]
+    mock_scrape.return_value = ScrapeResult(rows, outcomes=outcomes)
+    mock_curves.return_value = _mock_attrition_curves()
+    mock_players.return_value = {}
+    mock_adp.side_effect = lambda rows, n_teams, ppr: (rows, False)
+
+    resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
+                                           "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
+
+    assert resp.status_code == 200
+    meta = resp.json()["metadata"]
+    statuses = {entry["source"]: entry for entry in meta["source_statuses"]}
+    assert "FantasyPros" in meta["sources_used"]
+    assert "FFToday" in meta["sources_dropped"]
+    assert statuses["FFToday"]["status"] == "unavailable"
+    assert statuses["FFToday"]["reason"] == "HTTP 403"
+    assert statuses["FFToday"]["failures"] == [{"position": "RB", "reason": "HTTP 403"}]
+
+
+@patch("app.main.scrape_all", new_callable=AsyncMock)
+@patch("app.main.load_attrition_curves")
+@patch("app.main.load_player_map")
+@patch("app.main.enrich_with_adp")
+def test_sheet_metadata_marks_partial_sources_used_with_warnings(mock_adp, mock_players, mock_curves, mock_scrape, client):
+    result = {pos: [] for pos in ["QB", "RB", "WR", "TE", "DST"]}
+    result["RB"].append({
+        "source": "FantasyPros",
+        "player_name": "RBPlayer",
+        "pos": "RB",
+        "team": "KC",
+        "sleeper_id": "rb_1",
+        "espn_id": None,
+        "points": 100.0,
+    })
+    result["WR"].append({
+        "source": "FantasyPros",
+        "player_name": "WRPlayer",
+        "pos": "WR",
+        "team": "KC",
+        "sleeper_id": "wr_1",
+        "espn_id": None,
+        "points": 100.0,
+    })
+    mock_scrape.return_value = ScrapeResult(result, outcomes=[
+        SourceOutcome(source="FantasyPros", position="RB", rows=1, reason=None),
+        SourceOutcome(source="FantasyPros", position="WR", rows=1, reason=None),
+        SourceOutcome(source="FantasyPros", position="TE", rows=0, reason="timeout"),
+    ])
+    mock_curves.return_value = _mock_attrition_curves()
+    mock_players.return_value = {}
+    mock_adp.side_effect = lambda rows, n_teams, ppr: (rows, False)
+
+    resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
+                                           "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
+
+    assert resp.status_code == 200
+    meta = resp.json()["metadata"]
+    statuses = {entry["source"]: entry for entry in meta["source_statuses"]}
+    assert "FantasyPros" in meta["sources_used"]
+    assert "FantasyPros" not in meta["sources_dropped"]
+    assert statuses["FantasyPros"]["status"] == "partial"
+    assert statuses["FantasyPros"]["positions"] == ["RB", "WR"]
+    assert statuses["FantasyPros"]["failures"] == [{"position": "TE", "reason": "timeout"}]
+
+
+@patch("app.main.scrape_all", new_callable=AsyncMock)
+@patch("app.main.load_attrition_curves")
+@patch("app.main.load_player_map")
+@patch("app.main.enrich_with_adp")
+def test_all_sources_down_includes_unavailable_source_statuses(mock_adp, mock_players, mock_curves, mock_scrape, client):
+    outcomes = [
+        SourceOutcome(source="FantasyPros", position=pos, rows=0, reason="0 rows")
+        for pos in ["QB", "RB", "WR", "TE", "DST"]
+    ]
+    mock_scrape.return_value = ScrapeResult(
+        {pos: [] for pos in ["QB", "RB", "WR", "TE", "DST"]},
+        outcomes=outcomes,
+    )
+    mock_curves.return_value = _mock_attrition_curves()
+    mock_players.return_value = {}
+    mock_adp.side_effect = lambda rows, n_teams, ppr: (rows, False)
+
+    resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
+                                           "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
+
+    assert resp.status_code == 200
+    meta = resp.json()["metadata"]
+    statuses = {entry["source"]: entry for entry in meta["source_statuses"]}
+    assert meta["sources_used"] == []
+    assert statuses["FantasyPros"]["status"] == "unavailable"
+    assert statuses["FantasyPros"]["reason"] == "0 rows"
+
+
+@patch("app.main.scrape_all", new_callable=AsyncMock)
+@patch("app.main.load_attrition_curves")
+@patch("app.main.load_player_map")
+@patch("app.main.enrich_with_adp")
+def test_cached_sheet_preserves_source_status_metadata(mock_adp, mock_players, mock_curves, mock_scrape, client):
+    mock_scrape.return_value = _mock_scrape_result_with_sources(["FantasyPros"])
+    mock_curves.return_value = _mock_attrition_curves()
+    mock_players.return_value = {}
+    mock_adp.side_effect = lambda rows, n_teams, ppr: (rows, False)
+    payload = {"n_teams": 12, "QB": 1, "RB": 2, "WR": 3, "TE": 1, "DST": 1, "K": 0, "flex_slots": 1}
+
+    first = client.post("/api/sheet", json=payload)
+    second = client.post("/api/sheet", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    meta = second.json()["metadata"]
+    assert meta["cache_hit"] is True
+    assert meta["source_statuses"][0]["source"] in {"ESPN", "FFToday", "FantasyPros", "NumberFire"}
+    assert {entry["source"] for entry in meta["source_statuses"]} >= {"FantasyPros"}
+
+
+def test_legacy_cached_sheet_backfills_source_statuses_without_losing_source_names(client):
+    payload = {"n_teams": 12, "QB": 1, "RB": 2, "WR": 3, "TE": 1, "DST": 1, "K": 0, "flex_slots": 1}
+    from app.main import _sheet_cache_key
+    from app.config import LeagueConfig
+
+    cache.set(_sheet_cache_key(LeagueConfig(**payload)), {
+        "positions": {pos: [] for pos in ["QB", "RB", "WR", "TE", "DST"]},
+        "metadata": {
+            "season": 2026,
+            "n_teams": 12,
+            "ppr": 0.5,
+            "sources_used": ["FantasyPros"],
+            "sources_dropped": ["FFToday"],
+            "baselines": {},
+            "adp_available": False,
+            "cache_hit": False,
+            "generation_time_s": 1.0,
+        },
+    })
+
+    resp = client.post("/api/sheet", json=payload)
+
+    assert resp.status_code == 200
+    meta = resp.json()["metadata"]
+    assert meta["sources_used"] == ["FantasyPros"]
+    assert meta["sources_dropped"] == ["FFToday"]
+    statuses = {entry["source"]: entry for entry in meta["source_statuses"]}
+    assert statuses["FantasyPros"]["status"] == "used"
+    assert statuses["FFToday"]["status"] == "unavailable"
 
 
 # ---- CORS header present -----------------------------------------------------
