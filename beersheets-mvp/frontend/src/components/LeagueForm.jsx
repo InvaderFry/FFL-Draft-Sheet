@@ -9,7 +9,6 @@ import { useState, useEffect, useRef } from 'react'
 import styles from './LeagueForm.module.css'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
-const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || ''
 
 const DEFAULT_SETTINGS = {
   n_teams: 12,
@@ -70,16 +69,23 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
     const flexSum = parseFloat(settings.flex_rb) + parseFloat(settings.flex_wr) + parseFloat(settings.flex_te) + parseFloat(settings.flex_qb)
     if (Math.abs(flexSum - 1.0) > 0.01)
       errs.flex = `Flex allocations must sum to 1.0 (currently ${flexSum.toFixed(2)})`
+    for (const f of ['pass_td','rush_td','rec_td','pass_yds','rush_yds','rec_yds','interception','fumble_lost','te_premium']) {
+      if (settings[f] === '' || isNaN(parseFloat(settings[f])))
+        errs[f] = 'Required'
+    }
     return errs
   }
 
   async function handleClearCache() {
+    const token = window.prompt('Enter admin token to clear cache:')
+    if (token === null) return  // user cancelled
     if (clearTimerRef.current) clearTimeout(clearTimerRef.current)
     setClearStatus('clearing')
-    const headers = {}
-    if (ADMIN_SECRET) headers['X-Admin-Token'] = ADMIN_SECRET
     try {
-      const res = await fetch(`${API_URL}/api/cache/clear`, { method: 'POST', headers })
+      const res = await fetch(`${API_URL}/api/cache/clear`, {
+        method: 'POST',
+        headers: { 'X-Admin-Token': token },
+      })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       setClearStatus('cleared')
     } catch (_) {

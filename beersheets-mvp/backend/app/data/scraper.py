@@ -274,7 +274,12 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
                     full = first_td.text(strip=True)
                     rest = full[len(name):].strip() if full.startswith(name) else ""
                     team_word = rest.split()[0] if rest else ""
-                    team = team_word if (2 <= len(team_word) <= 3 and team_word.isupper()) else ""
+                    if 2 <= len(team_word) <= 3 and team_word.isupper():
+                        team = team_word
+                    else:
+                        # Anchor may only wrap a partial name; derive team from the
+                        # full cell text using the validated-team-code fallback.
+                        _, team = _split_fp_name_team(full)
                 else:
                     name, team = _split_fp_name_team(cells[0])
 
@@ -304,7 +309,7 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
                         "rec_td":   _f(cells[4]),
                         "rush_yds": _f(cells[5]) if len(cells) > 7 else 0,
                         "rush_td":  _f(cells[6]) if len(cells) > 8 else 0,
-                        "fumble_lost": _f(cells[-2]),
+                        "fumble_lost": _f(cells[-2]) if len(cells) > 8 else 0,
                     }
                     if pos == "TE":
                         stats["te_premium_eligible"] = True
