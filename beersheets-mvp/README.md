@@ -137,26 +137,52 @@ frontend/ (React 18 + Vite)      backend/ (Python 3.12 + FastAPI)
 
 ---
 
-## Deployment
+## Deployment (Render + Vercel)
 
-### Render (backend, free tier)
+Deploying makes the app accessible from any browser — including Safari on iPad. No code changes required; both services read their config files automatically.
 
-1. Fork this repo and connect it to [Render](https://render.com)
-2. Create a new Web Service → "Use existing render.yaml"
-3. Render reads `render.yaml` automatically and deploys the FastAPI Docker container
+### Step 1 — Deploy the backend to Render
 
-### Vercel (frontend)
+1. Go to [render.com](https://render.com) → **New → Web Service**
+2. Connect the GitHub repo (`InvaderFry/FFL-Draft-Sheet`)
+3. **Set Root Directory to `beersheets-mvp`** — this is where `render.yaml` lives
+4. Render auto-detects `render.yaml` and configures the Docker service
+5. Click **Deploy**
+6. Once live, note your backend URL (e.g. `https://ffl-draft-sheet-api.onrender.com`)
+7. Verify: visit `https://<your-render-url>/health` — should return `{"status":"ok"}`
 
-1. Import the repo in [Vercel](https://vercel.com)
-2. Set environment variable: `VITE_API_URL=https://your-render-app.onrender.com`
-3. Vercel reads `vercel.json` for build settings and SPA rewrites
+> **Free tier caveat:** Render spins down services after 15 minutes of inactivity. The first request after a cold start takes 30–60 seconds. The $7/mo paid tier keeps the service always-on.
+
+### Step 2 — Deploy the frontend to Vercel
+
+1. Go to [vercel.com](https://vercel.com) → **New Project** → Import `InvaderFry/FFL-Draft-Sheet`
+2. **Set Root Directory to `beersheets-mvp`** — this is where `vercel.json` lives
+3. Before deploying, add an environment variable:
+   - **Key:** `VITE_API_URL`
+   - **Value:** `https://ffl-draft-sheet-api.onrender.com` (your Render URL from Step 1)
+4. Click **Deploy** — Vercel reads `vercel.json` automatically
+5. Your app is live at `https://<your-project>.vercel.app`
+
+### Step 3 — Open on iPad (or any browser)
+
+Navigate to your Vercel URL in Safari. To add it to the iPad home screen as a shortcut:  
+**Share → Add to Home Screen**
 
 ### Environment variables
 
-| Variable | Description | Default |
-|---|---|---|
-| `VITE_API_URL` | Render backend URL (frontend) | `''` (same-origin) |
-| `CACHE_DIR` | Cache directory path (backend) | `cache/` |
+| Variable | Service | Description | Default |
+|---|---|---|---|
+| `VITE_API_URL` | Frontend (Vercel) | Full URL of the Render backend | `''` (same-origin) |
+| `CACHE_DIR` | Backend (Render) | Cache directory path | `cache/` |
+| `WEB_CONCURRENCY` | Backend (Render) | Uvicorn worker count | `1` |
+
+### Common issues
+
+| Symptom | Likely cause |
+|---|---|
+| Frontend loads but draft sheet never returns | `VITE_API_URL` not set or pointing to wrong URL |
+| Build fails on Render or Vercel | Root Directory not set to `beersheets-mvp` |
+| First request takes 30–60 s | Render free tier cold start — normal behavior |
 
 ---
 
