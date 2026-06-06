@@ -7,6 +7,8 @@
  */
 
 import { ecrColor, ecrColorStyle } from '../utils/ecrColor'
+import { valBgStyle, psPctBgStyle } from '../utils/valGradient'
+import { useTheme } from '../context/ThemeContext'
 import styles from './PlayerTable.module.css'
 
 const COLUMNS = [
@@ -19,7 +21,8 @@ const COLUMNS = [
   { key: 'ps_pct',      label: 'PS%',    align: 'right',  width: '44px'  },
 ]
 
-export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auctionMode, wrapStyle }) {
+export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auctionMode, wrapStyle, maxVal = 0 }) {
+  const { theme } = useTheme()
   const cols = auctionMode
     ? [...COLUMNS, { key: 'auction_price', label: '$', align: 'right', width: '42px' }]
     : COLUMNS
@@ -43,6 +46,8 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
             const tierClass = player.tier_is_even ? styles.tierEven : styles.tierOdd
             const ecr = ecrColor(player.adp_rank, player.ecr_rank, nTeams)
             const ecrStyle = { color: ecrColorStyle(ecr) }
+            const valStyle = valBgStyle(player.val, maxVal, theme)
+            const psStyle  = psPctBgStyle(player.ps_pct, theme)
 
             return (
               <tr
@@ -62,9 +67,9 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
                   {player.ecr_fmt}
                 </td>
                 <td className={styles.numCell}>{fmtVal(player.floor)}</td>
-                <td className={`${styles.numCell} ${styles.valCell}`}>{fmtVal(player.val)}</td>
+                <td className={`${styles.numCell} ${styles.valCell}`} style={valStyle}>{fmtVal(player.val)}</td>
                 <td className={styles.numCell}>{fmtVal(player.ceil)}</td>
-                <td className={styles.numCell}>{player.ps_pct != null ? `${player.ps_pct}%` : '—'}</td>
+                <td className={styles.numCell} style={psStyle}>{player.ps_pct != null ? `${player.ps_pct}%` : '—'}</td>
                 {auctionMode && (
                   <td className={`${styles.numCell} ${styles.auctionCell}`}>
                     {player.auction_price != null ? `$${player.auction_price}` : '—'}

@@ -82,6 +82,10 @@ export default function DraftBoard({
   const nTeams = config?.n_teams || 12
   const auctionMode = config?.auction_mode || false
   const sourceDetails = useMemo(() => buildSourceDetails(metadata), [metadata])
+  const maxVal = useMemo(
+    () => Math.max(0, ...Object.values(positions).flat().map(p => p.val ?? 0)),
+    [positions]
+  )
   const sourceCount = sourceDetails.used.length
 
   return (
@@ -255,6 +259,7 @@ export default function DraftBoard({
               isDrafted={isDrafted}
               onToggle={toggle}
               auctionMode={auctionMode}
+              maxVal={maxVal}
             />
           ) : (
             <PlayerTable
@@ -264,6 +269,7 @@ export default function DraftBoard({
               isDrafted={isDrafted}
               onToggle={toggle}
               auctionMode={auctionMode}
+              maxVal={maxVal}
               wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
             />
           )}
