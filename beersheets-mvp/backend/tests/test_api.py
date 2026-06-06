@@ -39,7 +39,12 @@ def _mock_scrape_result():
     for pos in positions:
         rows = []
         for i in range(20):
-            pts = 350.0 - i * 15 if pos == "QB" else 300.0 - i * 10
+            if pos == "QB":
+                pts = 350.0 - i * 15
+            elif pos == "DST":
+                pts = 150.0 - i * 5
+            else:
+                pts = 300.0 - i * 10
             rows.append({
                 "source": "FantasyPros",
                 "player_name": f"{pos}Player{i}",
@@ -97,6 +102,32 @@ def test_default_sheet_returns_200(mock_adp, mock_players, mock_curves, mock_scr
     assert "positions" in data
     assert "RB" in data["positions"]
     assert len(data["positions"]["RB"]) > 0
+    assert "mean_pts" in data["positions"]["RB"][0]
+    assert "baseline" in data["positions"]["RB"][0]
+    assert data["metadata"]["data_quality_warnings"] == []
+
+
+@patch("app.main.scrape_all", new_callable=AsyncMock)
+@patch("app.main.load_attrition_curves")
+@patch("app.main.load_player_map")
+@patch("app.main.enrich_with_adp")
+def test_inflated_projection_adds_data_quality_warning(mock_adp, mock_players, mock_curves, mock_scrape, client):
+    rows = _mock_scrape_result()
+    rows["WR"][0]["points"] = 934.8
+    mock_scrape.return_value = rows
+    mock_curves.return_value = _mock_attrition_curves()
+    mock_players.return_value = {}
+    mock_adp.side_effect = lambda rows, n_teams, ppr: (rows, False)
+
+    resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
+                                           "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
+
+    assert resp.status_code == 200
+    warnings = resp.json()["metadata"]["data_quality_warnings"]
+    assert warnings == [
+        "WR projections appear inflated (top mean_pts=934.8, expected <=400). "
+        "Data may be unreliable this early in the season."
+    ]
 
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)

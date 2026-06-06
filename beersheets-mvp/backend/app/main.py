@@ -61,6 +61,8 @@ class PlayerRow(BaseModel):
     pos: str
     team: str
     bye_week: int | None
+    mean_pts: float
+    baseline: float
     val: float
     floor: float
     ceil: float
@@ -97,6 +99,7 @@ class SheetMetadata(BaseModel):
     sources_dropped: list[str]
     source_statuses: list[SourceStatus] = Field(default_factory=list)
     baselines: dict[str, float]
+    data_quality_warnings: list[str] = Field(default_factory=list)
     adp_available: bool
     cache_hit: bool
     generation_time_s: float
@@ -124,6 +127,14 @@ def _sheet_cache_key(cfg: LeagueConfig) -> str:
 # --------------------------------------------------------------------------- #
 # Source status aggregation
 # --------------------------------------------------------------------------- #
+
+EXPECTED_MAX_MEAN_POINTS = {
+    "QB": 500.0,
+    "RB": 400.0,
+    "WR": 400.0,
+    "TE": 300.0,
+    "DST": 200.0,
+}
 
 def _outcome_value(outcome: Any, key: str, default: Any = None) -> Any:
     return getattr(outcome, key, default)
@@ -211,6 +222,42 @@ def _legacy_source_statuses(sources_used: list[str], sources_dropped: list[str])
     ]
 
 
+def _projection_quality_warnings(pos_projections: dict[str, list[float]]) -> list[str]:
+    warnings: list[str] = []
+    for pos in POSITIONS:
+        ceiling = EXPECTED_MAX_MEAN_POINTS.get(pos)
+        projections = pos_projections.get(pos, [])
+        if ceiling is None or not projections:
+            continue
+
+        top_mean = projections[0]
+        if top_mean > ceiling:
+            warnings.append(
+                f"{pos} projections appear inflated "
+                f"(top mean_pts={top_mean:.1f}, expected <={ceiling:.0f}). "
+                "Data may be unreliable this early in the season."
+            )
+    return warnings
+
+
+def _backfill_cached_diagnostic_fields(sheet: dict[str, Any]) -> None:
+    metadata = sheet.setdefault("metadata", {})
+    metadata.setdefault("data_quality_warnings", [])
+
+    baselines = metadata.get("baselines", {})
+    for pos, rows in sheet.get("positions", {}).items():
+        baseline = float(baselines.get(pos, 0.0))
+        for row in rows:
+            row.setdefault("baseline", round(baseline, 1))
+            if "mean_pts" in row:
+                continue
+            if "floor" in row and "ceil" in row:
+                mean_above_baseline = (float(row["floor"]) + float(row["ceil"])) / 2
+                row["mean_pts"] = round(baseline + mean_above_baseline, 1)
+            elif "val" in row:
+                row["mean_pts"] = round(baseline + float(row["val"]), 1)
+
+
 # --------------------------------------------------------------------------- #
 # Core pipeline
 # --------------------------------------------------------------------------- #
@@ -239,6 +286,8 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
             groups.setdefault(key, []).append(float(r.get("points", 0)))
         means = sorted([sum(v) / len(v) for v in groups.values()], reverse=True)
         pos_projections[pos] = means
+
+    data_quality_warnings = _projection_quality_warnings(pos_projections)
 
     # 5. Compute baselines
     baselines = compute_baselines(cfg, curves, pos_projections)
@@ -287,6 +336,7 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
             "sources_dropped": sources_dropped,
             "source_statuses": source_statuses,
             "baselines": {k: round(v, 1) for k, v in baselines.items()},
+            "data_quality_warnings": data_quality_warnings,
             "adp_available": adp_available,
             "cache_hit": False,
             "generation_time_s": round(elapsed, 2),
@@ -317,6 +367,7 @@ async def generate_sheet(cfg: LeagueConfig) -> SheetResponse:
     ck = _sheet_cache_key(cfg)
     cached = cache.get(ck)
     if cached is not None:
+        _backfill_cached_diagnostic_fields(cached)
         metadata = cached["metadata"]
         metadata["cache_hit"] = True
         if "source_statuses" not in metadata:

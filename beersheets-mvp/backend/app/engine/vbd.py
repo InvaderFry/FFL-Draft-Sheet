@@ -63,6 +63,7 @@ class PlayerVBD:
             "team": self.team,
             "bye_week": self.bye_week,
             "mean_pts": round(self.mean_pts, 1),
+            "baseline": round(self.baseline, 1),
             "sd_pts": round(self.sd_pts, 1),
             "n_sources": self.n_sources,
             "val": round(self.val, 1),
@@ -146,7 +147,7 @@ def aggregate_projections(
         sd = float(arr.std(ddof=min(1, n - 1))) if n > 1 else SD_FALLBACK_RATIO * mean
 
         val_raw = mean - baseline
-        val = max(0.0, val_raw)
+        val = val_raw
         floor_ = (mean - sd) - baseline
         ceil_ = (mean + sd) - baseline
 

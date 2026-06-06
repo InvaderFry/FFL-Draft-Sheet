@@ -128,6 +128,8 @@ async def _fetch_espn(client: httpx.AsyncClient, pos: str, cfg: LeagueConfig) ->
     while True:
         params = {
             "view": "kona_player_info",
+            # scoringPeriodId=0 asks ESPN for season-long projections; before
+            # July those values can be placeholders or otherwise unreliable.
             "scoringPeriodId": 0,
             "slotCategoryId": slot,
             "limit": limit,
