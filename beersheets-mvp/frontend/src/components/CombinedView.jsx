@@ -5,8 +5,8 @@ import styles from './CombinedView.module.css'
 // Each entry is one grid column; 'split' columns stack their positions 50/50.
 const COMBINED_COLUMNS = [
   { type: 'split', positions: ['QB', 'TE'] },
-  { type: 'full',  positions: ['WR'] },
   { type: 'full',  positions: ['RB'] },
+  { type: 'full',  positions: ['WR'] },
 ]
 
 const tableStyle = {
