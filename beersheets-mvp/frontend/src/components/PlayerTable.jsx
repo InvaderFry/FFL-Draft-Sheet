@@ -45,6 +45,8 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
         <tbody>
           {visible.map((player, idx) => {
             const tierClass = player.tier_is_even ? styles.tierEven : styles.tierOdd
+            const previous = visible[idx - 1]
+            const isTierStart = idx > 0 && player.tier != null && previous?.tier !== player.tier
             const ecr = ecrColor(player.adp_rank, player.ecr_rank, nTeams)
             const ecrStyle = { color: ecrColorStyle(ecr) }
             const valStyle = valBgStyle(player.val, maxVal, theme)
@@ -53,7 +55,7 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
             return (
               <tr
                 key={player.sleeper_id || `${player.player_name}-${idx}`}
-                className={tierClass}
+                className={`${tierClass} ${isTierStart ? styles.tierStart : ''}`}
                 onClick={() => onToggle(player.sleeper_id || player.player_name, player.player_name, player.pos)}
                 title="Click to mark as drafted"
               >
