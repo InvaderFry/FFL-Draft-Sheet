@@ -124,6 +124,10 @@
   border-top: none;
 }
 
+.tierStart td {
+  border-top: 1px solid var(--c-border2);
+}
+
 /* Subtle separator between tiers */
 .tierOdd + .tierEven td,
 .tierEven + .tierOdd td {
