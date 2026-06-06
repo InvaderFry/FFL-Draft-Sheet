@@ -10,6 +10,8 @@
  */
 
 import { ecrColor, ecrColorStyle } from '../utils/ecrColor'
+import { valBgStyle, psPctBgStyle } from '../utils/valGradient'
+import { useTheme } from '../context/ThemeContext'
 import '../styles/print.css'
 
 const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'DST']
@@ -23,10 +25,12 @@ function fmtVal(v) {
 export default function PrintView({ sheetData, config, isDrafted }) {
   if (!sheetData) return null
 
+  const { theme } = useTheme()
   const { positions, metadata } = sheetData
   const nTeams = config?.n_teams || 12
   const pprLabel = config?.scoring?.rec === 1 ? 'PPR' : config?.scoring?.rec === 0.5 ? '0.5 PPR' : 'Standard'
   const auctionMode = !!config?.auction_mode
+  const maxVal = Math.max(0, ...Object.values(positions).flat().map(p => p.val ?? 0))
 
   return (
     <div className="print-only print-sheet">
@@ -85,6 +89,8 @@ export default function PrintView({ sheetData, config, isDrafted }) {
                     const tierClass = player.tier_is_even ? 'tier-even' : 'tier-odd'
                     const ecr = ecrColor(player.adp_rank, player.ecr_rank, nTeams)
                     const ecrStyle = { color: ecrColorStyle(ecr) }
+                    const valStyle = valBgStyle(player.val, maxVal, theme)
+                    const psStyle  = psPctBgStyle(player.ps_pct, theme)
 
                     return (
                       <tr key={player.sleeper_id || idx}
@@ -97,9 +103,9 @@ export default function PrintView({ sheetData, config, isDrafted }) {
                         </td>
                         <td className="col-ecr" style={ecrStyle}>{player.ecr_fmt}</td>
                         <td className="col-num">{fmtVal(player.floor)}</td>
-                        <td className="col-num col-val">{fmtVal(player.val)}</td>
+                        <td className="col-num col-val" style={valStyle}>{fmtVal(player.val)}</td>
                         <td className="col-num">{fmtVal(player.ceil)}</td>
-                        <td className="col-num">
+                        <td className="col-num" style={psStyle}>
                           {player.ps_pct != null ? `${Math.round(player.ps_pct)}%` : '—'}
                         </td>
                         {auctionMode && (
