@@ -13,7 +13,7 @@ const POSITION_LABELS = {
 
 const POSITION_LIMITS = {
   QB: 30,
-  RB: 60,
+  RB: 66,
   WR: 66,
   TE: 24,
 }
