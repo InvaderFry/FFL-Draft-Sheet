@@ -11,6 +11,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import LeagueForm from './components/LeagueForm'
 import DraftBoard from './components/DraftBoard'
 import PrintView from './components/PrintView'
@@ -137,13 +138,14 @@ export default function App() {
         )}
       </main>
 
-      {/* Always-mounted print view (hidden on screen) */}
-      {sheetData && (
+      {/* Portaled to body so hiding #root in @media print does not suppress it. */}
+      {sheetData && typeof document !== 'undefined' && document.body && createPortal(
         <PrintView
           sheetData={sheetData}
           config={config}
           isDrafted={isDrafted}
-        />
+        />,
+        document.body
       )}
     </div>
   )

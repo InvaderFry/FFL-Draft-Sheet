@@ -7,6 +7,7 @@
  */
 
 import { ecrColor, ecrColorStyle } from '../utils/ecrColor'
+import { fmtVal } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle } from '../utils/valGradient'
 import { useTheme } from '../context/ThemeContext'
 import styles from './PlayerTable.module.css'
@@ -82,9 +83,4 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
       </table>
     </div>
   )
-}
-
-function fmtVal(v) {
-  if (v == null || isNaN(v)) return '—'
-  return v >= 0 ? v.toFixed(1) : `(${Math.abs(v).toFixed(1)})`
 }

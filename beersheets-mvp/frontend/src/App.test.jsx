@@ -2,6 +2,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
+import { ThemeProvider } from './context/ThemeContext'
+
+function renderApp() {
+  return render(
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  )
+}
 
 function qb(name, sleeperId) {
   return {
@@ -87,7 +96,7 @@ describe('App — draft state shared between board and print view', () => {
     const user = userEvent.setup()
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => SHEET })
 
-    const { container } = render(<App />)
+    const { container } = renderApp()
     await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
 
     // Board renders QB players.
@@ -95,7 +104,7 @@ describe('App — draft state shared between board and print view', () => {
     expect(await within(board).findByText('Patrick Mahomes')).toBeInTheDocument()
 
     // Print view is always mounted alongside; same player present.
-    const printRoot = container.querySelector('.print-sheet')
+    const printRoot = document.body.querySelector('.print-sheet')
     const printRowBefore = within(printRoot).getByText('Patrick Mahomes').closest('tr')
     expect(printRowBefore.className).not.toContain('drafted')
 
@@ -103,8 +112,8 @@ describe('App — draft state shared between board and print view', () => {
     const boardRow = within(board).getByText('Patrick Mahomes').closest('tr')
     await user.click(boardRow)
 
-    // Board shows the drafted marker…
-    expect(within(board).getByText('✕')).toBeInTheDocument()
+    // Board shows the drafted state in the side panel…
+    expect(within(board).getByText(/1 drafted/)).toBeInTheDocument()
     // …and the SAME state is reflected in the print view (regression test).
     await waitFor(() => {
       const printRow = within(printRoot).getByText('Patrick Mahomes').closest('tr')
@@ -120,13 +129,13 @@ describe('App — draft state shared between board and print view', () => {
     const user = userEvent.setup()
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => SHEET })
 
-    const { container } = render(<App />)
+    const { container } = renderApp()
     await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
 
     const board = container.querySelector('main')
     const boardRow = within(board).findByText('Patrick Mahomes')
     await user.click((await boardRow).closest('tr'))
-    expect(within(board).getByText('✕')).toBeInTheDocument()
+    expect(within(board).getByText(/1 drafted/)).toBeInTheDocument()
 
     // New Sheet resets everything.
     await user.click(screen.getByRole('button', { name: /new sheet/i }))
@@ -134,7 +143,7 @@ describe('App — draft state shared between board and print view', () => {
 
     const board2 = container.querySelector('main')
     await within(board2).findByText('Patrick Mahomes')
-    expect(within(board2).queryByText('✕')).not.toBeInTheDocument()
+    expect(within(board2).queryByText(/1 drafted/)).not.toBeInTheDocument()
   })
 })
 
@@ -143,7 +152,7 @@ describe('App — error handling', () => {
     const user = userEvent.setup()
     global.fetch = vi.fn().mockRejectedValue(new Error('Network boom'))
 
-    render(<App />)
+    renderApp()
     await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
 
     // Error message appears…
@@ -162,7 +171,7 @@ describe('App — error handling', () => {
       json: async () => ({ detail: 'baseline blew up' }),
     })
 
-    render(<App />)
+    renderApp()
     await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
 
     expect(await screen.findByText('baseline blew up')).toBeInTheDocument()
@@ -174,7 +183,7 @@ describe('App — source details', () => {
     const user = userEvent.setup()
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => SOURCE_STATUS_SHEET })
 
-    const { container } = render(<App />)
+    const { container } = renderApp()
     await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
 
     const board = container.querySelector('main')
@@ -204,7 +213,7 @@ describe('App — source details', () => {
     }
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => legacySheet })
 
-    const { container } = render(<App />)
+    const { container } = renderApp()
     await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
     const board = container.querySelector('main')
 
@@ -235,7 +244,7 @@ describe('App — source details', () => {
     }
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => emptySourceSheet })
 
-    const { container } = render(<App />)
+    const { container } = renderApp()
     await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
     const board = container.querySelector('main')
 

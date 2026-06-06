@@ -51,6 +51,11 @@ describe('valBgStyle', () => {
     expect(style.backgroundColor).toBe('rgba(254, 100, 11, 0.3)')
   })
 
+  it('supports the hardcoded print theme colors', () => {
+    expect(valBgStyle(0, 100, 'print', 0.25).backgroundColor).toBe('rgba(37, 99, 235, 0.25)')
+    expect(valBgStyle(100, 100, 'print', 0.40).backgroundColor).toBe('rgba(234, 88, 12, 0.4)')
+  })
+
   it('clamps negative value to 0 (blue endpoint)', () => {
     expect(valBgStyle(-10, 100, 'dark')).toEqual(valBgStyle(0, 100, 'dark'))
   })

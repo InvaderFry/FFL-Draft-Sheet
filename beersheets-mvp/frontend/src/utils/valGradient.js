@@ -4,12 +4,14 @@
  * Follows the same pattern as ecrColor.js: pure functions, no React deps.
  * Colors match the existing --c-ecr-blue / --c-ecr-orange CSS variables
  * for each theme, using Catppuccin palette for macchiato/latte.
+ * The print theme uses hardcoded paper-safe blue/orange endpoints.
  */
 
 const GRADIENT_COLORS = {
   dark:      { low: '#60a5fa', high: '#fb923c' },
   macchiato: { low: '#8aadf4', high: '#f5a97f' },
   latte:     { low: '#1e66f5', high: '#fe640b' },
+  print:     { low: '#2563eb', high: '#ea580c' },
 }
 
 function parseHex(hex) {
@@ -41,7 +43,7 @@ function hexToRgba(hex, alpha) {
  *
  * @param {number|null} value     - the player's VAL
  * @param {number}      maxValue  - global max VAL (across all positions)
- * @param {string}      theme     - 'dark' | 'macchiato' | 'latte'
+ * @param {string}      theme     - 'dark' | 'macchiato' | 'latte' | 'print'
  * @param {number}      [alpha]   - opacity of the background (default 0.30)
  * @returns {{ backgroundColor: string } | {}}
  */
@@ -59,7 +61,7 @@ export function valBgStyle(value, maxValue, theme, alpha = 0.30) {
  * Scale is always fixed 0–100 (PS% is position-scoped by the backend).
  *
  * @param {number|null} psPct  - the player's PS% value (0–100)
- * @param {string}      theme  - 'dark' | 'macchiato' | 'latte'
+ * @param {string}      theme  - 'dark' | 'macchiato' | 'latte' | 'print'
  * @param {number}      [alpha]
  * @returns {{ backgroundColor: string } | {}}
  */
