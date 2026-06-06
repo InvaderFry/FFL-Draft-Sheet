@@ -86,7 +86,7 @@
 
   .print-left-stack {
     display: flex;
-    flex: 1 1 0;
+    flex: 1.2 1 0;
     flex-direction: column;
     gap: 4pt;
     min-width: 0;
@@ -185,6 +185,27 @@
 
   .col-val {
     font-weight: 900;
+  }
+
+  /* QB/TE column overrides: shorter names free room for numeric values. */
+  .print-pos-qb .col-name,
+  .print-pos-te .col-name {
+    width: 22%;
+  }
+
+  .print-pos-qb .col-tmbw,
+  .print-pos-te .col-tmbw {
+    width: 9%;
+  }
+
+  .print-pos-qb .col-ecr,
+  .print-pos-te .col-ecr {
+    width: 10%;
+  }
+
+  .print-pos-qb .col-num,
+  .print-pos-te .col-num {
+    width: 14.75%;
   }
 
   .print-bottom {
