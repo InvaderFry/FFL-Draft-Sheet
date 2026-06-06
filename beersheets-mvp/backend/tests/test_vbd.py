@@ -42,7 +42,7 @@ def test_val_floor_ceil_calculated_correctly():
     mean = 210.0
     import numpy as np
     sd = float(np.std([200.0, 220.0], ddof=1))
-    assert p.val == pytest.approx(max(0, mean - 150.0))
+    assert p.val == pytest.approx(mean - 150.0)
     assert p.floor == pytest.approx((mean - sd) - 150.0)
     assert p.ceil == pytest.approx((mean + sd) - 150.0)
 
@@ -55,13 +55,12 @@ def test_single_source_sd_fallback():
     assert p.sd_pts == pytest.approx(SD_FALLBACK_RATIO * 180.0)
 
 
-def test_sub_baseline_val_clamped_to_zero():
+def test_sub_baseline_val_is_negative():
     rows = [_make_row("WaiverWire", "BUF", 10.0, "ESPN", "ww_id")]
     players = aggregate_projections(rows, "RB", baseline=100.0)
     p = players[0]
-    assert p.val == pytest.approx(0.0)
-    # Floor should still be negative (not clamped)
-    assert p.floor < 0
+    assert p.val < 0
+    assert p.floor < p.val
 
 
 def test_sorted_descending_by_val():
