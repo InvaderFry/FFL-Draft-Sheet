@@ -66,13 +66,16 @@ def test_degenerate_all_same_val():
     assert len(tiers) == 1
 
 
-def test_sub_baseline_players_last_tier():
-    vals = [50, 40, 30, 20, 10, 0, 0, 0]
+def test_sub_baseline_players_are_tiered_across_pool():
+    vals = [20, 15, 10, 5, 0, -2, -5, -8, -12]
     players = _make_qbs(vals)
     result = assign_tiers(players)
-    max_tier = max(p.tier for p in result)
-    zero_tiers = {p.tier for p in result if p.val == 0}
-    assert all(t == max_tier for t in zero_tiers)
+    tiers = {p.tier for p in result}
+    sub_baseline_tiers = {p.tier for p in result if p.val <= 0}
+
+    assert all(1 <= tier <= 8 for tier in sub_baseline_tiers)
+    assert len(tiers) >= 2
+    assert len(sub_baseline_tiers) >= 2
 
 
 def test_tier_is_even_flag():
@@ -118,12 +121,16 @@ def test_few_distinct_values_each_get_own_contiguous_tier():
 
 
 def test_few_distinct_values_with_sub_baseline():
-    """Sub-baseline (VAL=0) players join the last positive tier in the
-    degenerate branch and tier numbering stays contiguous."""
-    vals = [40, 30, 20, 0, 0]
+    """Sub-baseline values participate in the degenerate contiguous mapping."""
+    vals = [40, 30, 20, 0, -5, -5]
     players = _make_qbs(vals)
     result = assign_tiers(players)
     tier_set = sorted({p.tier for p in result})
     assert tier_set == list(range(1, max(tier_set) + 1))  # no gaps
-    last_tier = max(p.tier for p in result)
-    assert all(p.tier == last_tier for p in result if p.val == 0)
+
+    by_val = {p.val: p.tier for p in result}
+    assert by_val[40] == 1
+    assert by_val[30] == 2
+    assert by_val[20] == 3
+    assert by_val[0] == 4
+    assert by_val[-5] == 5

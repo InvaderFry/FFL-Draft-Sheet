@@ -8,7 +8,7 @@ N_TIERS_BY_POS: QB/TE → 8, RB/WR → 12, DST/K → 6
 (matches beersheet_clone.R and the plan)
 
 Edge cases:
-- Fewer unique values than requested tiers → equal-interval fallback
+- Fewer unique values than requested tiers → direct contiguous tier mapping
 - All same value → everyone tier 1
 
 Also sets tier_is_even (bool) for alternating row shading.
@@ -60,36 +60,26 @@ def assign_tiers(players: list[PlayerVBD]) -> list[PlayerVBD]:
     k = N_TIERS_BY_POS.get(pos, 8)
     vals = [p.val for p in players]
 
-    # Only use VAL > 0 for Jenks (sub-baseline players form a natural "last tier")
-    positive_vals = [v for v in vals if v > 0]
-    if not positive_vals:
-        for p in players:
-            p.tier = k
-            p.tier_is_even = (k % 2 == 0)
-        return players
+    unique_desc = sorted(set(vals), reverse=True)
 
-    unique_desc = sorted(set(positive_vals), reverse=True)
-
-    # Degenerate case: at most `k` distinct positive values.  Jenks/digitize can
+    # Degenerate case: at most `k` distinct values.  Jenks/digitize can
     # produce non-contiguous tier numbers here, so map each distinct value to its
     # own tier band directly (highest value → tier 1).
     if len(unique_desc) <= k:
         rank_of_value = {v: tier for tier, v in enumerate(unique_desc, start=1)}
         last_tier = len(unique_desc)
         for p in players:
-            t = rank_of_value.get(p.val, last_tier) if p.val > 0 else last_tier
+            t = rank_of_value.get(p.val, last_tier)
             p.tier = t
             p.tier_is_even = (t % 2 == 0)
         return players
 
     # General case: more distinct values than tiers → Jenks natural breaks.
-    breaks = _jenks_breaks(positive_vals, k)
+    breaks = _jenks_breaks(vals, k)
 
     # Assign tiers: break[0] < val ≤ break[1] → tier_class 1, etc.
     # We want tier 1 = highest VAL, so we reverse the digitize output.
     def val_to_tier(v: float) -> int:
-        if v <= 0:
-            return k  # sub-baseline → last tier
         # np.digitize: returns index of the bucket (1-indexed from left = low)
         bucket = int(np.digitize(v, breaks[1:-1]))  # 0..k-1
         # Reverse so bucket 0 (lowest) → tier k (worst)
