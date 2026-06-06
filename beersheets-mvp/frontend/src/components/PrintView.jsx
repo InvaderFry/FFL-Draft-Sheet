@@ -187,10 +187,11 @@ export default function PrintView({ sheetData, config, isDrafted }) {
       <header className="print-heading">
         <div className="print-title-row">
           <h2>ZSheet — {nTeams} Team · {pprLabel(scoring)}</h2>
+          <span className="print-title-roster">{buildRosterLine(config)}</span>
           <time>{new Date().toLocaleDateString()}</time>
         </div>
         <div className="print-subtitle">
-          {buildRosterLine(config)} · {buildScoringLine(scoring)}
+          {buildScoringLine(scoring)}
         </div>
       </header>
 
