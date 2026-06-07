@@ -350,9 +350,19 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
 # Endpoints
 # --------------------------------------------------------------------------- #
 
+@app.get("/")
+async def root() -> dict:
+    return {
+        "status": "ok",
+        "service": app.title,
+        "version": app.version,
+        **({"docs": app.docs_url} if app.docs_url else {}),
+    }
+
+
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": app.version}
 
 
 # No auth required — this cache holds only public, regeneratable data
