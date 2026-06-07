@@ -350,6 +350,11 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
 # Endpoints
 # --------------------------------------------------------------------------- #
 
+@app.get("/")
+async def root() -> dict:
+    return {"status": "ok", "service": "FFL Draft Sheet API", "version": "0.1.0", "docs": "/docs"}
+
+
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "version": "0.1.0"}
