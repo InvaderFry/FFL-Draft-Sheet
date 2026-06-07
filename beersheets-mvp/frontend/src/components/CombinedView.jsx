@@ -16,7 +16,7 @@ const tableStyle = {
   flex: 1,
 }
 
-export default function CombinedView({ positions, nTeams, isDrafted, onToggle, auctionMode, maxVal = 0 }) {
+export default function CombinedView({ positions, nTeams, isDrafted, onToggle, auctionMode, minVal = 0, maxVal = 0 }) {
   const { posColors } = useTheme()
   return (
     <div className={styles.grid}>
@@ -34,6 +34,7 @@ export default function CombinedView({ positions, nTeams, isDrafted, onToggle, a
                 isDrafted={isDrafted}
                 onToggle={onToggle}
                 auctionMode={auctionMode}
+                minVal={minVal}
                 maxVal={maxVal}
                 wrapStyle={tableStyle}
               />

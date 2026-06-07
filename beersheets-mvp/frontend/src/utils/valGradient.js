@@ -14,6 +14,8 @@ const GRADIENT_COLORS = {
   print:     { low: '#2563eb', high: '#ea580c' },
 }
 
+const VAL_RANGE_POSITIONS = ['QB', 'RB', 'WR', 'TE']
+
 function parseHex(hex) {
   const h = hex.replace('#', '')
   return [
@@ -37,20 +39,52 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
+function isFiniteVal(value) {
+  return value != null && Number.isFinite(value)
+}
+
+export function valRangeFromPositions(positions, rangePositions = VAL_RANGE_POSITIONS) {
+  const values = rangePositions
+    .flatMap(pos => positions?.[pos] || [])
+    .map(player => player.val)
+    .filter(isFiniteVal)
+
+  if (values.length === 0) return { minVal: 0, maxVal: 0 }
+
+  return {
+    minVal: Math.min(...values),
+    maxVal: Math.max(...values),
+  }
+}
+
+export function valGradientPosition(value, minValue, maxValue) {
+  if (
+    value == null ||
+    isNaN(value) ||
+    !Number.isFinite(minValue) ||
+    !Number.isFinite(maxValue) ||
+    minValue === maxValue
+  ) {
+    return null
+  }
+
+  return Math.max(0, Math.min((value - minValue) / (maxValue - minValue), 1))
+}
+
 /**
  * Returns a backgroundColor inline style for a VAL cell.
  * Blue = low value (t→0), Orange = high value (t→1).
  *
  * @param {number|null} value     - the player's VAL
+ * @param {number}      minValue  - global min VAL (across all positions)
  * @param {number}      maxValue  - global max VAL (across all positions)
  * @param {string}      theme     - 'dark' | 'macchiato' | 'latte' | 'print'
  * @param {number}      [alpha]   - opacity of the background (default 0.30)
  * @returns {{ backgroundColor: string } | {}}
  */
-export function valBgStyle(value, maxValue, theme, alpha = 0.30) {
-  if (value == null || isNaN(value) || maxValue <= 0) return {}
-  const clamped = Math.max(0, Math.min(value, maxValue))
-  const t = clamped / maxValue
+export function valBgStyle(value, minValue, maxValue, theme, alpha = 0.30) {
+  const t = valGradientPosition(value, minValue, maxValue)
+  if (t == null) return {}
   const colors = GRADIENT_COLORS[theme] ?? GRADIENT_COLORS.dark
   const hex = interpolateHex(colors.low, colors.high, t)
   return { backgroundColor: hexToRgba(hex, alpha) }
@@ -66,5 +100,5 @@ export function valBgStyle(value, maxValue, theme, alpha = 0.30) {
  * @returns {{ backgroundColor: string } | {}}
  */
 export function psPctBgStyle(psPct, theme, alpha = 0.30) {
-  return valBgStyle(psPct, 100, theme, alpha)
+  return valBgStyle(psPct, 0, 100, theme, alpha)
 }

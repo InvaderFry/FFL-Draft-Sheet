@@ -12,6 +12,7 @@ import CombinedView from './CombinedView'
 import DraftedPanel from './DraftedPanel'
 import Legend from './Legend'
 import { useTheme } from '../context/ThemeContext'
+import { valRangeFromPositions } from '../utils/valGradient'
 import styles from './DraftBoard.module.css'
 
 const TAB_ORDER = ['ALL', 'QB', 'RB', 'WR', 'TE', 'DST']
@@ -82,8 +83,8 @@ export default function DraftBoard({
   const nTeams = config?.n_teams || 12
   const auctionMode = config?.auction_mode || false
   const sourceDetails = useMemo(() => buildSourceDetails(metadata), [metadata])
-  const maxVal = useMemo(
-    () => Math.max(0, ...Object.values(positions).flat().map(p => p.val ?? 0)),
+  const { minVal, maxVal } = useMemo(
+    () => valRangeFromPositions(positions),
     [positions]
   )
   const sourceCount = sourceDetails.used.length
@@ -259,6 +260,7 @@ export default function DraftBoard({
               isDrafted={isDrafted}
               onToggle={toggle}
               auctionMode={auctionMode}
+              minVal={minVal}
               maxVal={maxVal}
             />
           ) : (
@@ -269,6 +271,7 @@ export default function DraftBoard({
               isDrafted={isDrafted}
               onToggle={toggle}
               auctionMode={auctionMode}
+              minVal={minVal}
               maxVal={maxVal}
               wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
             />
