@@ -96,6 +96,7 @@ class LeagueConfig(BaseModel):
     # Auction mode
     auction_mode: bool = Field(default=False)
     auction_budget: int = Field(default=200, ge=50, le=1000)
+    bench_spots: int = Field(default=6, ge=0, le=20)
 
     scoring: ScoringConfig = Field(default_factory=ScoringConfig)
 
@@ -126,5 +127,4 @@ class LeagueConfig(BaseModel):
     def n_rostered(self) -> int:
         """Total roster spots across all teams (used for auction math)."""
         total_starters = self.qb + self.rb + self.wr + self.te + self.dst + self.k + self.flex_slots
-        bench_spots = 6  # standard bench size assumption
-        return (total_starters + bench_spots) * self.n_teams
+        return (total_starters + self.bench_spots) * self.n_teams

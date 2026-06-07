@@ -80,3 +80,16 @@ def test_10team_200_budget_spot_check():
     cfg = build_league(n_teams=10, auction_mode=True, auction_budget=200)
     expected_disc = cfg.n_teams * cfg.auction_budget - cfg.n_rostered
     assert expected_disc > 0
+
+
+def test_n_rostered_default_is_6_bench():
+    cfg = build_league(n_teams=12)
+    total_starters = cfg.qb + cfg.rb + cfg.wr + cfg.te + cfg.dst + cfg.k + cfg.flex_slots
+    assert cfg.bench_spots == 6
+    assert cfg.n_rostered == (total_starters + 6) * 12
+
+
+def test_bench_spots_changes_n_rostered():
+    cfg = build_league(n_teams=10, bench_spots=8)
+    total_starters = cfg.qb + cfg.rb + cfg.wr + cfg.te + cfg.dst + cfg.k + cfg.flex_slots
+    assert cfg.n_rostered == (total_starters + 8) * 10

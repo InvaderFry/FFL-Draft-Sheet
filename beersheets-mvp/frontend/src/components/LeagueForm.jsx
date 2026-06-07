@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS = {
   fantasy_weeks: 14,
   QB: 1, RB: 2, WR: 3, TE: 1, DST: 1, K: 0,
   flex_slots: 1,
+  bench_spots: 6,
   flex_rb: 0.5, flex_wr: 0.4, flex_te: 0.1, flex_qb: 0.0,
   ppr: '0.5',     // UI-only; maps to scoring.rec below
   pass_td: 4, rush_td: 6, rec_td: 6,
@@ -66,6 +67,9 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
       errs.n_teams = 'Teams must be 8–16'
     if (settings.fantasy_weeks < 10 || settings.fantasy_weeks > 18)
       errs.fantasy_weeks = 'Weeks must be 10–18'
+    const benchSpots = parseInt(settings.bench_spots)
+    if (Number.isNaN(benchSpots) || benchSpots < 0 || benchSpots > 20)
+      errs.bench_spots = 'Bench must be 0–20'
     const flexSum = parseFloat(settings.flex_rb) + parseFloat(settings.flex_wr) + parseFloat(settings.flex_te) + parseFloat(settings.flex_qb)
     if (Math.abs(flexSum - 1.0) > 0.01)
       errs.flex = `Flex allocations must sum to 1.0 (currently ${flexSum.toFixed(2)})`
@@ -107,6 +111,7 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
       DST: parseInt(settings.DST),
       K: parseInt(settings.K),
       flex_slots: parseInt(settings.flex_slots),
+      bench_spots: parseInt(settings.bench_spots),
       flex_rb: parseFloat(settings.flex_rb),
       flex_wr: parseFloat(settings.flex_wr),
       flex_te: parseFloat(settings.flex_te),
@@ -261,6 +266,13 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
             <input type="number" min={0} max={3}
               value={settings.flex_slots}
               onChange={e => update('flex_slots', e.target.value)} />
+          </label>
+          <label className={styles.field}>
+            <span>Bench spots</span>
+            <input type="number" min={0} max={20}
+              value={settings.bench_spots}
+              onChange={e => update('bench_spots', e.target.value)} />
+            {validationError.bench_spots && <span className={styles.fieldError}>{validationError.bench_spots}</span>}
           </label>
         </section>
 

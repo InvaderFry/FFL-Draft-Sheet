@@ -19,9 +19,10 @@ from pydantic import BaseModel, Field
 
 from app.config import LeagueConfig, POSITIONS
 from app import cache
-from app.data.players import load_player_map
+from app.data.players import canonical_key, load_player_map
 from app.data.scraper import ADAPTERS, scrape_all
 from app.data.historical import load_attrition_curves
+from app.data.variance import load_variance
 from app.data.adp import enrich_with_adp
 from app.engine.baseline import compute_baselines
 from app.engine.vbd import aggregate_projections, PlayerVBD
@@ -120,7 +121,7 @@ def _sheet_cache_key(cfg: LeagueConfig) -> str:
     return (
         f"sheet_{cfg.season}_{cfg.n_teams}t_{ppr}ppr_"
         f"{cfg.qb}QB{cfg.rb}RB{cfg.wr}WR{cfg.te}TE_{cfg.flex_slots}FLEX_"
-        f"{cfg.fantasy_weeks}wk_{date.today()}"
+        f"{cfg.fantasy_weeks}wk_{cfg.bench_spots}bench_{date.today()}"
     )
 
 
@@ -274,6 +275,7 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
 
     # 3. Load attrition curves
     curves = load_attrition_curves(cfg.season)
+    variance = load_variance(cfg.season)
 
     # 4. Build mean-points-by-rank for baseline computation
     pos_projections: dict[str, list[float]] = {}
@@ -282,7 +284,7 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
         # Group by player, take mean, sort descending
         groups: dict[str, list[float]] = {}
         for r in rows:
-            key = r.get("sleeper_id") or r.get("player_name", "")
+            key = canonical_key(r)
             groups.setdefault(key, []).append(float(r.get("points", 0)))
         means = sorted([sum(v) / len(v) for v in groups.values()], reverse=True)
         pos_projections[pos] = means
@@ -299,7 +301,7 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
     ppr = cfg.scoring.rec
     for pos in POSITIONS:
         rows = raw_by_pos.get(pos, [])
-        players = aggregate_projections(rows, pos, baselines.get(pos, 0.0), player_map)
+        players = aggregate_projections(rows, pos, baselines.get(pos, 0.0), player_map, variance=variance)
         players = assign_tiers(players)
         players = assign_positional_scarcity(players)
         position_players[pos] = players

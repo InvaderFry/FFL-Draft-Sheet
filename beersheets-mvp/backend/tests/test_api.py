@@ -22,6 +22,15 @@ def client():
     return TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def mock_variance_loader(monkeypatch):
+    """Keep sheet-generation tests offline by replacing nfl_data_py weekly loading."""
+    monkeypatch.setattr("app.main.load_variance", lambda season: {
+        "player_cv": {},
+        "pos_median_cv": {pos: 0.45 for pos in ["QB", "RB", "WR", "TE", "DST"]},
+    })
+
+
 # ---- health ------------------------------------------------------------------
 
 def test_health(client):
@@ -382,6 +391,23 @@ def test_legacy_cached_sheet_backfills_source_statuses_without_losing_source_nam
     statuses = {entry["source"]: entry for entry in meta["source_statuses"]}
     assert statuses["FantasyPros"]["status"] == "used"
     assert statuses["FFToday"]["status"] == "unavailable"
+
+
+def test_sheet_cache_key_includes_bench_spots():
+    from app.main import _sheet_cache_key
+    from app.config import LeagueConfig
+
+    base = {
+        "n_teams": 12,
+        "QB": 1, "RB": 2, "WR": 3, "TE": 1, "DST": 1, "K": 0,
+        "flex_slots": 1,
+    }
+    default_key = _sheet_cache_key(LeagueConfig(**base))
+    deep_bench_key = _sheet_cache_key(LeagueConfig(**base, bench_spots=8))
+
+    assert "_6bench_" in default_key
+    assert "_8bench_" in deep_bench_key
+    assert default_key != deep_bench_key
 
 
 # ---- CORS header present -----------------------------------------------------

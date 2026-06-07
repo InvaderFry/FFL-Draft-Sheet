@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 
+import jenkspy
 import numpy as np
 
 from app.config import N_TIERS_BY_POS
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 def _jenks_breaks(values: list[float], n_classes: int) -> list[float]:
     """
-    Compute Jenks natural breaks.  Prefers jenkspy; falls back to equal-interval.
+    Compute Jenks natural breaks. Falls back only for runtime Jenks failures.
     """
     unique = sorted(set(values))
     if len(unique) <= n_classes:
@@ -38,11 +39,10 @@ def _jenks_breaks(values: list[float], n_classes: int) -> list[float]:
         return unique
 
     try:
-        import jenkspy  # type: ignore
         breaks = jenkspy.jenks_breaks(values, n_classes=n_classes)
         return list(breaks)
     except Exception as exc:
-        logger.warning("jenkspy failed (%s); using equal-interval fallback", exc)
+        logger.error("jenkspy failed (%s); tier quality degraded, using equal-interval fallback", exc)
         lo, hi = min(values), max(values)
         step = (hi - lo) / n_classes
         return [lo + i * step for i in range(n_classes + 1)]
