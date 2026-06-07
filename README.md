@@ -161,11 +161,11 @@ Deploying makes the app accessible from any browser — including Safari on iPad
 ### Step 2 — Deploy the frontend to Vercel
 
 1. Go to [vercel.com](https://vercel.com) → **New Project** → Import `InvaderFry/FFL-Draft-Sheet`
-2. **Leave Root Directory blank (repo root)** — this is where `vercel.json` lives
+2. Set **Root Directory** to `frontend` — this scopes Vercel to the React app only and prevents it from trying to deploy the backend as a second service
 3. Before deploying, add an environment variable:
    - **Key:** `VITE_API_URL`
    - **Value:** `https://ffl-draft-sheet-api.onrender.com` (your Render URL from Step 1)
-4. Click **Deploy** — Vercel reads `vercel.json` automatically
+4. Click **Deploy** — Vercel auto-detects Vite and reads `frontend/vercel.json` automatically
 5. Your app is live at `https://<your-project>.vercel.app`
 
 ### Step 3 — Open on iPad (or any browser)
@@ -186,7 +186,8 @@ Navigate to your Vercel URL in Safari. To add it to the iPad home screen as a sh
 | Symptom | Likely cause |
 |---|---|
 | Frontend loads but draft sheet never returns | `VITE_API_URL` not set or pointing to wrong URL |
-| Build fails on Render or Vercel | Root Directory not left blank / set to repo root |
+| Vercel shows multi-service detection / requires `experimentalServices` | Root Directory not set to `frontend` — Vercel scanned the whole repo and found the backend too |
+| Vercel build fails | Root Directory not set to `frontend` |
 | Build fails: `/app` or `/requirements.txt` not found | Docker Context Directory not set to `./backend` — Render used the repo root as context where those files don't exist |
 | First request takes 30–60 s | Render free tier cold start — normal behavior |
 
