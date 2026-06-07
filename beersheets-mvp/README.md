@@ -9,7 +9,7 @@ Generates a Value-Based Drafting board with man-games baseline, Jenks natural-br
 ## Features
 
 - **Value-Based Drafting (VBD)** with the Frank Dupont "man-games" replacement baseline
-- **Floor / VAL / Ceiling** columns derived from cross-source standard deviation
+- **Floor / VAL / Ceiling** columns using historical weekly outcome variance, with source-σ fallback
 - **Jenks natural-break tiers** (12 for RB/WR, 8 for QB/TE, 6 for DST)
 - **Positional scarcity (PS%)** — share of value remaining after each player
 - **ECR** formatted as `round|pick` with ADP-divergence coloring (blue = going earlier, orange = later)
@@ -90,6 +90,7 @@ npm run lint    # eslint
   "fantasy_weeks": 14,
   "QB": 1, "RB": 2, "WR": 3, "TE": 1, "DST": 1, "K": 0,
   "flex_slots": 1,
+  "bench_spots": 6,
   "flex_rb": 0.5, "flex_wr": 0.4, "flex_te": 0.1,
   "auction_mode": false,
   "auction_budget": 200,
@@ -115,7 +116,7 @@ frontend/ (React 18 + Vite)      backend/ (Python 3.12 + FastAPI)
   DraftBoard.jsx                      ↓ Data orchestrator
   PlayerTable.jsx                     ├── Sleeper player map
   PrintView.jsx                       ├── Multi-source projection scraper
-  useDraftState.js                    ├── nfl_data_py attrition curves
+  useDraftState.js                    ├── nfl_data_py attrition curves + weekly variance
   ecrColor.js                         ├── Man-games baseline (Dupont)
                                       ├── VBD (Floor/VAL/Ceil)
                                       ├── Jenks tier assignment
@@ -199,12 +200,16 @@ Walk the positional attrition curve (3-year historical games-played-by-rank from
 ### Value columns
 
 ```
-VAL   = mean_pts − baseline_pts          (clamped ≥ 0 for the value pool)
-Floor = (mean_pts − σ) − baseline_pts
-Ceil  = (mean_pts + σ) − baseline_pts
+VAL   = mean_pts − baseline_pts
+Floor = (mean_pts − band) − baseline_pts
+Ceil  = (mean_pts + band) − baseline_pts
 ```
 
-where σ = standard deviation of fantasy points across projection sources. Single-source players: σ = 12% × mean.
+`VAL` may be negative; sub-baseline values are intentional and are used by tiering and scarcity.
+
+`band` comes from historical weekly outcome variance: player CV × projected mean, where CV is weekly stdev / weekly mean across the last three completed seasons. Known players without enough weekly samples fall back to their position's median CV. If weekly variance data or a player's historical identity is unavailable, the backend falls back to source σ; single-source players use σ = 12% × mean.
+
+This scales the band with player caliber while measuring real outcome volatility instead of projection-site disagreement.
 
 ### Positional scarcity (PS%)
 
@@ -233,7 +238,7 @@ price[i] = $1 + (val[i] / Σ val) × discretionary
 | FFToday | Projection scrape |
 | NumberFire | Projection scrape |
 | ESPN Fantasy API | Projection scrape |
-| nfl_data_py (nflverse) | Historical games-played for attrition curve |
+| nfl_data_py (nflverse) | Historical games-played for attrition curves; weekly game logs for floor/ceiling variance |
 
 ---
 

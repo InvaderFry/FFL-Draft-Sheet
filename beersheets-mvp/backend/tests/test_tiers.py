@@ -2,7 +2,8 @@
 
 import pytest
 from app.engine.vbd import PlayerVBD
-from app.engine.tiers import assign_tiers
+from app.engine import tiers as tiers_mod
+from app.engine.tiers import _jenks_breaks, assign_tiers
 
 
 def _make_player(name, pos, val):
@@ -142,3 +143,17 @@ def test_few_distinct_values_with_sub_baseline():
 
     pos_tier_set = sorted({p.tier for p in result if p.val > 0})
     assert pos_tier_set == list(range(1, max(pos_tier_set) + 1))
+
+
+def test_jenks_runtime_failure_falls_back_loudly(monkeypatch, caplog):
+    def fail_jenks_breaks(_values, n_classes):
+        raise RuntimeError("bad input")
+
+    monkeypatch.setattr(tiers_mod.jenkspy, "jenks_breaks", fail_jenks_breaks)
+    values = [float(i) for i in range(10)]
+
+    with caplog.at_level("ERROR"):
+        breaks = _jenks_breaks(values, n_classes=4)
+
+    assert breaks == pytest.approx([0.0, 2.25, 4.5, 6.75, 9.0])
+    assert any("tier quality degraded" in record.message for record in caplog.records)

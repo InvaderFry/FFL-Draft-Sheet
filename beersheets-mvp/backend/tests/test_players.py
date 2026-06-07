@@ -3,7 +3,7 @@
 import pytest
 
 from app.data import players as players_mod
-from app.data.players import PlayerRecord, find_player
+from app.data.players import PlayerRecord, canonical_key, find_player
 
 
 def _rec(sid, full_name, pos, team):
@@ -100,3 +100,17 @@ def test_no_match_returns_none(seeded_map):
 def test_no_candidates_for_unknown_position(seeded_map):
     # Position with no records → no crash, returns None.
     assert find_player("Anyone", "DST", "KC") is None
+
+
+def test_canonical_key_prefers_sleeper_id():
+    row = {"sleeper_id": "12345", "player_name": "Someone Else", "team": "KC"}
+    assert canonical_key(row) == "sid:12345"
+
+
+def test_canonical_key_falls_back_to_normalized_name_and_team():
+    row = {"player_name": "  Justin Jefferson  ", "team": "  MIN "}
+    assert canonical_key(row) == "name:justin jefferson:min"
+
+
+def test_canonical_key_missing_fields_do_not_crash():
+    assert canonical_key({}) == "name::"

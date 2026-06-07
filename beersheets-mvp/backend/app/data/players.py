@@ -6,6 +6,7 @@ mapping sleeper_id → player record, bridged to ESPN, Yahoo, MFL, and GSIS IDs
 via nfl_data_py import_ids().
 
 Public API:
+    canonical_key(row: dict) -> str
     load_player_map(force_refresh=False) -> dict[str, PlayerRecord]
     get_player(sleeper_id: str) -> PlayerRecord | None
     find_player(name: str, pos: str, team: str) -> PlayerRecord | None
@@ -34,6 +35,20 @@ POSITIONS_OF_INTEREST = set(POSITIONS) | {"DEF"}
 _player_map: dict[str, "PlayerRecord"] | None = None
 _name_index: dict[str, list["PlayerRecord"]] = {}
 _pos_index: dict[str, list["PlayerRecord"]] = {}
+
+
+def canonical_key(row: dict) -> str:
+    """Canonical grouping identity for a projection row.
+
+    Prefer Sleeper ID; fall back to normalized name+team. The prefixes prevent
+    a numeric Sleeper ID from colliding with a player name.
+    """
+    sid = row.get("sleeper_id")
+    if sid:
+        return f"sid:{sid}"
+    name = (row.get("player_name") or "").strip().lower()
+    team = (row.get("team") or "").strip().lower()
+    return f"name:{name}:{team}"
 
 
 @dataclass
