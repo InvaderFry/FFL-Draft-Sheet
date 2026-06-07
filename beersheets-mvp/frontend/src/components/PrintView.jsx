@@ -90,8 +90,8 @@ function printValStyle(value, minValue, maxValue) {
 }
 
 function printPsStyle(psPct) {
-  if (psPct == null || isNaN(psPct)) return {}
-  const t = Math.max(0, Math.min(psPct, 100)) / 100
+  const t = valGradientPosition(psPct, 0, 100)
+  if (t == null) return {}
   if (t >= 0.67) return psPctBgStyle(psPct, 'print', 0.40)
   if (t <= 0.33) return psPctBgStyle(psPct, 'print', 0.25)
   return {}
