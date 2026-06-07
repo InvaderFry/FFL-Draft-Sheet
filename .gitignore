@@ -7,7 +7,6 @@ venv/
 .pytest_cache/
 
 # Backend file cache
-beersheets-mvp/backend/cache/
 cache/
 
 # Node / frontend
