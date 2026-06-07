@@ -144,13 +144,14 @@ Deploying makes the app accessible from any browser — including Safari on iPad
 
 ### Step 1 — Deploy the backend to Render
 
-1. Go to [render.com](https://render.com) → **New → Web Service**
+1. Go to [render.com](https://render.com) → **New → Blueprint**
 2. Connect the GitHub repo (`InvaderFry/FFL-Draft-Sheet`)
-3. **Leave Root Directory blank (repo root)** — this is where `render.yaml` lives
-4. Render auto-detects `render.yaml` and configures the Docker service
-5. Click **Deploy**
-6. Once live, note your backend URL (e.g. `https://ffl-draft-sheet-api.onrender.com`)
-7. Verify: visit `https://<your-render-url>/health` — should return `{"status":"ok"}`
+3. Leave Root Directory blank — Render reads `render.yaml` from the repo root automatically
+4. Click **Apply** — Render creates the `ffl-draft-sheet-api` web service from the blueprint
+5. Once live, note your backend URL (e.g. `https://ffl-draft-sheet-api.onrender.com`)
+6. Verify: visit `https://<your-render-url>/health` — should return `{"status":"ok"}`
+
+> **Why Blueprint and not Web Service?** `render.yaml` sets `dockerContext: ./backend` so Docker can find `requirements.txt` and `app/`. The "New → Web Service" flow ignores `render.yaml` and defaults the build context to the repo root, where those files don't exist — causing the build to fail.
 
 > **Free tier caveat:** Render spins down services after 15 minutes of inactivity. The first request after a cold start takes 30–60 seconds. The $7/mo paid tier keeps the service always-on.
 
@@ -183,6 +184,7 @@ Navigate to your Vercel URL in Safari. To add it to the iPad home screen as a sh
 |---|---|
 | Frontend loads but draft sheet never returns | `VITE_API_URL` not set or pointing to wrong URL |
 | Build fails on Render or Vercel | Root Directory not left blank / set to repo root |
+| Build fails: `/app` or `/requirements.txt` not found | Created service via "New → Web Service" instead of "New → Blueprint" — Render skipped `render.yaml` and used the repo root as the Docker build context |
 | First request takes 30–60 s | Render free tier cold start — normal behavior |
 
 ---
