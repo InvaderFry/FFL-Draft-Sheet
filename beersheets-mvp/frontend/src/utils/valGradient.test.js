@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { valBgStyle, psPctBgStyle } from './valGradient'
+import { valBgStyle, psPctBgStyle, valGradientPosition, valRangeFromPositions } from './valGradient'
 
 describe('valBgStyle', () => {
   it('returns {} for null value', () => {
@@ -12,6 +12,11 @@ describe('valBgStyle', () => {
 
   it('returns {} when minValue equals maxValue', () => {
     expect(valBgStyle(10, 10, 10, 'dark')).toEqual({})
+  })
+
+  it('returns {} when range bounds are not finite', () => {
+    expect(valBgStyle(10, NaN, 50, 'dark')).toEqual({})
+    expect(valBgStyle(10, 0, NaN, 'dark')).toEqual({})
   })
 
   it('returns low color (blue) at t=0 for dark theme', () => {
@@ -72,6 +77,43 @@ describe('valBgStyle', () => {
   it('respects custom alpha', () => {
     const style = valBgStyle(-10, -10, 100, 'dark', 0.5)
     expect(style.backgroundColor).toBe('rgba(96, 165, 250, 0.5)')
+  })
+})
+
+describe('valGradientPosition', () => {
+  it('returns the shared clamped position for gradient callers', () => {
+    expect(valGradientPosition(0, -20, 40)).toBeCloseTo(1 / 3)
+    expect(valGradientPosition(-999, -20, 40)).toBe(0)
+    expect(valGradientPosition(999, -20, 40)).toBe(1)
+  })
+
+  it('returns null for invalid values or ranges', () => {
+    expect(valGradientPosition(null, -20, 40)).toBeNull()
+    expect(valGradientPosition(NaN, -20, 40)).toBeNull()
+    expect(valGradientPosition(10, NaN, 40)).toBeNull()
+    expect(valGradientPosition(10, -20, NaN)).toBeNull()
+    expect(valGradientPosition(10, 10, 10)).toBeNull()
+  })
+})
+
+describe('valRangeFromPositions', () => {
+  it('uses only finite QB/RB/WR/TE values for the range', () => {
+    expect(valRangeFromPositions({
+      QB: [{ val: 40 }],
+      RB: [{ val: null }, { val: 5 }],
+      WR: [{ val: NaN }, { val: 20 }],
+      TE: [{ val: 12 }],
+      DST: [{ val: -50 }],
+      K: [{ val: 100 }],
+    })).toEqual({ minVal: 5, maxVal: 40 })
+  })
+
+  it('falls back to an empty range when no finite skill-position values exist', () => {
+    expect(valRangeFromPositions({
+      QB: [{ val: null }],
+      RB: [{ val: NaN }],
+      DST: [{ val: -50 }],
+    })).toEqual({ minVal: 0, maxVal: 0 })
   })
 })
 

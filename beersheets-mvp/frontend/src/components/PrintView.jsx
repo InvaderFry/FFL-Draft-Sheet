@@ -1,7 +1,7 @@
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import { ecrColor } from '../utils/ecrColor'
 import { fmtVal } from '../utils/formatters'
-import { valBgStyle, psPctBgStyle } from '../utils/valGradient'
+import { valBgStyle, psPctBgStyle, valGradientPosition, valRangeFromPositions } from '../utils/valGradient'
 import '../styles/print.css'
 
 const POSITION_LABELS = {
@@ -19,6 +19,7 @@ const POSITION_LIMITS = {
 }
 
 const DST_LIMIT = 14
+const EMPTY_POSITIONS = {}
 
 function fmtNumber(value) {
   if (value == null || isNaN(value)) return '0'
@@ -81,8 +82,8 @@ function printEcrStyle(color) {
 }
 
 function printValStyle(value, minValue, maxValue) {
-  if (value == null || isNaN(value) || minValue === maxValue) return {}
-  const t = Math.max(0, Math.min((value - minValue) / (maxValue - minValue), 1))
+  const t = valGradientPosition(value, minValue, maxValue)
+  if (t == null) return {}
   if (t >= 0.67) return valBgStyle(value, minValue, maxValue, 'print', 0.40)
   if (t <= 0.33) return valBgStyle(value, minValue, maxValue, 'print', 0.25)
   return {}
@@ -169,15 +170,18 @@ function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, au
 const PositionTable = memo(PositionTableBase)
 
 export default function PrintView({ sheetData, config, isDrafted }) {
+  const positions = sheetData?.positions ?? EMPTY_POSITIONS
+  const metadata = sheetData?.metadata
+  const { minVal, maxVal } = useMemo(
+    () => valRangeFromPositions(positions),
+    [positions]
+  )
+
   if (!sheetData) return null
 
-  const { positions = {}, metadata } = sheetData
   const nTeams = config?.n_teams || 12
   const scoring = config?.scoring ?? {}
   const auctionMode = !!config?.auction_mode
-  const valValues = ['QB', 'RB', 'WR', 'TE'].flatMap(pos => positions[pos] || []).map(p => p.val ?? 0)
-  const minVal = valValues.length > 0 ? Math.min(...valValues) : 0
-  const maxVal = valValues.length > 0 ? Math.max(...valValues) : 0
   const dstPlayers = (positions.DST || [])
     .slice()
     .sort((a, b) => (b.val ?? 0) - (a.val ?? 0))

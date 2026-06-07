@@ -12,6 +12,7 @@ import CombinedView from './CombinedView'
 import DraftedPanel from './DraftedPanel'
 import Legend from './Legend'
 import { useTheme } from '../context/ThemeContext'
+import { valRangeFromPositions } from '../utils/valGradient'
 import styles from './DraftBoard.module.css'
 
 const TAB_ORDER = ['ALL', 'QB', 'RB', 'WR', 'TE', 'DST']
@@ -82,17 +83,9 @@ export default function DraftBoard({
   const nTeams = config?.n_teams || 12
   const auctionMode = config?.auction_mode || false
   const sourceDetails = useMemo(() => buildSourceDetails(metadata), [metadata])
-  const valValues = useMemo(
-    () => Object.values(positions).flat().map(p => p.val ?? 0),
+  const { minVal, maxVal } = useMemo(
+    () => valRangeFromPositions(positions),
     [positions]
-  )
-  const minVal = useMemo(
-    () => valValues.length > 0 ? Math.min(...valValues) : 0,
-    [valValues]
-  )
-  const maxVal = useMemo(
-    () => valValues.length > 0 ? Math.max(...valValues) : 0,
-    [valValues]
   )
   const sourceCount = sourceDetails.used.length
 

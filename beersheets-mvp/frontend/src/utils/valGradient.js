@@ -14,6 +14,8 @@ const GRADIENT_COLORS = {
   print:     { low: '#2563eb', high: '#ea580c' },
 }
 
+const VAL_RANGE_POSITIONS = ['QB', 'RB', 'WR', 'TE']
+
 function parseHex(hex) {
   const h = hex.replace('#', '')
   return [
@@ -37,6 +39,38 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
+function isFiniteVal(value) {
+  return value != null && Number.isFinite(value)
+}
+
+export function valRangeFromPositions(positions, rangePositions = VAL_RANGE_POSITIONS) {
+  const values = rangePositions
+    .flatMap(pos => positions?.[pos] || [])
+    .map(player => player.val)
+    .filter(isFiniteVal)
+
+  if (values.length === 0) return { minVal: 0, maxVal: 0 }
+
+  return {
+    minVal: Math.min(...values),
+    maxVal: Math.max(...values),
+  }
+}
+
+export function valGradientPosition(value, minValue, maxValue) {
+  if (
+    value == null ||
+    isNaN(value) ||
+    !Number.isFinite(minValue) ||
+    !Number.isFinite(maxValue) ||
+    minValue === maxValue
+  ) {
+    return null
+  }
+
+  return Math.max(0, Math.min((value - minValue) / (maxValue - minValue), 1))
+}
+
 /**
  * Returns a backgroundColor inline style for a VAL cell.
  * Blue = low value (t→0), Orange = high value (t→1).
@@ -49,8 +83,8 @@ function hexToRgba(hex, alpha) {
  * @returns {{ backgroundColor: string } | {}}
  */
 export function valBgStyle(value, minValue, maxValue, theme, alpha = 0.30) {
-  if (value == null || isNaN(value) || minValue === maxValue) return {}
-  const t = Math.max(0, Math.min((value - minValue) / (maxValue - minValue), 1))
+  const t = valGradientPosition(value, minValue, maxValue)
+  if (t == null) return {}
   const colors = GRADIENT_COLORS[theme] ?? GRADIENT_COLORS.dark
   const hex = interpolateHex(colors.low, colors.high, t)
   return { backgroundColor: hexToRgba(hex, alpha) }
