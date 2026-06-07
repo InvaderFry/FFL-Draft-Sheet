@@ -42,15 +42,15 @@ function hexToRgba(hex, alpha) {
  * Blue = low value (t→0), Orange = high value (t→1).
  *
  * @param {number|null} value     - the player's VAL
+ * @param {number}      minValue  - global min VAL (across all positions)
  * @param {number}      maxValue  - global max VAL (across all positions)
  * @param {string}      theme     - 'dark' | 'macchiato' | 'latte' | 'print'
  * @param {number}      [alpha]   - opacity of the background (default 0.30)
  * @returns {{ backgroundColor: string } | {}}
  */
-export function valBgStyle(value, maxValue, theme, alpha = 0.30) {
-  if (value == null || isNaN(value) || maxValue <= 0) return {}
-  const clamped = Math.max(0, Math.min(value, maxValue))
-  const t = clamped / maxValue
+export function valBgStyle(value, minValue, maxValue, theme, alpha = 0.30) {
+  if (value == null || isNaN(value) || minValue === maxValue) return {}
+  const t = Math.max(0, Math.min((value - minValue) / (maxValue - minValue), 1))
   const colors = GRADIENT_COLORS[theme] ?? GRADIENT_COLORS.dark
   const hex = interpolateHex(colors.low, colors.high, t)
   return { backgroundColor: hexToRgba(hex, alpha) }
@@ -66,5 +66,5 @@ export function valBgStyle(value, maxValue, theme, alpha = 0.30) {
  * @returns {{ backgroundColor: string } | {}}
  */
 export function psPctBgStyle(psPct, theme, alpha = 0.30) {
-  return valBgStyle(psPct, 100, theme, alpha)
+  return valBgStyle(psPct, 0, 100, theme, alpha)
 }

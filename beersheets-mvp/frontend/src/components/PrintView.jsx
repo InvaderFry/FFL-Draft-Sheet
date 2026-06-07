@@ -80,11 +80,11 @@ function printEcrStyle(color) {
   return {}
 }
 
-function printValStyle(value, maxValue) {
-  if (value == null || isNaN(value) || maxValue <= 0) return {}
-  const t = Math.max(0, Math.min(value, maxValue)) / maxValue
-  if (t >= 0.67) return valBgStyle(value, maxValue, 'print', 0.40)
-  if (t <= 0.33) return valBgStyle(value, maxValue, 'print', 0.25)
+function printValStyle(value, minValue, maxValue) {
+  if (value == null || isNaN(value) || minValue === maxValue) return {}
+  const t = Math.max(0, Math.min((value - minValue) / (maxValue - minValue), 1))
+  if (t >= 0.67) return valBgStyle(value, minValue, maxValue, 'print', 0.40)
+  if (t <= 0.33) return valBgStyle(value, minValue, maxValue, 'print', 0.25)
   return {}
 }
 
@@ -109,7 +109,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function PositionTableBase({ pos, players, nTeams, isDrafted, maxVal, auctionMode }) {
+function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, auctionMode }) {
   const visible = players.slice(0, POSITION_LIMITS[pos] ?? players.length)
 
   return (
@@ -147,7 +147,7 @@ function PositionTableBase({ pos, players, nTeams, isDrafted, maxVal, auctionMod
                 <td className="col-tmbw">{teamBye(player)}</td>
                 <td className="col-ecr" style={printEcrStyle(ecr)}>{player.ecr_fmt || '—'}</td>
                 <td className="col-num">{fmtVal(player.floor)}</td>
-                <td className="col-num col-val" style={printValStyle(player.val, maxVal)}>{fmtVal(player.val)}</td>
+                <td className="col-num col-val" style={printValStyle(player.val, minVal, maxVal)}>{fmtVal(player.val)}</td>
                 <td className="col-num">{fmtVal(player.ceil)}</td>
                 <td className="col-num" style={printPsStyle(player.ps_pct)}>
                   {player.ps_pct != null ? `${Math.round(player.ps_pct)}%` : '—'}
@@ -175,8 +175,9 @@ export default function PrintView({ sheetData, config, isDrafted }) {
   const nTeams = config?.n_teams || 12
   const scoring = config?.scoring ?? {}
   const auctionMode = !!config?.auction_mode
-  const maxValPlayers = ['QB', 'RB', 'WR', 'TE'].flatMap(pos => positions[pos] || [])
-  const maxVal = Math.max(0, ...maxValPlayers.map(p => p.val ?? 0))
+  const valValues = ['QB', 'RB', 'WR', 'TE'].flatMap(pos => positions[pos] || []).map(p => p.val ?? 0)
+  const minVal = valValues.length > 0 ? Math.min(...valValues) : 0
+  const maxVal = valValues.length > 0 ? Math.max(...valValues) : 0
   const dstPlayers = (positions.DST || [])
     .slice()
     .sort((a, b) => (b.val ?? 0) - (a.val ?? 0))
@@ -202,6 +203,7 @@ export default function PrintView({ sheetData, config, isDrafted }) {
             players={positions.QB || []}
             nTeams={nTeams}
             isDrafted={isDrafted}
+            minVal={minVal}
             maxVal={maxVal}
             auctionMode={auctionMode}
           />
@@ -210,6 +212,7 @@ export default function PrintView({ sheetData, config, isDrafted }) {
             players={positions.TE || []}
             nTeams={nTeams}
             isDrafted={isDrafted}
+            minVal={minVal}
             maxVal={maxVal}
             auctionMode={auctionMode}
           />
@@ -219,6 +222,7 @@ export default function PrintView({ sheetData, config, isDrafted }) {
           players={positions.RB || []}
           nTeams={nTeams}
           isDrafted={isDrafted}
+          minVal={minVal}
           maxVal={maxVal}
           auctionMode={auctionMode}
         />
@@ -227,6 +231,7 @@ export default function PrintView({ sheetData, config, isDrafted }) {
           players={positions.WR || []}
           nTeams={nTeams}
           isDrafted={isDrafted}
+          minVal={minVal}
           maxVal={maxVal}
           auctionMode={auctionMode}
         />

@@ -82,9 +82,17 @@ export default function DraftBoard({
   const nTeams = config?.n_teams || 12
   const auctionMode = config?.auction_mode || false
   const sourceDetails = useMemo(() => buildSourceDetails(metadata), [metadata])
-  const maxVal = useMemo(
-    () => Math.max(0, ...Object.values(positions).flat().map(p => p.val ?? 0)),
+  const valValues = useMemo(
+    () => Object.values(positions).flat().map(p => p.val ?? 0),
     [positions]
+  )
+  const minVal = useMemo(
+    () => valValues.length > 0 ? Math.min(...valValues) : 0,
+    [valValues]
+  )
+  const maxVal = useMemo(
+    () => valValues.length > 0 ? Math.max(...valValues) : 0,
+    [valValues]
   )
   const sourceCount = sourceDetails.used.length
 
@@ -259,6 +267,7 @@ export default function DraftBoard({
               isDrafted={isDrafted}
               onToggle={toggle}
               auctionMode={auctionMode}
+              minVal={minVal}
               maxVal={maxVal}
             />
           ) : (
@@ -269,6 +278,7 @@ export default function DraftBoard({
               isDrafted={isDrafted}
               onToggle={toggle}
               auctionMode={auctionMode}
+              minVal={minVal}
               maxVal={maxVal}
               wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
             />

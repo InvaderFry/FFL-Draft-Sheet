@@ -22,7 +22,7 @@ const COLUMNS = [
   { key: 'ps_pct',      label: 'PS%',    align: 'right',  width: '44px'  },
 ]
 
-export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auctionMode, wrapStyle, maxVal = 0 }) {
+export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auctionMode, wrapStyle, minVal = 0, maxVal = 0 }) {
   const { theme } = useTheme()
   const cols = auctionMode
     ? [...COLUMNS, { key: 'auction_price', label: '$', align: 'right', width: '42px' }]
@@ -49,7 +49,7 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
             const isTierStart = idx > 0 && player.tier != null && previous?.tier !== player.tier
             const ecr = ecrColor(player.adp_rank, player.ecr_rank, nTeams)
             const ecrStyle = { color: ecrColorStyle(ecr) }
-            const valStyle = valBgStyle(player.val, maxVal, theme)
+            const valStyle = valBgStyle(player.val, minVal, maxVal, theme)
             const psStyle  = psPctBgStyle(player.ps_pct, theme)
 
             return (
