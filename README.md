@@ -146,7 +146,7 @@ Deploying makes the app accessible from any browser — including Safari on iPad
 
 1. Go to [render.com](https://render.com) → **New → Web Service**
 2. Connect the GitHub repo (`InvaderFry/FFL-Draft-Sheet`)
-3. **Set Root Directory to `beersheets-mvp`** — this is where `render.yaml` lives
+3. **Leave Root Directory blank (repo root)** — this is where `render.yaml` lives
 4. Render auto-detects `render.yaml` and configures the Docker service
 5. Click **Deploy**
 6. Once live, note your backend URL (e.g. `https://ffl-draft-sheet-api.onrender.com`)
@@ -157,7 +157,7 @@ Deploying makes the app accessible from any browser — including Safari on iPad
 ### Step 2 — Deploy the frontend to Vercel
 
 1. Go to [vercel.com](https://vercel.com) → **New Project** → Import `InvaderFry/FFL-Draft-Sheet`
-2. **Set Root Directory to `beersheets-mvp`** — this is where `vercel.json` lives
+2. **Leave Root Directory blank (repo root)** — this is where `vercel.json` lives
 3. Before deploying, add an environment variable:
    - **Key:** `VITE_API_URL`
    - **Value:** `https://ffl-draft-sheet-api.onrender.com` (your Render URL from Step 1)
@@ -182,7 +182,7 @@ Navigate to your Vercel URL in Safari. To add it to the iPad home screen as a sh
 | Symptom | Likely cause |
 |---|---|
 | Frontend loads but draft sheet never returns | `VITE_API_URL` not set or pointing to wrong URL |
-| Build fails on Render or Vercel | Root Directory not set to `beersheets-mvp` |
+| Build fails on Render or Vercel | Root Directory not left blank / set to repo root |
 | First request takes 30–60 s | Render free tier cold start — normal behavior |
 
 ---
