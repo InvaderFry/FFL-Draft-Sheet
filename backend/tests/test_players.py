@@ -29,9 +29,10 @@ def seeded_map(monkeypatch):
         "4": _rec("4", "Tyreek Hill", "WR", "MIA"),
     }
     monkeypatch.setattr(players_mod, "_player_map", records)
-    name_idx, pos_idx = players_mod._build_indexes(records)
+    name_idx, pos_idx, espn_idx = players_mod._build_indexes(records)
     monkeypatch.setattr(players_mod, "_name_index", name_idx)
     monkeypatch.setattr(players_mod, "_pos_index", pos_idx)
+    monkeypatch.setattr(players_mod, "_espn_index", espn_idx)
     return records
 
 
@@ -64,7 +65,7 @@ def test_cross_position_falls_back_to_full_scan(monkeypatch):
         "11": _rec("11", "Patrick Mahomes", "QB", "KC"),
     }
     monkeypatch.setattr(players_mod, "_player_map", records)
-    name_idx, pos_idx = players_mod._build_indexes(records)
+    name_idx, pos_idx, _ = players_mod._build_indexes(records)
     monkeypatch.setattr(players_mod, "_name_index", name_idx)
     monkeypatch.setattr(players_mod, "_pos_index", pos_idx)
 
@@ -83,7 +84,7 @@ def test_dst_does_not_fall_back_to_other_positions(monkeypatch):
         # so the test fails if the DST fallback is not skipped.
         "20": _rec("20", "San Francisco 49ers", "WR", "SF"),
     }
-    name_idx, pos_idx = players_mod._build_indexes(records)
+    name_idx, pos_idx, _ = players_mod._build_indexes(records)
     monkeypatch.setattr(players_mod, "_player_map", records)
     monkeypatch.setattr(players_mod, "_name_index", name_idx)
     monkeypatch.setattr(players_mod, "_pos_index", pos_idx)
