@@ -91,7 +91,7 @@ def _mock_attrition_curves():
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
 @patch("app.main.load_attrition_curves")
-@patch("app.main.load_player_map")
+@patch("app.main.load_player_map_async")
 @patch("app.main.enrich_with_adp")
 def test_default_sheet_returns_200(mock_adp, mock_players, mock_curves, mock_scrape, client):
     mock_scrape.return_value = _mock_scrape_result()
@@ -118,7 +118,7 @@ def test_default_sheet_returns_200(mock_adp, mock_players, mock_curves, mock_scr
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
 @patch("app.main.load_attrition_curves")
-@patch("app.main.load_player_map")
+@patch("app.main.load_player_map_async")
 @patch("app.main.enrich_with_adp")
 def test_inflated_projection_adds_data_quality_warning(mock_adp, mock_players, mock_curves, mock_scrape, client):
     rows = _mock_scrape_result()
@@ -141,7 +141,7 @@ def test_inflated_projection_adds_data_quality_warning(mock_adp, mock_players, m
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
 @patch("app.main.load_attrition_curves")
-@patch("app.main.load_player_map")
+@patch("app.main.load_player_map_async")
 @patch("app.main.enrich_with_adp")
 def test_all_positions_populated(mock_adp, mock_players, mock_curves, mock_scrape, client):
     mock_scrape.return_value = _mock_scrape_result()
@@ -162,7 +162,7 @@ def test_all_positions_populated(mock_adp, mock_players, mock_curves, mock_scrap
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
 @patch("app.main.load_attrition_curves")
-@patch("app.main.load_player_map")
+@patch("app.main.load_player_map_async")
 @patch("app.main.enrich_with_adp")
 def test_kicker_starters_accepted_but_no_k_position(mock_adp, mock_players, mock_curves, mock_scrape, client):
     mock_scrape.return_value = _mock_scrape_result()  # QB/RB/WR/TE/DST only
@@ -196,7 +196,7 @@ def test_invalid_flex_alloc_returns_422(client):
 
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
-@patch("app.main.load_player_map")
+@patch("app.main.load_player_map_async")
 def test_generation_failure_returns_generic_500_detail(mock_players, mock_scrape, client):
     """Internal exception text (paths, upstream errors) must not reach clients."""
     mock_players.return_value = {}
@@ -210,7 +210,7 @@ def test_generation_failure_returns_generic_500_detail(mock_players, mock_scrape
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
 @patch("app.main.load_attrition_curves")
-@patch("app.main.load_player_map")
+@patch("app.main.load_player_map_async")
 @patch("app.main.enrich_with_adp")
 def test_all_sources_down_returns_200_with_empty_positions(mock_adp, mock_players, mock_curves, mock_scrape, client):
     # All sources return empty lists
@@ -228,7 +228,7 @@ def test_all_sources_down_returns_200_with_empty_positions(mock_adp, mock_player
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
 @patch("app.main.load_attrition_curves")
-@patch("app.main.load_player_map")
+@patch("app.main.load_player_map_async")
 @patch("app.main.enrich_with_adp")
 def test_sheet_metadata_includes_structured_used_source_statuses(mock_adp, mock_players, mock_curves, mock_scrape, client):
     mock_scrape.return_value = _mock_scrape_result_with_sources(["FantasyPros", "ESPN"])
@@ -251,7 +251,7 @@ def test_sheet_metadata_includes_structured_used_source_statuses(mock_adp, mock_
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
 @patch("app.main.load_attrition_curves")
-@patch("app.main.load_player_map")
+@patch("app.main.load_player_map_async")
 @patch("app.main.enrich_with_adp")
 def test_sheet_metadata_includes_unavailable_source_reason(mock_adp, mock_players, mock_curves, mock_scrape, client):
     rows = _mock_scrape_result()
@@ -279,7 +279,7 @@ def test_sheet_metadata_includes_unavailable_source_reason(mock_adp, mock_player
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
 @patch("app.main.load_attrition_curves")
-@patch("app.main.load_player_map")
+@patch("app.main.load_player_map_async")
 @patch("app.main.enrich_with_adp")
 def test_sheet_metadata_marks_partial_sources_used_with_warnings(mock_adp, mock_players, mock_curves, mock_scrape, client):
     result = {pos: [] for pos in ["QB", "RB", "WR", "TE", "DST"]}
@@ -325,7 +325,7 @@ def test_sheet_metadata_marks_partial_sources_used_with_warnings(mock_adp, mock_
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
 @patch("app.main.load_attrition_curves")
-@patch("app.main.load_player_map")
+@patch("app.main.load_player_map_async")
 @patch("app.main.enrich_with_adp")
 def test_all_sources_down_includes_unavailable_source_statuses(mock_adp, mock_players, mock_curves, mock_scrape, client):
     outcomes = [
@@ -353,7 +353,7 @@ def test_all_sources_down_includes_unavailable_source_statuses(mock_adp, mock_pl
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
 @patch("app.main.load_attrition_curves")
-@patch("app.main.load_player_map")
+@patch("app.main.load_player_map_async")
 @patch("app.main.enrich_with_adp")
 def test_cached_sheet_preserves_source_status_metadata(mock_adp, mock_players, mock_curves, mock_scrape, client):
     mock_scrape.return_value = _mock_scrape_result_with_sources(["FantasyPros"])

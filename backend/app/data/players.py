@@ -8,6 +8,7 @@ via nfl_data_py import_ids().
 Public API:
     canonical_key(row: dict) -> str
     load_player_map(force_refresh=False) -> dict[str, PlayerRecord]
+    load_player_map_async(force_refresh=False) -> dict[str, PlayerRecord]
     get_player(sleeper_id: str) -> PlayerRecord | None
     get_player_by_espn_id(espn_id: str) -> PlayerRecord | None
     find_player(name: str, pos: str, team: str) -> PlayerRecord | None
@@ -15,6 +16,7 @@ Public API:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 from dataclasses import dataclass, field
@@ -204,6 +206,17 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
         # treat it as the "loaded" flag, so the indexes must be in place first.
         _player_map = records
         return _player_map
+
+
+async def load_player_map_async(force_refresh: bool = False) -> dict[str, PlayerRecord]:
+    """
+    Async-safe entry point for event-loop callers.
+
+    On a cold cache load_player_map does a synchronous ~11k-player Sleeper
+    fetch (up to 30s) plus file I/O, so it must not run on the event loop.
+    Use this from async code instead of wrapping the sync function ad hoc.
+    """
+    return await asyncio.to_thread(load_player_map, force_refresh)
 
 
 def get_player(sleeper_id: str) -> PlayerRecord | None:

@@ -34,8 +34,9 @@ services:
       - VITE_API_URL=http://localhost:8000
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     healthcheck:
-      # busybox wget ships with alpine; --spider avoids downloading the page.
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5173/"]
+      # node's built-in fetch keeps the probe image-agnostic (no wget/curl
+      # dependency if the base image ever changes).
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5173/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
