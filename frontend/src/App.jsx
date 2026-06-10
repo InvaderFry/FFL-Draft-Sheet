@@ -16,6 +16,7 @@ import LeagueForm from './components/LeagueForm'
 import DraftBoard from './components/DraftBoard'
 import PrintView from './components/PrintView'
 import { useDraftState } from './hooks/useDraftState'
+import { useEspnDraftSync } from './hooks/useEspnDraftSync'
 import { useTheme } from './context/ThemeContext'
 import styles from './App.module.css'
 
@@ -31,7 +32,15 @@ export default function App() {
   const [sheetData, setSheetData] = useState(null)
   const [config, setConfig] = useState(null)
   const [error, setError] = useState(null)
-  const { isDrafted, toggle, count: draftedCount, clear: clearDrafted, draftedList } = useDraftState()
+  const { isDrafted, toggle, applySyncedPicks, count: draftedCount, clear: clearDrafted, remove: removeDrafted, draftedList } = useDraftState()
+  const espnSync = useEspnDraftSync({ sheetData, applySyncedPicks })
+
+  // The board's "clear" wipes manual marks; synced picks survive while a
+  // sync session exists, because once polling has stopped (draft complete,
+  // permanent error) they would not re-hydrate.
+  const handleClearDrafted = useCallback(() => {
+    clearDrafted({ keepSynced: espnSync.status !== 'disconnected' })
+  }, [clearDrafted, espnSync.status])
 
   const handleSheet = useCallback((data, cfg) => {
     setSheetData(data)
@@ -62,7 +71,8 @@ export default function App() {
     setConfig(null)
     setError(null)
     clearDrafted()
-  }, [clearDrafted])
+    espnSync.disconnect()
+  }, [clearDrafted, espnSync.disconnect])
 
   return (
     <div className={styles.app}>
@@ -131,8 +141,10 @@ export default function App() {
               isDrafted={isDrafted}
               onToggle={toggle}
               draftedCount={draftedCount}
-              onClearDrafted={clearDrafted}
+              onClearDrafted={handleClearDrafted}
+              onRemoveDrafted={removeDrafted}
               draftedList={draftedList}
+              espnSync={espnSync}
             />
           </div>
         )}

@@ -9,6 +9,7 @@ Public API:
     canonical_key(row: dict) -> str
     load_player_map(force_refresh=False) -> dict[str, PlayerRecord]
     get_player(sleeper_id: str) -> PlayerRecord | None
+    get_player_by_espn_id(espn_id: str) -> PlayerRecord | None
     find_player(name: str, pos: str, team: str) -> PlayerRecord | None
 """
 
@@ -35,6 +36,7 @@ POSITIONS_OF_INTEREST = set(POSITIONS) | {"DEF"}
 _player_map: dict[str, "PlayerRecord"] | None = None
 _name_index: dict[str, list["PlayerRecord"]] = {}
 _pos_index: dict[str, list["PlayerRecord"]] = {}
+_espn_index: dict[str, "PlayerRecord"] = {}
 
 
 def canonical_key(row: dict) -> str:
@@ -127,26 +129,30 @@ def _bridge_gsis_ids(records: dict[str, PlayerRecord]) -> None:
 
 def _build_indexes(
     records: dict[str, PlayerRecord],
-) -> tuple[dict[str, list[PlayerRecord]], dict[str, list[PlayerRecord]]]:
+) -> tuple[dict[str, list[PlayerRecord]], dict[str, list[PlayerRecord]], dict[str, PlayerRecord]]:
     """
-    Build both lookup indexes in a single pass over the records:
+    Build the lookup indexes in a single pass over the records:
       - name_index: full_name (lowercased) → records, for the exact-name fast path
       - pos_index:  position → records, so fuzzy matching can scan same-position
                     candidates instead of the full ~11k-player map
+      - espn_index: espn_id → record, for draft-pick enrichment
     """
     name_idx: dict[str, list[PlayerRecord]] = {}
     pos_idx: dict[str, list[PlayerRecord]] = {}
+    espn_idx: dict[str, PlayerRecord] = {}
     for rec in records.values():
         name_idx.setdefault(rec.full_name.lower().strip(), []).append(rec)
         pos_idx.setdefault(rec.position, []).append(rec)
-    return name_idx, pos_idx
+        if rec.espn_id:
+            espn_idx[rec.espn_id] = rec
+    return name_idx, pos_idx, espn_idx
 
 
 def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
     """
     Return the full Sleeper player map.  Results are cached (file cache + module-level).
     """
-    global _player_map, _name_index, _pos_index
+    global _player_map, _name_index, _pos_index, _espn_index
 
     if _player_map is not None and not force_refresh:
         return _player_map
@@ -158,7 +164,7 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
             logger.info("Player map loaded from file cache (%d players)", len(cached))
             # Reconstruct dataclasses from dicts
             _player_map = {sid: PlayerRecord(**v) for sid, v in cached.items()}
-            _name_index, _pos_index = _build_indexes(_player_map)
+            _name_index, _pos_index, _espn_index = _build_indexes(_player_map)
             return _player_map
 
     # Fetch from Sleeper
@@ -172,6 +178,7 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
         _player_map = {}
         _name_index = {}
         _pos_index = {}
+        _espn_index = {}
         return _player_map
 
     records = _parse_sleeper_response(raw)
@@ -182,7 +189,7 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
     logger.info("Player map: %d players cached", len(records))
 
     _player_map = records
-    _name_index, _pos_index = _build_indexes(_player_map)
+    _name_index, _pos_index, _espn_index = _build_indexes(_player_map)
     return _player_map
 
 
@@ -190,6 +197,12 @@ def get_player(sleeper_id: str) -> PlayerRecord | None:
     """Look up a player by exact Sleeper ID."""
     m = load_player_map()
     return m.get(sleeper_id)
+
+
+def get_player_by_espn_id(espn_id: str) -> PlayerRecord | None:
+    """Look up a player by exact ESPN ID."""
+    load_player_map()
+    return _espn_index.get(espn_id)
 
 
 def find_player(name: str, pos: str, team: str) -> PlayerRecord | None:

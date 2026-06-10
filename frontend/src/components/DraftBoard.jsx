@@ -10,6 +10,7 @@ import { useState, useMemo } from 'react'
 import PlayerTable from './PlayerTable'
 import CombinedView from './CombinedView'
 import DraftedPanel from './DraftedPanel'
+import DraftSync from './DraftSync'
 import Legend from './Legend'
 import { useTheme } from '../context/ThemeContext'
 import { valRangeFromPositions } from '../utils/valGradient'
@@ -72,7 +73,9 @@ export default function DraftBoard({
   onToggle: toggle,
   draftedCount: count = 0,
   onClearDrafted: clear,
+  onRemoveDrafted,
   draftedList = [],
+  espnSync = null,
 }) {
   const { posColors } = useTheme()
   const [activePos, setActivePos] = useState('ALL')
@@ -184,6 +187,7 @@ export default function DraftBoard({
               Generated in {metadata.generation_time_s}s
             </span>
           )}
+          {espnSync && <DraftSync espnSync={espnSync} defaultSeason={metadata?.season} />}
           {count > 0 && (
             <span className={styles.draftCount}>
               {count} drafted —{' '}
@@ -277,7 +281,13 @@ export default function DraftBoard({
             />
           )}
         </div>
-        <DraftedPanel draftedList={draftedList} onToggle={toggle} />
+        <DraftedPanel
+          draftedList={draftedList}
+          onToggle={toggle}
+          onRemove={onRemoveDrafted}
+          myTeamId={espnSync?.myTeamId}
+          syncActive={espnSync?.status === 'connected' || espnSync?.status === 'connecting'}
+        />
       </div>
     </div>
   )

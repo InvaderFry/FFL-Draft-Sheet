@@ -1,0 +1,99 @@
+{
+  "id": 12345678,
+  "seasonId": 2025,
+  "segmentId": 0,
+  "scoringPeriodId": 1,
+  "draftDetail": {
+    "drafted": true,
+    "inProgress": false,
+    "picks": [
+      {
+        "autoDraftTypeId": 0,
+        "bidAmount": 0,
+        "id": 1,
+        "keeper": false,
+        "lineupSlotId": 2,
+        "memberId": "{ABC-123}",
+        "nominatingTeamId": 0,
+        "overallPickNo": 1,
+        "playerId": 3929630,
+        "reservedForKeeper": false,
+        "roundId": 1,
+        "roundPickNumber": 1,
+        "teamId": 4,
+        "tradeLocked": false
+      },
+      {
+        "autoDraftTypeId": 0,
+        "bidAmount": 0,
+        "id": 2,
+        "keeper": false,
+        "lineupSlotId": 4,
+        "memberId": "{DEF-456}",
+        "nominatingTeamId": 0,
+        "overallPickNo": 2,
+        "playerId": 4262921,
+        "reservedForKeeper": false,
+        "roundId": 1,
+        "roundPickNumber": 2,
+        "teamId": 7,
+        "tradeLocked": false
+      },
+      {
+        "autoDraftTypeId": 0,
+        "bidAmount": 0,
+        "id": 3,
+        "keeper": false,
+        "lineupSlotId": 16,
+        "memberId": "{ABC-123}",
+        "nominatingTeamId": 0,
+        "overallPickNo": 3,
+        "playerId": -16003,
+        "reservedForKeeper": false,
+        "roundId": 1,
+        "roundPickNumber": 3,
+        "teamId": 4,
+        "tradeLocked": false
+      },
+      {
+        "autoDraftTypeId": 0,
+        "bidAmount": 0,
+        "id": 4,
+        "keeper": false,
+        "lineupSlotId": 17,
+        "memberId": "{DEF-456}",
+        "nominatingTeamId": 0,
+        "overallPickNo": 4,
+        "playerId": 9999999,
+        "reservedForKeeper": false,
+        "roundId": 2,
+        "roundPickNumber": 1,
+        "teamId": 7,
+        "tradeLocked": false
+      }
+    ]
+  },
+  "teams": [
+    {
+      "id": 4,
+      "abbrev": "ZD",
+      "name": "Team Derrick",
+      "location": "Team",
+      "nickname": "Derrick",
+      "divisionId": 0
+    },
+    {
+      "id": 7,
+      "abbrev": "OLD",
+      "name": "",
+      "location": "Old School",
+      "nickname": "Squad",
+      "divisionId": 0
+    }
+  ],
+  "status": {
+    "currentMatchupPeriod": 1,
+    "isActive": true,
+    "latestScoringPeriod": 1
+  }
+}

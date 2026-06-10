@@ -15,10 +15,12 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 from app.config import LeagueConfig, POSITIONS
 from app import cache
+from app.providers import espn as espn_provider
+from app.providers.base import DraftStatus
 from app.data.players import canonical_key, load_player_map
 from app.data.scraper import ADAPTERS, scrape_all
 from app.data.historical import load_attrition_curves
@@ -372,6 +374,40 @@ async def health() -> dict:
 async def clear_cache() -> dict:
     cache.clear_projections()
     return {"status": "cleared"}
+
+
+class EspnDraftRequest(BaseModel):
+    league_id: int
+    season: int = Field(ge=2018, le=2035)
+    # SecretStr so the credentials never appear in reprs/validation errors.
+    espn_s2: SecretStr | None = None
+    swid: SecretStr | None = None
+
+
+# Stateless per-request proxy: draft picks must be fresh, so no caching here
+# (the file cache's TTL floor is hours). Cookies travel in the POST body —
+# never as browser cookies — which keeps the wildcard-CORS setup above valid.
+@app.post("/api/draft/espn", response_model=DraftStatus)
+async def espn_draft_status(req: EspnDraftRequest) -> DraftStatus:
+    try:
+        return await espn_provider.fetch_draft(
+            league_id=req.league_id,
+            season=req.season,
+            espn_s2=req.espn_s2.get_secret_value() if req.espn_s2 else None,
+            swid=req.swid.get_secret_value() if req.swid else None,
+        )
+    except espn_provider.EspnAuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    except espn_provider.EspnNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except espn_provider.EspnSchemaError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except espn_provider.EspnTimeoutError as exc:
+        raise HTTPException(status_code=504, detail=str(exc))
+    except espn_provider.EspnUpstreamError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    # No catch-all: exception text from arbitrary errors must not reach the
+    # response, since this is the one endpoint that handles credentials.
 
 
 @app.post("/api/sheet", response_model=SheetResponse)

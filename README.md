@@ -15,6 +15,7 @@ Generates a Value-Based Drafting board with man-games baseline, Jenks natural-br
 - **ECR** formatted as `round|pick` with ADP-divergence coloring (blue = going earlier, orange = later)
 - **Auction dollar values** using the standard VBD-to-dollars formula
 - **Click-to-cross-off** drafted players; state persists for the session
+- **Live ESPN draft-room sync** — picks made in your ESPN draft are crossed off automatically, with team attribution and a "My Team" roster panel (private leagues supported via espn_s2/SWID cookies)
 - **Printable one-pager** matching the classic BeerSheets landscape layout (`@media print`)
 - All from **free public APIs** (Sleeper, Fantasy Football Calculator, public projection sites)
 
@@ -105,6 +106,105 @@ npm run lint    # eslint
 > contains no `K` position block. See the Stage 2 roadmap.
 
 Full schema auto-generated at `/docs`.
+
+### `POST /api/draft/espn`
+
+Live draft-room sync. A stateless proxy in front of ESPN's (undocumented) v3
+fantasy API: fetches the league with `view=mDraftDetail&view=mTeams`,
+normalizes picks, and enriches them with player names via the Sleeper map.
+The frontend polls this every ~5s during a draft — ESPN is the source of
+truth, so nothing is stored server-side.
+
+**Request body:**
+```json
+{
+  "league_id": 12345678,
+  "season": 2026,
+  "espn_s2": "…",   // optional — private leagues only
+  "swid": "{…}"     // optional — private leagues only
+}
+```
+
+**Response:** `{provider, in_progress, complete, picks[], teams[], fetched_at}`
+where each pick has `overall`, `round`, `team_id`, and bridged
+`sleeper_id`/`player_name`/`pos` when known.
+
+> **Security note:** `espn_s2`/`SWID` are cookies from espn.com that grant
+> full access to your ESPN account. They are sent in the request body over
+> HTTPS, forwarded to ESPN only, and never logged or cached by the backend.
+> The frontend stores them only in your browser's localStorage ("Forget saved
+> credentials" in the sync panel removes them).
+
+---
+
+## Setting up ESPN live draft sync
+
+### Step 1 — Find your league ID
+
+Open your league on [fantasy.espn.com](https://fantasy.espn.com) and look at
+the URL:
+
+```
+https://fantasy.espn.com/football/league?leagueId=12345678
+                                                  ^^^^^^^^
+```
+
+The number after `leagueId=` is what goes in the **League ID** field.
+
+### Step 2 — Connect (public leagues)
+
+If your league's settings allow public viewing, that's all you need:
+
+1. Generate your sheet, then click **⚡ Sync ESPN draft** in the board header.
+2. Enter the League ID and season, and click **Connect**.
+3. Pick your team from the **My team…** dropdown so your roster shows in the
+   MY TEAM panel.
+
+If you get an "ESPN denied access" error, your league is private — continue
+to Step 3.
+
+### Step 3 — Get your cookies (private leagues)
+
+Most home leagues are private, so ESPN needs proof you're a member. That
+proof is two cookies from your logged-in espn.com session: `espn_s2` and
+`SWID`.
+
+1. Log in to [fantasy.espn.com](https://fantasy.espn.com) in a desktop
+   browser and open your league.
+2. Open the browser dev tools:
+   - **Chrome / Edge:** press `F12` (or `Cmd+Option+I` on Mac), then go to
+     **Application** → **Storage** → **Cookies** → `https://fantasy.espn.com`
+   - **Firefox:** press `F12`, then **Storage** → **Cookies** →
+     `https://fantasy.espn.com`
+   - **Safari:** enable the Develop menu (Settings → Advanced → "Show
+     features for web developers"), then **Develop** → **Show Web Inspector**
+     → **Storage** → **Cookies**
+3. In the cookie list, find:
+   - **`espn_s2`** — a very long string (often containing `%` characters).
+     Copy the entire **value**.
+   - **`SWID`** — a shorter ID in curly braces, like
+     `{1A2B3C4D-1234-5678-ABCD-1A2B3C4D5E6F}`. Copy it **including the
+     braces**.
+4. In the app, click **⚡ Sync ESPN draft** → **Private league?** and paste
+   both values into their fields, then **Connect**.
+
+Tips:
+
+- Use the cookie value exactly as shown — don't URL-decode the `%xx`
+  sequences in `espn_s2`.
+- The cookies persist in your browser's localStorage so a page refresh
+  mid-draft reconnects in two clicks. Click **Forget saved credentials** to
+  remove them after your draft.
+- These cookies grant full access to your ESPN account — treat them like a
+  password and don't share screenshots of the panel. They typically stay
+  valid for a long time, but if syncing suddenly fails with an auth error,
+  log in to espn.com again and copy fresh values.
+
+### Step 4 — Dry-run before draft day (recommended)
+
+Connect to your league with **last season** as the season value: a completed
+draft replays the full pick list, so you can confirm the connection,
+cookies, and team picker work end-to-end before your real draft.
 
 ---
 
