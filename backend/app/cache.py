@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -59,15 +60,31 @@ def get(key: str) -> Any | None:
 
 
 def set(key: str, value: Any) -> None:
-    """Store a JSON-serialisable value in the cache."""
+    """Store a JSON-serialisable value in the cache.
+
+    Writes go to a unique temp file then os.replace() into place, so
+    concurrent writers (worker threads, multiple uvicorn workers) can never
+    leave a torn/partial JSON file behind — readers see either the old or
+    the new complete entry.
+    """
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     path = _key_to_path(key)
+    tmp_path: str | None = None
     try:
-        with path.open("w") as fh:
+        fd, tmp_path = tempfile.mkstemp(dir=CACHE_DIR, suffix=".tmp")
+        with os.fdopen(fd, "w") as fh:
             json.dump({"ts": time.time(), "value": value}, fh)
+        os.replace(tmp_path, path)
+        tmp_path = None
         logger.debug("Cache written: %s", key)
     except Exception as exc:
         logger.warning("Cache write error for %s: %s", key, exc)
+    finally:
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 def delete(key: str) -> None:

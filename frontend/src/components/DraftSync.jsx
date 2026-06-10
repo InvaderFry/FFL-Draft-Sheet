@@ -34,19 +34,22 @@ function loadSaved() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) settings = JSON.parse(raw)
   } catch (_) {}
-  if (!settings) return null
   // Older versions persisted credentials to localStorage — scrub them.
-  if (settings.espn_s2 || settings.swid) {
+  if (settings && (settings.espn_s2 || settings.swid)) {
     settings = { ...settings }
     delete settings.espn_s2
     delete settings.swid
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)) } catch (_) {}
   }
+  // Read credentials even when the settings entry is missing (e.g. its write
+  // failed): otherwise saved creds would be invisible to the form and the
+  // next persist() would wipe them.
   let creds = null
   try {
     const raw = sessionStorage.getItem(CRED_KEY)
     if (raw) creds = JSON.parse(raw)
   } catch (_) {}
+  if (!settings && !creds) return null
   return { ...settings, espn_s2: creds?.espn_s2 || '', swid: creds?.swid || '' }
 }
 

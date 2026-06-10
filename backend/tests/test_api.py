@@ -195,6 +195,17 @@ def test_invalid_flex_alloc_returns_422(client):
     assert resp.status_code == 422
 
 
+@patch("app.main.scrape_all", new_callable=AsyncMock)
+@patch("app.main.load_player_map")
+def test_generation_failure_returns_generic_500_detail(mock_players, mock_scrape, client):
+    """Internal exception text (paths, upstream errors) must not reach clients."""
+    mock_players.return_value = {}
+    mock_scrape.side_effect = RuntimeError("secret /internal/path leaked")
+    resp = client.post("/api/sheet", json={"n_teams": 12})
+    assert resp.status_code == 500
+    assert resp.json()["detail"] == "Sheet generation failed"
+
+
 # ---- all-sources-down graceful degradation -----------------------------------
 
 @patch("app.main.scrape_all", new_callable=AsyncMock)
