@@ -16,6 +16,7 @@ import LeagueForm from './components/LeagueForm'
 import DraftBoard from './components/DraftBoard'
 import PrintView from './components/PrintView'
 import { useDraftState } from './hooks/useDraftState'
+import { useEspnDraftSync } from './hooks/useEspnDraftSync'
 import { useTheme } from './context/ThemeContext'
 import styles from './App.module.css'
 
@@ -31,7 +32,8 @@ export default function App() {
   const [sheetData, setSheetData] = useState(null)
   const [config, setConfig] = useState(null)
   const [error, setError] = useState(null)
-  const { isDrafted, toggle, count: draftedCount, clear: clearDrafted, draftedList } = useDraftState()
+  const { isDrafted, toggle, applySyncedPicks, count: draftedCount, clear: clearDrafted, draftedList } = useDraftState()
+  const espnSync = useEspnDraftSync({ sheetData, applySyncedPicks })
 
   const handleSheet = useCallback((data, cfg) => {
     setSheetData(data)
@@ -62,7 +64,8 @@ export default function App() {
     setConfig(null)
     setError(null)
     clearDrafted()
-  }, [clearDrafted])
+    espnSync.disconnect()
+  }, [clearDrafted, espnSync.disconnect])
 
   return (
     <div className={styles.app}>
@@ -133,6 +136,7 @@ export default function App() {
               draftedCount={draftedCount}
               onClearDrafted={clearDrafted}
               draftedList={draftedList}
+              espnSync={espnSync}
             />
           </div>
         )}

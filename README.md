@@ -15,6 +15,7 @@ Generates a Value-Based Drafting board with man-games baseline, Jenks natural-br
 - **ECR** formatted as `round|pick` with ADP-divergence coloring (blue = going earlier, orange = later)
 - **Auction dollar values** using the standard VBD-to-dollars formula
 - **Click-to-cross-off** drafted players; state persists for the session
+- **Live ESPN draft-room sync** — picks made in your ESPN draft are crossed off automatically, with team attribution and a "My Team" roster panel (private leagues supported via espn_s2/SWID cookies)
 - **Printable one-pager** matching the classic BeerSheets landscape layout (`@media print`)
 - All from **free public APIs** (Sleeper, Fantasy Football Calculator, public projection sites)
 
@@ -105,6 +106,34 @@ npm run lint    # eslint
 > contains no `K` position block. See the Stage 2 roadmap.
 
 Full schema auto-generated at `/docs`.
+
+### `POST /api/draft/espn`
+
+Live draft-room sync. A stateless proxy in front of ESPN's (undocumented) v3
+fantasy API: fetches the league with `view=mDraftDetail&view=mTeams`,
+normalizes picks, and enriches them with player names via the Sleeper map.
+The frontend polls this every ~5s during a draft — ESPN is the source of
+truth, so nothing is stored server-side.
+
+**Request body:**
+```json
+{
+  "league_id": 12345678,
+  "season": 2026,
+  "espn_s2": "…",   // optional — private leagues only
+  "swid": "{…}"     // optional — private leagues only
+}
+```
+
+**Response:** `{provider, in_progress, complete, picks[], teams[], fetched_at}`
+where each pick has `overall`, `round`, `team_id`, and bridged
+`sleeper_id`/`player_name`/`pos` when known.
+
+> **Security note:** `espn_s2`/`SWID` are cookies from espn.com that grant
+> full access to your ESPN account. They are sent in the request body over
+> HTTPS, forwarded to ESPN only, and never logged or cached by the backend.
+> The frontend stores them only in your browser's localStorage ("Forget saved
+> credentials" in the sync panel removes them).
 
 ---
 

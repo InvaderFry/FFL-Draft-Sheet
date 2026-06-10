@@ -46,6 +46,34 @@
   background: var(--c-surface2);
 }
 
+.itemSynced {
+  cursor: default;
+}
+
+.itemName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team {
+  color: var(--c-text-dim);
+  font-size: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.myList {
+  flex: 0 1 auto;
+  max-height: 40%;
+}
+
+.empty {
+  padding: 4px 8px;
+  font-size: 10px;
+  color: var(--c-text-dim);
+  font-style: italic;
+}
+
 .pos {
   color: var(--c-text-dim);
   font-size: 10px;
