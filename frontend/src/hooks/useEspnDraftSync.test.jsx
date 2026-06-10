@@ -193,6 +193,91 @@ describe('useEspnDraftSync', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('abandons a poll response that resolves after disconnect()', async () => {
+    let resolveFetch
+    fetchMock.mockReturnValue(new Promise(r => { resolveFetch = r }))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2026 }))
+    act(() => result.current.disconnect())
+    expect(result.current.status).toBe('disconnected')
+
+    await act(async () => {
+      resolveFetch(draftResponse({ picks: [CMC_PICK] }))
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    // The late response must not resurrect state or apply picks.
+    expect(applySyncedPicks).not.toHaveBeenCalled()
+    expect(result.current.status).toBe('disconnected')
+    expect(result.current.pickCount).toBe(0)
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000) })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not re-arm polling when the tab hides during an in-flight poll', async () => {
+    let resolveFetch
+    fetchMock.mockReturnValueOnce(new Promise(r => { resolveFetch = r }))
+    fetchMock.mockResolvedValue(draftResponse({ picks: [CMC_PICK] }))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2026 }))
+
+    // Hide while the first fetch is still in flight, then let it resolve.
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    await act(async () => {
+      resolveFetch(draftResponse({ picks: [CMC_PICK] }))
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000) })
+    expect(fetchMock).toHaveBeenCalledTimes(1) // no hidden-tab polling
+
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    await flush()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('resumes a soft-error session on visibility return', async () => {
+    fetchMock.mockRejectedValue(new TypeError('network down'))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2026 }))
+    await flush()
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(20000) })
+    expect(result.current.status).toBe('error')
+
+    // Hide (cancels the pending backoff timer), backend recovers, return.
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    fetchMock.mockResolvedValue(draftResponse({ picks: [CMC_PICK] }))
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false })
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    await flush()
+
+    expect(result.current.status).toBe('connected')
+  })
+
+  it('treats 422 as permanent with a readable message', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false, status: 422,
+      json: async () => ({ detail: [{ loc: ['body', 'season'], msg: 'ge=2018' }] }),
+    })
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: '' }))
+    await flush()
+
+    expect(result.current.status).toBe('error')
+    expect(result.current.error).not.toContain('[object Object]')
+    expect(result.current.error).toContain('Invalid league ID or season')
+    await act(async () => { await vi.advanceTimersByTimeAsync(120000) })
+    expect(fetchMock).toHaveBeenCalledTimes(1) // no retries of an invalid payload
+  })
+
   it('sends cookies from settings in the request body', async () => {
     fetchMock.mockResolvedValue(draftResponse({ picks: [] }))
     const { result } = renderSync()

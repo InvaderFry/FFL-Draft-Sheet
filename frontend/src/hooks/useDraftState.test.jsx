@@ -96,4 +96,35 @@ describe('useDraftState', () => {
     expect(result.current.isDrafted('a')).toBe(true)
     expect(result.current.draftedList[0].source).toBe('espn')
   })
+
+  it('remove() deletes any entry regardless of source', () => {
+    const { result } = renderHook(() => useDraftState())
+    act(() => {
+      result.current.toggle('m1', 'Manual Guy', 'WR')
+      result.current.applySyncedPicks([
+        { id: 'a', name: 'Player a', pos: 'RB', teamId: 't1', teamName: 'T', overall: 1 },
+      ])
+    })
+
+    act(() => result.current.remove('a'))
+    expect(result.current.isDrafted('a')).toBe(false)
+    expect(result.current.isDrafted('m1')).toBe(true)
+  })
+
+  it('clear({keepSynced: true}) wipes manual marks but keeps synced picks', () => {
+    const { result } = renderHook(() => useDraftState())
+    act(() => {
+      result.current.toggle('m1', 'Manual Guy', 'WR')
+      result.current.applySyncedPicks([
+        { id: 'a', name: 'Player a', pos: 'RB', teamId: 't1', teamName: 'T', overall: 1 },
+      ])
+    })
+
+    act(() => result.current.clear({ keepSynced: true }))
+    expect(result.current.isDrafted('a')).toBe(true)
+    expect(result.current.isDrafted('m1')).toBe(false)
+
+    act(() => result.current.clear())
+    expect(result.current.count).toBe(0)
+  })
 })

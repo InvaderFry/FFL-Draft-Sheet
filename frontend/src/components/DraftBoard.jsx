@@ -73,6 +73,7 @@ export default function DraftBoard({
   onToggle: toggle,
   draftedCount: count = 0,
   onClearDrafted: clear,
+  onRemoveDrafted,
   draftedList = [],
   espnSync = null,
 }) {
@@ -186,7 +187,7 @@ export default function DraftBoard({
               Generated in {metadata.generation_time_s}s
             </span>
           )}
-          {espnSync && <DraftSync espnSync={espnSync} />}
+          {espnSync && <DraftSync espnSync={espnSync} defaultSeason={metadata?.season} />}
           {count > 0 && (
             <span className={styles.draftCount}>
               {count} drafted —{' '}
@@ -280,7 +281,13 @@ export default function DraftBoard({
             />
           )}
         </div>
-        <DraftedPanel draftedList={draftedList} onToggle={toggle} myTeamId={espnSync?.myTeamId} />
+        <DraftedPanel
+          draftedList={draftedList}
+          onToggle={toggle}
+          onRemove={onRemoveDrafted}
+          myTeamId={espnSync?.myTeamId}
+          syncActive={espnSync?.status === 'connected' || espnSync?.status === 'connecting'}
+        />
       </div>
     </div>
   )

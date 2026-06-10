@@ -7,10 +7,15 @@
  *
  * Toggling an ESPN-synced entry is a no-op — ESPN is the source of truth and
  * the pick would reappear on the next poll anyway; undo it in the draft room.
+ * remove(id) deletes any entry regardless of source: the escape hatch for
+ * mismapped/reversed picks once polling has stopped (the UI only offers it
+ * then — while live, a removed synced pick re-hydrates within one poll).
  *
  * State persists for the lifetime of the session (React state; not
- * localStorage). clear() wipes everything — synced picks re-hydrate from ESPN
- * within one poll, so this is the correct "reset" behavior while connected.
+ * localStorage). clear({keepSynced}) wipes manual marks and, by default,
+ * synced picks too; callers pass keepSynced while a sync session exists,
+ * because once polling has stopped (draft complete, permanent error) wiped
+ * picks would NOT re-hydrate.
  */
 
 import { useState, useCallback, useMemo } from 'react'
@@ -70,7 +75,14 @@ export function useDraftState() {
 
   const isDrafted = useCallback((id) => drafted.has(id), [drafted])
 
-  const clear = useCallback(() => setDraftedList([]), [])
+  /** Unconditional removal, any source. */
+  const remove = useCallback((id) => {
+    setDraftedList(prev => prev.filter(p => p.id !== id))
+  }, [])
 
-  return { draftedList, toggle, applySyncedPicks, isDrafted, clear, count: draftedList.length }
+  const clear = useCallback(({ keepSynced = false } = {}) => {
+    setDraftedList(prev => keepSynced ? prev.filter(p => p.source === 'espn') : [])
+  }, [])
+
+  return { draftedList, toggle, applySyncedPicks, isDrafted, remove, clear, count: draftedList.length }
 }

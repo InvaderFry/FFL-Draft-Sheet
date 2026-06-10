@@ -8,8 +8,11 @@
  *   3. connected → live status chip (picks count, last sync, errors)
  *
  * Connection settings persist in localStorage (key beersheet_espn_sync) so a
- * page refresh mid-draft reconnects in two clicks. Credentials never leave
- * this browser except to this app's backend, which forwards them to ESPN.
+ * page refresh mid-draft reconnects in two clicks. The saved team choice is
+ * scoped to its league — ESPN reuses small team ids across leagues, so a
+ * stale myTeamId must never carry over to a different league. Credentials
+ * never leave this browser except to this app's backend, which forwards
+ * them to ESPN.
  */
 
 import { useState, useEffect } from 'react'
@@ -44,22 +47,31 @@ function agoLabel(ts, now) {
   return s < 60 ? `${s}s ago` : `${Math.floor(s / 60)}m ago`
 }
 
-export default function DraftSync({ espnSync }) {
-  const { status, teams, myTeamId, setMyTeamId, error, lastSyncAt, pickCount, connect, disconnect, retry } = espnSync
+export default function DraftSync({ espnSync, defaultSeason = null }) {
+  const {
+    status, teams, myTeamId, setMyTeamId, error, lastSyncAtRef, pickCount,
+    connect, disconnect, retry,
+  } = espnSync
   const [open, setOpen] = useState(false)
   const [showPrivate, setShowPrivate] = useState(false)
-  const saved = loadSaved()
-  const [form, setForm] = useState({
-    leagueId: saved?.leagueId || '',
-    season: saved?.season || CURRENT_SEASON,
-    espn_s2: saved?.espn_s2 || '',
-    swid: saved?.swid || '',
+  const [form, setForm] = useState(() => {
+    const saved = loadSaved()
+    return {
+      leagueId: saved?.leagueId || '',
+      // Prefer the season the sheet was generated for over the clock.
+      season: saved?.season || defaultSeason || CURRENT_SEASON,
+      espn_s2: saved?.espn_s2 || '',
+      swid: saved?.swid || '',
+    }
   })
   const [now, setNow] = useState(Date.now())
 
-  // Restore the saved team choice once teams arrive after a reconnect.
+  // Restore the saved team choice once teams arrive after a reconnect —
+  // only for the same league it was saved in.
   useEffect(() => {
-    if (teams.length > 0 && !myTeamId && saved?.myTeamId &&
+    if (teams.length === 0 || myTeamId) return
+    const saved = loadSaved()
+    if (saved?.leagueId === form.leagueId && saved?.myTeamId &&
         teams.some(t => t.team_id === saved.myTeamId)) {
       setMyTeamId(saved.myTeamId)
     }
@@ -77,8 +89,12 @@ export default function DraftSync({ espnSync }) {
 
   const handleConnect = (e) => {
     e.preventDefault()
-    if (!form.leagueId) return
-    persist({ ...form, myTeamId: saved?.myTeamId || null })
+    if (!form.leagueId || !form.season) return
+    const saved = loadSaved()
+    // Carry the saved team choice forward only when reconnecting to the
+    // league it belongs to.
+    const myTeam = saved?.leagueId === form.leagueId ? saved?.myTeamId ?? null : null
+    persist({ ...form, myTeamId: myTeam })
     setOpen(false)
     connect(form)
   }
@@ -88,15 +104,10 @@ export default function DraftSync({ espnSync }) {
     persist({ ...form, myTeamId: teamId || null })
   }
 
-  const handleDisconnect = () => {
-    disconnect()
-    setMyTeamId(null)
-  }
-
   const handleForget = () => {
     forget()
-    setForm({ leagueId: '', season: CURRENT_SEASON, espn_s2: '', swid: '' })
-    handleDisconnect()
+    setForm({ leagueId: '', season: defaultSeason || CURRENT_SEASON, espn_s2: '', swid: '' })
+    disconnect()
   }
 
   if (status === 'disconnected') {
@@ -135,6 +146,7 @@ export default function DraftSync({ espnSync }) {
                 onChange={e => update('season', e.target.value)}
                 min="2018"
                 max="2035"
+                required
               />
             </label>
             <button
@@ -175,7 +187,7 @@ export default function DraftSync({ espnSync }) {
                 </button>
               </div>
             )}
-            <button type="submit" className={styles.submitBtn} disabled={!form.leagueId}>
+            <button type="submit" className={styles.submitBtn} disabled={!form.leagueId || !form.season}>
               Connect
             </button>
           </form>
@@ -184,6 +196,7 @@ export default function DraftSync({ espnSync }) {
     )
   }
 
+  const lastSyncAt = lastSyncAtRef.current
   const dotClass =
     status === 'error' ? styles.dotError
     : status === 'complete' ? styles.dotDone
@@ -219,7 +232,7 @@ export default function DraftSync({ espnSync }) {
             ))}
           </select>
         )}
-        <button type="button" className={styles.linkBtn} onClick={handleDisconnect}>
+        <button type="button" className={styles.linkBtn} onClick={disconnect}>
           disconnect
         </button>
       </span>

@@ -13,12 +13,13 @@ error messages — log only league_id/season/has_cookies.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
 import httpx
 
-from app.data.players import get_player_by_espn_id
+from app.data.players import get_player_by_espn_id, load_player_map
 from app.providers.base import DraftPick, DraftStatus, DraftTeam
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,12 @@ async def fetch_draft(
             "ESPN response did not contain draft data — the league may be "
             "private (provide cookies) or ESPN's API may have changed."
         )
+
+    # Warm the player map off the event loop: on a cold cache load_player_map
+    # does a synchronous ~11k-player Sleeper fetch (up to 30s) that would
+    # otherwise block every concurrent request. Once memoized, per-pick
+    # lookups in _parse_league are dict hits.
+    await asyncio.to_thread(load_player_map)
 
     return _parse_league(data)
 

@@ -32,8 +32,15 @@ export default function App() {
   const [sheetData, setSheetData] = useState(null)
   const [config, setConfig] = useState(null)
   const [error, setError] = useState(null)
-  const { isDrafted, toggle, applySyncedPicks, count: draftedCount, clear: clearDrafted, draftedList } = useDraftState()
+  const { isDrafted, toggle, applySyncedPicks, count: draftedCount, clear: clearDrafted, remove: removeDrafted, draftedList } = useDraftState()
   const espnSync = useEspnDraftSync({ sheetData, applySyncedPicks })
+
+  // The board's "clear" wipes manual marks; synced picks survive while a
+  // sync session exists, because once polling has stopped (draft complete,
+  // permanent error) they would not re-hydrate.
+  const handleClearDrafted = useCallback(() => {
+    clearDrafted({ keepSynced: espnSync.status !== 'disconnected' })
+  }, [clearDrafted, espnSync.status])
 
   const handleSheet = useCallback((data, cfg) => {
     setSheetData(data)
@@ -134,7 +141,8 @@ export default function App() {
               isDrafted={isDrafted}
               onToggle={toggle}
               draftedCount={draftedCount}
-              onClearDrafted={clearDrafted}
+              onClearDrafted={handleClearDrafted}
+              onRemoveDrafted={removeDrafted}
               draftedList={draftedList}
               espnSync={espnSync}
             />

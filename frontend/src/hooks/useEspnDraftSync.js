@@ -6,12 +6,16 @@
  * sheet's players, and feeds them into useDraftState via applySyncedPicks.
  *
  * Lifecycle: connect() fetches immediately (doubling as validation and
- * populating the team picker), then polls on an interval. Polling pauses
- * while the tab is hidden and resumes with an immediate fetch. Transient
- * failures back off exponentially (5s → 60s) and only flip status to
- * 'error' after MAX_SOFT_FAILURES in a row — before that the UI shows a
- * stale lastSyncAt. Polling stops for good when ESPN reports the draft
- * complete.
+ * populating the team picker), then polls on an interval. Each poll captures
+ * the settings object it ran with and abandons its response if disconnect()
+ * or a reconnect happened mid-flight. Polling pauses while the tab is hidden
+ * (the scheduler refuses to arm a timer while hidden, so an in-flight poll
+ * cannot re-start the loop) and resumes with an immediate fetch on return.
+ * Transient failures back off exponentially (5s → 60s) and only flip status
+ * to 'error' after MAX_SOFT_FAILURES in a row — the backoff loop keeps
+ * retrying in that state and visibility resume covers it too. Polling stops
+ * for good (stoppedRef) when ESPN reports the draft complete or the failure
+ * is permanent (bad credentials, unknown league, invalid request).
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
@@ -21,20 +25,29 @@ const POLL_MS = 5000
 const MAX_BACKOFF_MS = 60000
 const MAX_SOFT_FAILURES = 3
 
+function sameTeams(a, b) {
+  return a.length === b.length &&
+    a.every((t, i) => t.team_id === b[i].team_id && t.name === b[i].name)
+}
+
 export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   const [status, setStatus] = useState('disconnected') // disconnected | connecting | connected | complete | error
   const [teams, setTeams] = useState([])
   const [myTeamId, setMyTeamId] = useState(null)
   const [error, setError] = useState(null)
-  const [lastSyncAt, setLastSyncAt] = useState(null)
   const [pickCount, setPickCount] = useState(0)
+  // A ref, not state: it advances on every successful poll, and making it
+  // state would re-render the whole board every 5s for a value only the
+  // status chip (which has its own 1s ticker) reads.
+  const lastSyncAtRef = useRef(null)
 
   const settingsRef = useRef(null)
   const timerRef = useRef(null)
   const inFlightRef = useRef(false)
   const failuresRef = useRef(0)
-  const statusRef = useRef('disconnected')
-  statusRef.current = status
+  // Permanent stop: draft complete or unrecoverable error. Blocks both the
+  // scheduler and the visibility-resume path until connect()/retry().
+  const stoppedRef = useRef(false)
 
   // espn_id → board entry, so synced picks cross off the same row the user
   // would have clicked (PlayerTable keys rows by sleeper_id || player_name).
@@ -66,12 +79,15 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
     }
   }, [])
 
-  // poll and schedule call each other; the ref breaks the definition cycle.
+  // poll and scheduleNext call each other; the ref breaks the definition cycle.
   const pollRef = useRef(null)
 
-  const schedule = useCallback((delay) => {
+  const scheduleNext = useCallback((delay) => {
     stopTimer()
-    if (!settingsRef.current) return
+    if (!settingsRef.current || stoppedRef.current) return
+    // Never arm while hidden — the visibilitychange handler polls on return.
+    // This also covers a poll that resolves after the tab was hidden.
+    if (typeof document !== 'undefined' && document.hidden) return
     timerRef.current = setTimeout(() => pollRef.current(), delay)
   }, [stopTimer])
 
@@ -94,13 +110,19 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
         let detail = `Sync failed (HTTP ${resp.status})`
         try {
           const body = await resp.json()
-          if (body?.detail) detail = body.detail
+          // FastAPI 422 validation errors put a list of objects in detail.
+          if (typeof body?.detail === 'string') detail = body.detail
+          else if (resp.status === 422) detail = 'Invalid league ID or season — check the connect form.'
         } catch (_) {}
-        // Auth/not-found are permanent — retrying won't fix them.
-        const permanent = resp.status === 401 || resp.status === 404
+        // Auth/not-found/validation failures are permanent — retrying the
+        // same payload won't fix them.
+        const permanent = [401, 404, 422].includes(resp.status)
         throw Object.assign(new Error(detail), { permanent })
       }
       const data = await resp.json()
+      // Abandon the response if disconnect()/connect() ran while in flight —
+      // applying it would resurrect state the user just reset.
+      if (settingsRef.current !== settings) return
 
       const teamNames = new Map((data.teams || []).map(t => [t.team_id, t.name]))
       const picks = (data.picks || []).map(pick => {
@@ -120,39 +142,50 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
       })
 
       applyRef.current(picks)
-      setTeams(data.teams || [])
+      setTeams(prev => sameTeams(prev, data.teams || []) ? prev : (data.teams || []))
       setPickCount(picks.length)
-      setLastSyncAt(Date.now())
+      lastSyncAtRef.current = Date.now()
       setError(null)
       failuresRef.current = 0
 
       if (data.complete && !data.in_progress) {
+        stoppedRef.current = true
         setStatus('complete')
         return // no reschedule
       }
       setStatus('connected')
-      schedule(POLL_MS)
+      scheduleNext(POLL_MS)
     } catch (err) {
+      if (settingsRef.current !== settings) return // abandoned mid-flight
       failuresRef.current += 1
       if (err.permanent) {
+        stoppedRef.current = true
         setStatus('error')
         setError(err.message)
-        return // no reschedule; user must reconnect
+        return // no reschedule; user must fix the input and reconnect
       }
       if (failuresRef.current >= MAX_SOFT_FAILURES) {
         setStatus('error')
         setError(err.message || 'Sync failed')
       }
-      schedule(Math.min(POLL_MS * 2 ** failuresRef.current, MAX_BACKOFF_MS))
+      scheduleNext(Math.min(POLL_MS * 2 ** failuresRef.current, MAX_BACKOFF_MS))
     } finally {
       inFlightRef.current = false
+      // If a new session connected while this poll was in flight, its
+      // immediate fetch was blocked by the in-flight guard — kick it now.
+      if (settingsRef.current && settingsRef.current !== settings) {
+        scheduleNext(0)
+      }
     }
-  }, [schedule])
+  }, [scheduleNext])
   pollRef.current = poll
 
   const connect = useCallback((settings) => {
-    settingsRef.current = settings
+    // A fresh object per connect, so in-flight polls from a previous session
+    // fail the identity check and abandon their responses.
+    settingsRef.current = { ...settings }
     failuresRef.current = 0
+    stoppedRef.current = false
     setStatus('connecting')
     setError(null)
     poll()
@@ -160,27 +193,31 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
 
   const disconnect = useCallback(() => {
     settingsRef.current = null
+    stoppedRef.current = false
     stopTimer()
     setStatus('disconnected')
     setTeams([])
+    setMyTeamId(null)
     setPickCount(0)
-    setLastSyncAt(null)
+    lastSyncAtRef.current = null
     setError(null)
   }, [stopTimer])
 
-  // Pause while hidden; fetch immediately on return.
+  // Pause while hidden; fetch immediately on return. Resumes any non-stopped
+  // session — including soft-failure 'error', whose backoff timer the hide
+  // path cancels.
   useEffect(() => {
     const onVisibility = () => {
-      if (!settingsRef.current) return
+      if (!settingsRef.current || stoppedRef.current) return
       if (document.hidden) {
         stopTimer()
-      } else if (statusRef.current === 'connected' || statusRef.current === 'connecting') {
-        poll()
+      } else {
+        pollRef.current()
       }
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
-  }, [poll, stopTimer])
+  }, [stopTimer])
 
   // Cleanup on unmount
   useEffect(() => stopTimer, [stopTimer])
@@ -188,13 +225,14 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   const retry = useCallback(() => {
     if (!settingsRef.current) return
     failuresRef.current = 0
+    stoppedRef.current = false
     setStatus('connecting')
     setError(null)
     poll()
   }, [poll])
 
   return {
-    status, teams, myTeamId, setMyTeamId, error, lastSyncAt, pickCount,
+    status, teams, myTeamId, setMyTeamId, error, lastSyncAtRef, pickCount,
     connect, disconnect, retry,
   }
 }

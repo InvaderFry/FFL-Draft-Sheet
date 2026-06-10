@@ -1,5 +1,6 @@
 """Tests for the ESPN live draft provider and POST /api/draft/espn."""
 
+import contextlib
 import json
 import logging
 from pathlib import Path
@@ -53,11 +54,13 @@ def _patch_espn(status_code=200, payload=None):
     )
 
 
+@contextlib.contextmanager
 def _patch_players():
-    return patch(
+    with patch(
         "app.providers.espn.get_player_by_espn_id",
         side_effect=lambda eid: KNOWN_PLAYERS.get(eid),
-    )
+    ), patch("app.providers.espn.load_player_map", return_value={}):
+        yield
 
 
 REQUEST = {"league_id": 12345678, "season": 2025}

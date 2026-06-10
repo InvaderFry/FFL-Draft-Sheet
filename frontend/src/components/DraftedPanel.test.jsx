@@ -22,16 +22,42 @@ describe('DraftedPanel', () => {
     expect(onToggle).toHaveBeenCalledWith('m1', 'Manual Guy', 'WR')
   })
 
-  it('synced entries show the team name and cannot be un-toggled', async () => {
+  it('synced entries are locked while sync is active', async () => {
     const onToggle = vi.fn()
-    render(<DraftedPanel draftedList={[SYNCED_OTHER]} onToggle={onToggle} />)
+    const onRemove = vi.fn()
+    render(
+      <DraftedPanel
+        draftedList={[SYNCED_OTHER]}
+        onToggle={onToggle}
+        onRemove={onRemove}
+        syncActive
+      />
+    )
 
     expect(screen.getByText('Old School Squad')).toBeInTheDocument()
     await userEvent.click(screen.getByText('Justin Jefferson'))
     expect(onToggle).not.toHaveBeenCalled()
+    expect(onRemove).not.toHaveBeenCalled()
     expect(
       screen.getByTitle('Synced from ESPN — undo in your draft room')
     ).toBeInTheDocument()
+  })
+
+  it('synced entries become removable once sync is no longer active', async () => {
+    const onToggle = vi.fn()
+    const onRemove = vi.fn()
+    render(
+      <DraftedPanel
+        draftedList={[SYNCED_OTHER]}
+        onToggle={onToggle}
+        onRemove={onRemove}
+        syncActive={false}
+      />
+    )
+
+    await userEvent.click(screen.getByText('Justin Jefferson'))
+    expect(onRemove).toHaveBeenCalledWith('s2')
+    expect(onToggle).not.toHaveBeenCalled()
   })
 
   it('shows a MY TEAM section filtered to my picks when myTeamId is set', () => {
