@@ -34,6 +34,9 @@ export default function App() {
   const [error, setError] = useState(null)
   const { isDrafted, toggle, applySyncedPicks, count: draftedCount, clear: clearDrafted, remove: removeDrafted, draftedList } = useDraftState()
   const espnSync = useEspnDraftSync({ sheetData, applySyncedPicks })
+  // Destructured so hooks below can depend on the stable callback instead of
+  // the espnSync object, which is recreated every render.
+  const { disconnect: espnDisconnect } = espnSync
 
   // The board's "clear" wipes manual marks; synced picks survive while a
   // sync session exists, because once polling has stopped (draft complete,
@@ -71,8 +74,8 @@ export default function App() {
     setConfig(null)
     setError(null)
     clearDrafted()
-    espnSync.disconnect()
-  }, [clearDrafted, espnSync.disconnect])
+    espnDisconnect()
+  }, [clearDrafted, espnDisconnect])
 
   return (
     <div className={styles.app}>

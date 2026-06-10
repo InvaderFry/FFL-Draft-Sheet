@@ -11,7 +11,6 @@ Falls back to a constant 14.0 games/player if the pull fails.
 from __future__ import annotations
 
 import logging
-from datetime import date
 
 import numpy as np
 
@@ -57,8 +56,6 @@ def _build_curves_from_nfl_data(season: int) -> dict[str, list[float]]:
 
     curves: dict[str, list[float]] = {}
 
-    # Columns we care about
-    need_cols = {"season", "player_id", "position", "games"}
     # Handle different nfl_data_py column names
     col_map = {}
     for col in df.columns:

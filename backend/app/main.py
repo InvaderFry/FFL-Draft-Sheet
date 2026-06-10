@@ -8,8 +8,8 @@ Endpoints:
 
 from __future__ import annotations
 
+import asyncio
 import logging
-import os
 import time
 from typing import Any
 
@@ -22,7 +22,7 @@ from app import cache
 from app.providers import espn as espn_provider
 from app.providers.base import DraftStatus
 from app.data.players import canonical_key, load_player_map
-from app.data.scraper import ADAPTERS, scrape_all
+from app.data.scraper import scrape_all
 from app.data.historical import load_attrition_curves
 from app.data.variance import load_variance
 from app.data.adp import enrich_with_adp
@@ -268,8 +268,9 @@ def _backfill_cached_diagnostic_fields(sheet: dict[str, Any]) -> None:
 async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
     t0 = time.perf_counter()
 
-    # 1. Load player map (for bye weeks + ID bridging)
-    player_map = load_player_map()
+    # 1. Load player map (for bye weeks + ID bridging). Sync httpx call on a
+    # cold cache — keep it off the event loop.
+    player_map = await asyncio.to_thread(load_player_map)
 
     # 2. Scrape projections for all positions
     raw_by_pos = await scrape_all(cfg)
@@ -317,7 +318,9 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
     adp_available = False
     for pos, players in position_players.items():
         rows = [p.__dict__ for p in players]
-        enriched, pos_adp_ok = enrich_with_adp(rows, cfg.n_teams, ppr)
+        # enrich_with_adp hits the FFC API on a cold cache — keep it off the
+        # event loop.
+        enriched, pos_adp_ok = await asyncio.to_thread(enrich_with_adp, rows, cfg.n_teams, ppr)
         adp_available = adp_available or pos_adp_ok
         for p, row in zip(players, enriched):
             p.adp_rank = row.get("adp_rank")
@@ -429,7 +432,9 @@ async def generate_sheet(cfg: LeagueConfig) -> SheetResponse:
         result = await _generate_sheet(cfg)
     except Exception as exc:
         logger.exception("Sheet generation failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        # Arbitrary exception text can expose paths and upstream internals —
+        # full traceback goes to the logs, the client gets a generic message.
+        raise HTTPException(status_code=500, detail="Sheet generation failed")
 
     cache.set(ck, result)
     return SheetResponse(**result)

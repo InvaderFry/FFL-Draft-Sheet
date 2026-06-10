@@ -11,14 +11,17 @@
  * page refresh mid-draft reconnects in two clicks. The saved team choice is
  * scoped to its league — ESPN reuses small team ids across leagues, so a
  * stale myTeamId must never carry over to a different league. Credentials
- * never leave this browser except to this app's backend, which forwards
- * them to ESPN.
+ * (espn_s2/SWID) grant full ESPN account access, so they live in
+ * sessionStorage instead — they survive a refresh mid-draft but vanish when
+ * the tab closes. They never leave this browser except to this app's
+ * backend, which forwards them to ESPN.
  */
 
 import { useState, useEffect } from 'react'
 import styles from './DraftSync.module.css'
 
 const STORAGE_KEY = 'beersheet_espn_sync'
+const CRED_KEY = 'beersheet_espn_creds'
 const CURRENT_SEASON = (() => {
   const now = new Date()
   // The draft season flips over in spring, well before August drafts.
@@ -26,19 +29,45 @@ const CURRENT_SEASON = (() => {
 })()
 
 function loadSaved() {
+  let settings = null
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) settings = JSON.parse(raw)
   } catch (_) {}
-  return null
+  if (!settings) return null
+  // Older versions persisted credentials to localStorage — scrub them.
+  if (settings.espn_s2 || settings.swid) {
+    settings = { ...settings }
+    delete settings.espn_s2
+    delete settings.swid
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)) } catch (_) {}
+  }
+  let creds = null
+  try {
+    const raw = sessionStorage.getItem(CRED_KEY)
+    if (raw) creds = JSON.parse(raw)
+  } catch (_) {}
+  return { ...settings, espn_s2: creds?.espn_s2 || '', swid: creds?.swid || '' }
 }
 
 function persist(settings) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)) } catch (_) {}
+  const { espn_s2, swid } = settings
+  const rest = { ...settings }
+  delete rest.espn_s2
+  delete rest.swid
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rest)) } catch (_) {}
+  try {
+    if (espn_s2 || swid) {
+      sessionStorage.setItem(CRED_KEY, JSON.stringify({ espn_s2, swid }))
+    } else {
+      sessionStorage.removeItem(CRED_KEY)
+    }
+  } catch (_) {}
 }
 
 function forget() {
   try { localStorage.removeItem(STORAGE_KEY) } catch (_) {}
+  try { sessionStorage.removeItem(CRED_KEY) } catch (_) {}
 }
 
 function agoLabel(ts, now) {
@@ -160,8 +189,9 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
               <div className={styles.privateSection}>
                 <p className={styles.warning}>
                   ⚠ espn_s2 and SWID are cookies from espn.com that grant full
-                  access to your ESPN account. They are stored only in this
-                  browser and sent only to this app's backend to reach ESPN.
+                  access to your ESPN account. They are kept only in this
+                  browser tab (cleared when it closes) and sent only to this
+                  app&apos;s backend to reach ESPN.
                 </p>
                 <label className={styles.field}>
                   <span>espn_s2</span>
