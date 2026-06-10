@@ -1,0 +1,16 @@
+# Keep the Docker build context (./backend) lean — only app/ and
+# requirements.txt are COPY'd, but excluding these speeds up context upload
+# and prevents accidental inclusion if COPY patterns ever broaden.
+.dockerignore
+Dockerfile
+.pytest_cache
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+.venv
+venv
+cache/
+tests/
+requirements-dev.txt
+*.log

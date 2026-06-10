@@ -8,6 +8,7 @@ via nfl_data_py import_ids().
 Public API:
     canonical_key(row: dict) -> str
     load_player_map(force_refresh=False) -> dict[str, PlayerRecord]
+    load_player_map_async(force_refresh=False) -> dict[str, PlayerRecord]
     get_player(sleeper_id: str) -> PlayerRecord | None
     get_player_by_espn_id(espn_id: str) -> PlayerRecord | None
     find_player(name: str, pos: str, team: str) -> PlayerRecord | None
@@ -15,7 +16,9 @@ Public API:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import threading
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -37,6 +40,9 @@ _player_map: dict[str, "PlayerRecord"] | None = None
 _name_index: dict[str, list["PlayerRecord"]] = {}
 _pos_index: dict[str, list["PlayerRecord"]] = {}
 _espn_index: dict[str, "PlayerRecord"] = {}
+# load_player_map runs in worker threads (asyncio.to_thread call sites), so
+# initialization of the globals above must be serialized.
+_load_lock = threading.Lock()
 
 
 def canonical_key(row: dict) -> str:
@@ -157,40 +163,60 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
     if _player_map is not None and not force_refresh:
         return _player_map
 
-    # Try file cache first
-    if not force_refresh:
-        cached = cache.get(CACHE_KEY)
-        if cached is not None:
-            logger.info("Player map loaded from file cache (%d players)", len(cached))
-            # Reconstruct dataclasses from dicts
-            _player_map = {sid: PlayerRecord(**v) for sid, v in cached.items()}
-            _name_index, _pos_index, _espn_index = _build_indexes(_player_map)
+    with _load_lock:
+        # Re-check under the lock: another thread may have finished loading
+        # while this one waited.
+        if _player_map is not None and not force_refresh:
             return _player_map
 
-    # Fetch from Sleeper
-    logger.info("Fetching player map from Sleeper API…")
-    try:
-        resp = httpx.get(SLEEPER_PLAYERS_URL, timeout=30.0)
-        resp.raise_for_status()
-        raw = resp.json()
-    except Exception as exc:
-        logger.error("Sleeper API fetch failed: %s", exc)
-        _player_map = {}
-        _name_index = {}
-        _pos_index = {}
-        _espn_index = {}
+        # Try file cache first
+        if not force_refresh:
+            cached = cache.get(CACHE_KEY)
+            if cached is not None:
+                logger.info("Player map loaded from file cache (%d players)", len(cached))
+                # Reconstruct dataclasses from dicts
+                player_map = {sid: PlayerRecord(**v) for sid, v in cached.items()}
+                _name_index, _pos_index, _espn_index = _build_indexes(player_map)
+                _player_map = player_map
+                return _player_map
+
+        # Fetch from Sleeper
+        logger.info("Fetching player map from Sleeper API…")
+        try:
+            resp = httpx.get(SLEEPER_PLAYERS_URL, timeout=30.0)
+            resp.raise_for_status()
+            raw = resp.json()
+        except Exception as exc:
+            logger.error("Sleeper API fetch failed: %s", exc)
+            _player_map = {}
+            _name_index = {}
+            _pos_index = {}
+            _espn_index = {}
+            return _player_map
+
+        records = _parse_sleeper_response(raw)
+        _bridge_gsis_ids(records)
+
+        # Persist to file cache (store as plain dicts)
+        cache.set(CACHE_KEY, {sid: rec.__dict__ for sid, rec in records.items()})
+        logger.info("Player map: %d players cached", len(records))
+
+        _name_index, _pos_index, _espn_index = _build_indexes(records)
+        # Assign _player_map last: lock-free readers (get_player_by_espn_id)
+        # treat it as the "loaded" flag, so the indexes must be in place first.
+        _player_map = records
         return _player_map
 
-    records = _parse_sleeper_response(raw)
-    _bridge_gsis_ids(records)
 
-    # Persist to file cache (store as plain dicts)
-    cache.set(CACHE_KEY, {sid: rec.__dict__ for sid, rec in records.items()})
-    logger.info("Player map: %d players cached", len(records))
+async def load_player_map_async(force_refresh: bool = False) -> dict[str, PlayerRecord]:
+    """
+    Async-safe entry point for event-loop callers.
 
-    _player_map = records
-    _name_index, _pos_index, _espn_index = _build_indexes(_player_map)
-    return _player_map
+    On a cold cache load_player_map does a synchronous ~11k-player Sleeper
+    fetch (up to 30s) plus file I/O, so it must not run on the event loop.
+    Use this from async code instead of wrapping the sync function ad hoc.
+    """
+    return await asyncio.to_thread(load_player_map, force_refresh)
 
 
 def get_player(sleeper_id: str) -> PlayerRecord | None:

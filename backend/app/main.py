@@ -8,8 +8,8 @@ Endpoints:
 
 from __future__ import annotations
 
+import asyncio
 import logging
-import os
 import time
 from typing import Any
 
@@ -21,8 +21,8 @@ from app.config import LeagueConfig, POSITIONS
 from app import cache
 from app.providers import espn as espn_provider
 from app.providers.base import DraftStatus
-from app.data.players import canonical_key, load_player_map
-from app.data.scraper import ADAPTERS, scrape_all
+from app.data.players import canonical_key, load_player_map_async
+from app.data.scraper import scrape_all
 from app.data.historical import load_attrition_curves
 from app.data.variance import load_variance
 from app.data.adp import enrich_with_adp
@@ -269,7 +269,7 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
     t0 = time.perf_counter()
 
     # 1. Load player map (for bye weeks + ID bridging)
-    player_map = load_player_map()
+    player_map = await load_player_map_async()
 
     # 2. Scrape projections for all positions
     raw_by_pos = await scrape_all(cfg)
@@ -313,16 +313,15 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
     if cfg.auction_mode:
         assign_auction_prices(all_players, cfg)
 
-    # 8. ADP enrichment
-    adp_available = False
-    for pos, players in position_players.items():
-        rows = [p.__dict__ for p in players]
-        enriched, pos_adp_ok = enrich_with_adp(rows, cfg.n_teams, ppr)
-        adp_available = adp_available or pos_adp_ok
-        for p, row in zip(players, enriched):
-            p.adp_rank = row.get("adp_rank")
-            p.ecr_rank = row.get("ecr_rank")
-            p.ecr_fmt = row.get("ecr_fmt", "—")
+    # 8. ADP enrichment — one call across all positions, so the FFC fetch
+    # (and its cache-file read) happens once per request instead of once per
+    # position. Still off the event loop for the cold-cache HTTP case.
+    all_rows = [p.__dict__ for p in all_players]
+    enriched, adp_available = await asyncio.to_thread(enrich_with_adp, all_rows, cfg.n_teams, ppr)
+    for p, row in zip(all_players, enriched):
+        p.adp_rank = row.get("adp_rank")
+        p.ecr_rank = row.get("ecr_rank")
+        p.ecr_fmt = row.get("ecr_fmt", "—")
 
     # 9. Serialize
     result_positions: dict[str, list[dict]] = {}
@@ -429,7 +428,9 @@ async def generate_sheet(cfg: LeagueConfig) -> SheetResponse:
         result = await _generate_sheet(cfg)
     except Exception as exc:
         logger.exception("Sheet generation failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        # Arbitrary exception text can expose paths and upstream internals —
+        # full traceback goes to the logs, the client gets a generic message.
+        raise HTTPException(status_code=500, detail="Sheet generation failed")
 
     cache.set(ck, result)
     return SheetResponse(**result)

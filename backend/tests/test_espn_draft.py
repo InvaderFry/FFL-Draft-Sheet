@@ -59,7 +59,7 @@ def _patch_players():
     with patch(
         "app.providers.espn.get_player_by_espn_id",
         side_effect=lambda eid: KNOWN_PLAYERS.get(eid),
-    ), patch("app.providers.espn.load_player_map", return_value={}):
+    ), patch("app.providers.espn.load_player_map_async", return_value={}):
         yield
 
 

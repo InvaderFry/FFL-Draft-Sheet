@@ -142,7 +142,10 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error(body.detail || `Server error ${res.status}`)
+        // detail may be a non-string (e.g. FastAPI 422 validation arrays) —
+        // fall back to the status rather than rendering "[object Object]".
+        const detail = typeof body.detail === 'string' ? body.detail : null
+        throw new Error(detail || `Server error ${res.status}`)
       }
       const data = await res.json()
       onSheet(data, payload)

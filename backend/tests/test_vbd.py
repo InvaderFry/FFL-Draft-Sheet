@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import pytest
 from app.engine.vbd import aggregate_projections, SD_FALLBACK_RATIO
-from app.config import ScoringConfig
 
 
 def _make_row(player_name, team, pts, source, sleeper_id=None, pos="RB"):
