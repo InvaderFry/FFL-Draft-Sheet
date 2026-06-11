@@ -69,6 +69,20 @@
   font-family: var(--font-data);
 }
 
+.checkField {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--c-text-muted);
+  cursor: pointer;
+}
+
+.checkField input {
+  margin: 1px 0 0;
+  accent-color: var(--c-text-muted);
+}
+
 .privateToggle {
   background: none;
   border: none;

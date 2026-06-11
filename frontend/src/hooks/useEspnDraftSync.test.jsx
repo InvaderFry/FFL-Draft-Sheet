@@ -278,6 +278,70 @@ describe('useEspnDraftSync', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1) // no retries of an invalid payload
   })
 
+  it('practice replay deals a completed draft pick-by-pick from one fetch', async () => {
+    fetchMock.mockResolvedValue(draftResponse({
+      picks: [CMC_PICK, OFFSHEET_PICK], inProgress: false, complete: true,
+    }))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2025, practice: true }))
+    await flush()
+
+    // Connected with the draft held back — nothing dealt yet.
+    expect(result.current.status).toBe('connected')
+    expect(result.current.replayTotal).toBe(2)
+    expect(result.current.pickCount).toBe(0)
+    expect(applySyncedPicks.mock.calls.at(-1)[0]).toEqual([])
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    expect(result.current.pickCount).toBe(1)
+    expect(applySyncedPicks.mock.calls.at(-1)[0]).toMatchObject([{ id: 'cmc_sleeper' }])
+    expect(result.current.status).toBe('connected')
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    expect(result.current.pickCount).toBe(2)
+    expect(result.current.status).toBe('complete')
+
+    // The replay never refetches and stops for good at the last pick.
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000) })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result.current.pickCount).toBe(2)
+  })
+
+  it('practice connect to an incomplete draft falls back to live polling', async () => {
+    fetchMock.mockResolvedValue(draftResponse({ picks: [CMC_PICK] }))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2026, practice: true }))
+    await flush()
+
+    expect(result.current.replayTotal).toBe(null)
+    expect(result.current.pickCount).toBe(1)
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('disconnect() mid-replay stops dealing picks', async () => {
+    fetchMock.mockResolvedValue(draftResponse({
+      picks: [CMC_PICK, OFFSHEET_PICK], inProgress: false, complete: true,
+    }))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2025, practice: true }))
+    await flush()
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    expect(result.current.pickCount).toBe(1)
+
+    act(() => result.current.disconnect())
+    expect(result.current.status).toBe('disconnected')
+    expect(result.current.replayTotal).toBe(null)
+
+    const applies = applySyncedPicks.mock.calls.length
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000) })
+    expect(applySyncedPicks.mock.calls.length).toBe(applies)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('sends cookies from settings in the request body', async () => {
     fetchMock.mockResolvedValue(draftResponse({ picks: [] }))
     const { result } = renderSync()

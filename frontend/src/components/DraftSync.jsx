@@ -82,7 +82,7 @@ function agoLabel(ts, now) {
 export default function DraftSync({ espnSync, defaultSeason = null }) {
   const {
     status, teams, myTeamId, setMyTeamId, error, lastSyncAtRef, pickCount,
-    connect, disconnect, retry,
+    replayTotal, connect, disconnect, retry,
   } = espnSync
   const [open, setOpen] = useState(false)
   const [showPrivate, setShowPrivate] = useState(false)
@@ -94,6 +94,7 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
       season: saved?.season || defaultSeason || CURRENT_SEASON,
       espn_s2: saved?.espn_s2 || '',
       swid: saved?.swid || '',
+      practice: saved?.practice || false,
     }
   })
   const [now, setNow] = useState(Date.now())
@@ -138,7 +139,7 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
 
   const handleForget = () => {
     forget()
-    setForm({ leagueId: '', season: defaultSeason || CURRENT_SEASON, espn_s2: '', swid: '' })
+    setForm({ leagueId: '', season: defaultSeason || CURRENT_SEASON, espn_s2: '', swid: '', practice: false })
     disconnect()
   }
 
@@ -158,6 +159,8 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
             <div className={styles.panelTitle}>Live ESPN draft sync</div>
             <p className={styles.hint}>
               Picks made in your ESPN draft room are crossed off here automatically.
+              Mock Draft Lobby rooms run outside your league — to practice, use
+              the replay below instead.
             </p>
             <label className={styles.field}>
               <span>League ID</span>
@@ -180,6 +183,17 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
                 max="2035"
                 required
               />
+            </label>
+            <label className={styles.checkField}>
+              <input
+                type="checkbox"
+                checked={form.practice}
+                onChange={e => update('practice', e.target.checked)}
+              />
+              <span>
+                Practice replay — re-deal a completed draft pick-by-pick
+                (set season to last year)
+              </span>
             </label>
             <button
               type="button"
@@ -242,7 +256,11 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
       <span className={styles.chip}>
         <span className={`${styles.dot} ${dotClass}`} />
         {status === 'connecting' && 'Connecting to ESPN…'}
-        {status === 'connected' && `Live · ${pickCount} picks · ${agoLabel(lastSyncAt, now)}`}
+        {status === 'connected' && (replayTotal
+          ? `Practice replay · ${pickCount}/${replayTotal} picks`
+          : pickCount === 0
+            ? `Connected · waiting for picks · ${agoLabel(lastSyncAt, now)}`
+            : `Live · ${pickCount} picks · ${agoLabel(lastSyncAt, now)}`)}
         {status === 'complete' && `Draft complete · ${pickCount} picks`}
         {status === 'error' && (
           <>

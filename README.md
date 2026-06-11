@@ -200,11 +200,28 @@ Tips:
   valid for a long time, but if syncing suddenly fails with an auth error,
   log in to espn.com again and copy fresh values.
 
-### Step 4 — Dry-run before draft day (recommended)
+### Step 4 — Practice before draft day (recommended)
 
-Connect to your league with **last season** as the season value: a completed
-draft replays the full pick list, so you can confirm the connection,
-cookies, and team picker work end-to-end before your real draft.
+Check **Practice replay** in the connect form and set the season to **last
+year**: the app fetches your league's completed draft and re-deals it one
+pick every few seconds, exactly like a live draft — picks stream in, the
+board crosses them off, and (once you choose your team) the MY TEAM panel
+fills up. It's a full rehearsal of the live sync, plus confirmation that
+your league ID, cookies, and team picker all work, without depending on a
+live ESPN draft room.
+
+### A note on ESPN mock drafts
+
+ESPN's [Mock Draft Lobby](https://fantasy.espn.com/football/mockdraftlobby)
+rooms are **not part of your league** — they run in a temporary league ESPN
+creates for the mock. Connecting with your home league ID while you mock
+draft will sync your *league's* draft (which hasn't started), not the mock
+room, so the sheet sits at "waiting for picks."
+
+You can try the `leagueId` from the mock draft room's URL, but ESPN doesn't
+officially expose mock leagues through its API, so it may come back as
+"league not found." The practice replay above is the dependable way to
+rehearse.
 
 ---
 

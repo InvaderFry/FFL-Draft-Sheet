@@ -116,6 +116,41 @@ def test_team_names_with_location_nickname_fallback(client):
     assert teams["7"]["abbrev"] == "OLD"
 
 
+def test_pre_draft_placeholder_slots_are_not_picks(client):
+    """Before the draft, ESPN pre-populates every pick slot with a
+    placeholder playerId (0 / -1) — none of those are real picks."""
+    pending = json.loads(json.dumps(FIXTURE))
+    pending["draftDetail"]["drafted"] = False
+    pending["draftDetail"]["inProgress"] = False
+    for slot in pending["draftDetail"]["picks"]:
+        slot["playerId"] = -1
+    pending["draftDetail"]["picks"][1]["playerId"] = 0
+
+    with _patch_espn(payload=pending), _patch_players():
+        resp = client.post("/api/draft/espn", json=REQUEST)
+
+    data = resp.json()
+    assert data["picks"] == []
+    assert data["complete"] is False
+    assert data["in_progress"] is False
+
+
+def test_live_draft_skips_unmade_slots_keeps_made_picks(client):
+    """Mid-draft the picks list mixes real picks with placeholder slots —
+    only the made picks (including D/ST) come through."""
+    live = json.loads(json.dumps(FIXTURE))
+    live["draftDetail"]["drafted"] = False
+    live["draftDetail"]["inProgress"] = True
+    live["draftDetail"]["picks"][3]["playerId"] = -1  # not yet picked
+
+    with _patch_espn(payload=live), _patch_players():
+        resp = client.post("/api/draft/espn", json=REQUEST)
+
+    picks = resp.json()["picks"]
+    assert [p["overall"] for p in picks] == [1, 2, 3]
+    assert picks[2]["pos"] == "DST"  # real negative-id pick survives the filter
+
+
 def test_in_progress_draft(client):
     live = json.loads(json.dumps(FIXTURE))
     live["draftDetail"]["drafted"] = False
