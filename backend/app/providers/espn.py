@@ -150,6 +150,13 @@ def _parse_league(data: dict) -> DraftStatus:
         player_id = p.get("playerId")
         if player_id is None:
             continue
+        player_id = int(player_id)
+        # ESPN pre-populates a slot for every pick before and during the
+        # draft; slots not yet picked carry a placeholder playerId (0 or -1).
+        # The only legitimate non-positive ids are D/ST picks, encoded as
+        # -16000 - proTeamId — anything else is an empty slot, not a pick.
+        if player_id <= 0 and (-player_id - 16000) not in ESPN_PRO_TEAMS:
+            continue
         pick = DraftPick(
             overall=int(p.get("overallPickNo") or i + 1),
             round=p.get("roundId"),
@@ -157,7 +164,7 @@ def _parse_league(data: dict) -> DraftStatus:
             team_id=str(p.get("teamId", "")),
             provider_player_id=str(player_id),
         )
-        _enrich_pick(pick, int(player_id))
+        _enrich_pick(pick, player_id)
         picks.append(pick)
     picks.sort(key=lambda pk: pk.overall)
 

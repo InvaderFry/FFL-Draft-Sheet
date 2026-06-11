@@ -206,6 +206,19 @@ Connect to your league with **last season** as the season value: a completed
 draft replays the full pick list, so you can confirm the connection,
 cookies, and team picker work end-to-end before your real draft.
 
+### A note on mock drafts
+
+ESPN's [Mock Draft Lobby](https://fantasy.espn.com/football/mockdraftlobby)
+rooms are **not part of your league** — they run in a temporary league ESPN
+creates for the mock. Connecting with your home league ID while you mock
+draft will sync your *league's* draft (which hasn't started), not the mock
+room, so the sheet sits at "waiting for picks."
+
+To sync a mock, look at the mock draft room's URL and use the `leagueId`
+from *that* URL instead. ESPN doesn't officially expose mock leagues through
+its API, so this may still come back as "league not found" — the last-season
+dry run above is the reliable way to test the sync end-to-end.
+
 ---
 
 ## Architecture

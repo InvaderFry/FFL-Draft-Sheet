@@ -159,6 +159,11 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
             <p className={styles.hint}>
               Picks made in your ESPN draft room are crossed off here automatically.
             </p>
+            <p className={styles.hint}>
+              Mock Draft Lobby rooms run outside your league, so your league ID
+              won&apos;t see them — use the <code>leagueId</code> from the mock
+              room&apos;s URL instead.
+            </p>
             <label className={styles.field}>
               <span>League ID</span>
               <input
@@ -242,7 +247,9 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
       <span className={styles.chip}>
         <span className={`${styles.dot} ${dotClass}`} />
         {status === 'connecting' && 'Connecting to ESPN…'}
-        {status === 'connected' && `Live · ${pickCount} picks · ${agoLabel(lastSyncAt, now)}`}
+        {status === 'connected' && (pickCount === 0
+          ? `Connected · waiting for picks · ${agoLabel(lastSyncAt, now)}`
+          : `Live · ${pickCount} picks · ${agoLabel(lastSyncAt, now)}`)}
         {status === 'complete' && `Draft complete · ${pickCount} picks`}
         {status === 'error' && (
           <>
