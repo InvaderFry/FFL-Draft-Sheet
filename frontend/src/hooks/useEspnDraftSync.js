@@ -16,12 +16,22 @@
  * retrying in that state and visibility resume covers it too. Polling stops
  * for good (stoppedRef) when ESPN reports the draft complete or the failure
  * is permanent (bad credentials, unknown league, invalid request).
+ *
+ * Practice replay: connect() with settings.practice re-deals a completed
+ * draft (e.g. last season's) one pick every REPLAY_MS instead of applying it
+ * wholesale, so the live-draft flow — picks streaming in, board crossing
+ * off, team panel filling — can be rehearsed without a live draft. ESPN
+ * mock-lobby rooms run in temporary leagues the API may not expose, so this
+ * is the dependable practice path. Replay ticks reuse the poll scheduler
+ * (and its hidden-tab pause) but never refetch; a practice connect to a
+ * draft that is NOT complete falls through to normal live polling.
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 const POLL_MS = 5000
+const REPLAY_MS = 3000
 const MAX_BACKOFF_MS = 60000
 const MAX_SOFT_FAILURES = 3
 
@@ -36,6 +46,8 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   const [myTeamId, setMyTeamId] = useState(null)
   const [error, setError] = useState(null)
   const [pickCount, setPickCount] = useState(0)
+  // Total picks of an active practice replay; null during real syncs.
+  const [replayTotal, setReplayTotal] = useState(null)
   // A ref, not state: it advances on every successful poll, and making it
   // state would re-render the whole board every 5s for a value only the
   // status chip (which has its own 1s ticker) reads.
@@ -48,6 +60,9 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   // Permanent stop: draft complete or unrecoverable error. Blocks both the
   // scheduler and the visibility-resume path until connect()/retry().
   const stoppedRef = useRef(false)
+  // Active practice replay: { picks, revealed }. While set, scheduler ticks
+  // reveal the next pick instead of fetching.
+  const replayRef = useRef(null)
 
   // espn_id → board entry, so synced picks cross off the same row the user
   // would have clicked (PlayerTable keys rows by sleeper_id || player_name).
@@ -91,9 +106,32 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
     timerRef.current = setTimeout(() => pollRef.current(), delay)
   }, [stopTimer])
 
+  const revealNext = useCallback(() => {
+    const replay = replayRef.current
+    if (!replay) return
+    replay.revealed = Math.min(replay.revealed + 1, replay.picks.length)
+    applyRef.current(replay.picks.slice(0, replay.revealed))
+    setPickCount(replay.revealed)
+    lastSyncAtRef.current = Date.now()
+    if (replay.revealed >= replay.picks.length) {
+      replayRef.current = null
+      stoppedRef.current = true
+      setStatus('complete')
+      return
+    }
+    scheduleNext(REPLAY_MS)
+  }, [scheduleNext])
+
   const poll = useCallback(async () => {
     const settings = settingsRef.current
-    if (!settings || inFlightRef.current) return
+    if (!settings) return
+    // A replay tick (scheduler or visibility resume) reveals the next pick
+    // of the already-fetched draft instead of refetching.
+    if (replayRef.current) {
+      revealNext()
+      return
+    }
+    if (inFlightRef.current) return
     inFlightRef.current = true
     try {
       const resp = await fetch(`${API_URL}/api/draft/espn`, {
@@ -141,12 +179,26 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
         }
       })
 
-      applyRef.current(picks)
       setTeams(prev => sameTeams(prev, data.teams || []) ? prev : (data.teams || []))
-      setPickCount(picks.length)
       lastSyncAtRef.current = Date.now()
       setError(null)
       failuresRef.current = 0
+
+      // Practice replay: hold the completed draft back and deal it out one
+      // pick per tick. An incomplete draft can't be replayed — fall through
+      // and sync it live.
+      if (settings.practice && data.complete && picks.length > 0) {
+        replayRef.current = { picks, revealed: 0 }
+        setReplayTotal(picks.length)
+        applyRef.current([])
+        setPickCount(0)
+        setStatus('connected')
+        scheduleNext(REPLAY_MS)
+        return
+      }
+
+      applyRef.current(picks)
+      setPickCount(picks.length)
 
       if (data.complete && !data.in_progress) {
         stoppedRef.current = true
@@ -177,7 +229,7 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
         scheduleNext(0)
       }
     }
-  }, [scheduleNext])
+  }, [scheduleNext, revealNext])
   pollRef.current = poll
 
   const connect = useCallback((settings) => {
@@ -186,6 +238,8 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
     settingsRef.current = { ...settings }
     failuresRef.current = 0
     stoppedRef.current = false
+    replayRef.current = null
+    setReplayTotal(null)
     setStatus('connecting')
     setError(null)
     poll()
@@ -194,6 +248,8 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   const disconnect = useCallback(() => {
     settingsRef.current = null
     stoppedRef.current = false
+    replayRef.current = null
+    setReplayTotal(null)
     stopTimer()
     setStatus('disconnected')
     setTeams([])
@@ -233,6 +289,6 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
 
   return {
     status, teams, myTeamId, setMyTeamId, error, lastSyncAtRef, pickCount,
-    connect, disconnect, retry,
+    replayTotal, connect, disconnect, retry,
   }
 }
