@@ -1,0 +1,1060 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ESPN Fantasy Football Draft API (inferred from HAR)",
+    "version": "0.1.0-har-inferred",
+    "description": "OpenAPI specification inferred from the provided HAR capture of `fantasy.espn.com/football/draft`. The useful application API calls observed were ESPN Fantasy read endpoints, the draft WebSocket join URL, and a Disney/BAM GraphQL token-refresh endpoint. Static CDN assets, browser beacons, and analytics calls are not modeled as first-class operations. Live secrets from cookies and tokens are intentionally not embedded as example values. Personal identifiers (league id, SWID, tokens) have been replaced with placeholder values.",
+    "x-har-source": "DRAFTMOCKfantasy.espn.com_Archive [26-06-11 21-32-19].har",
+    "x-har-entry-count": 433,
+    "x-observed-personal-context": {
+      "leagueId": 123456789,
+      "seasonId": 2026,
+      "teamId": 2,
+      "memberId": "{00000000-0000-0000-0000-000000000000}",
+      "draftSecurityTokenExample": 111111111
+    }
+  },
+  "servers": [
+    {
+      "url": "https://lm-api-reads.fantasy.espn.com",
+      "description": "ESPN Fantasy read API"
+    },
+    {
+      "url": "wss://fantasydraft.espn.com",
+      "description": "Draft room WebSocket endpoint"
+    },
+    {
+      "url": "https://espn.api.edge.bamgrid.com",
+      "description": "Disney/BAM Edge GraphQL API used for token refresh"
+    },
+    {
+      "url": "https://fantasy.espn.com",
+      "description": "Fantasy web frontend"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Fantasy Draft",
+      "description": "League draft state and security values."
+    },
+    {
+      "name": "Fantasy Season",
+      "description": "Season-level game metadata and schedules."
+    },
+    {
+      "name": "Draft WebSocket",
+      "description": "Observed draft-room socket handshake."
+    },
+    {
+      "name": "Auth",
+      "description": "Observed token refresh operation."
+    },
+    {
+      "name": "Frontend",
+      "description": "Observed fantasy web page entrypoint."
+    }
+  ],
+  "paths": {
+    "/football/draft": {
+      "get": {
+        "tags": [
+          "Frontend"
+        ],
+        "operationId": "loadFantasyDraftPage",
+        "summary": "Load the ESPN Fantasy draft web page",
+        "servers": [
+          {
+            "url": "https://fantasy.espn.com"
+          }
+        ],
+        "parameters": [
+          {
+            "name": "leagueId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 123456789
+          },
+          {
+            "name": "seasonId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 2026
+          },
+          {
+            "name": "teamId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 2
+          },
+          {
+            "name": "memberId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "{00000000-0000-0000-0000-000000000000}"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Draft page HTML shell.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftPageHtml"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/apis/v3/games/ffl/seasons/{seasonId}/segments/{segmentId}/leagues/{leagueId}/teams/{teamId}/draftSecurity": {
+      "get": {
+        "tags": [
+          "Fantasy Draft"
+        ],
+        "operationId": "getDraftSecurityToken",
+        "summary": "Get draft security token for a team",
+        "description": "Observed immediately before the draft-room WebSocket connection.",
+        "security": [
+          {
+            "espnCookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SeasonId"
+          },
+          {
+            "$ref": "#/components/parameters/SegmentId"
+          },
+          {
+            "$ref": "#/components/parameters/LeagueId"
+          },
+          {
+            "$ref": "#/components/parameters/TeamId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bare numeric draft security token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftSecurityResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized or expired ESPN cookies.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/apis/v3/games/ffl/seasons/{seasonId}/segments/{segmentId}/leagues/{leagueId}": {
+      "get": {
+        "tags": [
+          "Fantasy Draft"
+        ],
+        "operationId": "getLeagueDraftInit",
+        "summary": "Get league draft initialization data",
+        "description": "Observed with `view=draftInit&view=mSettings` and a JSON-encoded `filter` query.",
+        "security": [
+          {
+            "espnCookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SeasonId"
+          },
+          {
+            "$ref": "#/components/parameters/SegmentId"
+          },
+          {
+            "$ref": "#/components/parameters/LeagueId"
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "description": "URL-encoded JSON filter string.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "{\"players\":{\"filterStatsForContainerIds\":{\"value\":[\"002025\",\"102026\"]}}}"
+          },
+          {
+            "$ref": "#/components/parameters/View"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "League draft initialization payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeagueDraftInitResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized or expired ESPN cookies.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/apis/v3/games/ffl/seasons/{seasonId}": {
+      "get": {
+        "tags": [
+          "Fantasy Season"
+        ],
+        "operationId": "getFantasySeasonMetadata",
+        "summary": "Get fantasy football season metadata",
+        "description": "Observed for `view=proTeamSchedules_wl` and `view=kona_game_state`.",
+        "security": [
+          {
+            "espnCookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SeasonId"
+          },
+          {
+            "$ref": "#/components/parameters/View"
+          },
+          {
+            "$ref": "#/components/parameters/PlatformVersion"
+          },
+          {
+            "name": "X-Fantasy-Platform",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "espn-fantasy-web"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Season-level metadata; response shape changes by `view`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SeasonMetadataResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/KonaGameStateResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized or expired ESPN cookies.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/game-1/league-{leagueId}/JOIN": {
+      "get": {
+        "tags": [
+          "Draft WebSocket"
+        ],
+        "operationId": "joinDraftRoomWebSocket",
+        "summary": "Open draft-room WebSocket connection",
+        "description": "OpenAPI does not fully model WebSocket frames, but the HAR captured the HTTP upgrade handshake. The actual draft actions/events likely travel over this socket and were not present as decoded frames in the HAR.",
+        "servers": [
+          {
+            "url": "wss://fantasydraft.espn.com"
+          }
+        ],
+        "security": [
+          {
+            "espnCookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "leagueId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 123456789
+          },
+          {
+            "name": "1",
+            "in": "query",
+            "required": true,
+            "description": "Observed game id.",
+            "schema": {
+              "type": "integer"
+            },
+            "example": 1
+          },
+          {
+            "name": "2",
+            "in": "query",
+            "required": true,
+            "description": "Observed league id duplicate.",
+            "schema": {
+              "type": "integer"
+            },
+            "example": 123456789
+          },
+          {
+            "name": "3",
+            "in": "query",
+            "required": true,
+            "description": "Observed team id.",
+            "schema": {
+              "type": "integer"
+            },
+            "example": 2
+          },
+          {
+            "name": "4",
+            "in": "query",
+            "required": true,
+            "description": "Observed member/SWID value.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "{00000000-0000-0000-0000-000000000000}"
+          },
+          {
+            "name": "5",
+            "in": "query",
+            "required": true,
+            "description": "Composite join credential in the form `gameId:leagueId:teamId:memberId:draftSecurityToken`.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "1:123456789:2:{00000000-0000-0000-0000-000000000000}:111111111"
+          },
+          {
+            "name": "6",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            },
+            "example": false
+          },
+          {
+            "name": "7",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            },
+            "example": false
+          },
+          {
+            "name": "8",
+            "in": "query",
+            "required": true,
+            "description": "Observed client/channel name.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "KONA"
+          },
+          {
+            "name": "nocache",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "example": 100249
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "Switching Protocols; WebSocket connection established."
+          },
+          "401": {
+            "description": "Unauthorized or invalid join credential."
+          }
+        }
+      }
+    },
+    "/graph/v1/device/graphql": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "refreshBamToken",
+        "summary": "Refresh Disney/BAM session token via GraphQL",
+        "servers": [
+          {
+            "url": "https://espn.api.edge.bamgrid.com"
+          }
+        ],
+        "security": [
+          {
+            "edgeAuthorizationHeader": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQLRefreshTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "GraphQL refresh token result. Captured response included token metadata; live token values omitted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphQLRefreshTokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized authorization header or refresh token."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "espnCookieAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Cookie",
+        "description": "ESPN Fantasy APIs were called with ESPN session cookies. Observed cookie names included SWID, espn_s2, ESPN-ONESITE.WEB-PROD.token, espnAuth, and dtcAuth. Do not hard-code live cookie values in this spec."
+      },
+      "edgeAuthorizationHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "authorization",
+        "description": "Authorization header used by the BAM/Disney GraphQL endpoint. The captured value is omitted."
+      }
+    },
+    "parameters": {
+      "SeasonId": {
+        "name": "seasonId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        },
+        "example": 2026
+      },
+      "SegmentId": {
+        "name": "segmentId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        },
+        "example": 0
+      },
+      "LeagueId": {
+        "name": "leagueId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        },
+        "example": 123456789
+      },
+      "TeamId": {
+        "name": "teamId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        },
+        "example": 2
+      },
+      "View": {
+        "name": "view",
+        "in": "query",
+        "required": false,
+        "description": "ESPN view selector. The HAR used repeated `view` parameters.",
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "examples": {
+          "draftInitAndSettings": {
+            "value": [
+              "draftInit",
+              "mSettings"
+            ]
+          },
+          "proTeamSchedules": {
+            "value": [
+              "proTeamSchedules_wl"
+            ]
+          },
+          "konaGameState": {
+            "value": [
+              "kona_game_state"
+            ]
+          }
+        }
+      },
+      "PlatformVersion": {
+        "name": "platformVersion",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "example": "<platformVersion-hash>"
+      }
+    },
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "No structured ESPN error body was observed in the HAR for these endpoints."
+      },
+      "DraftSecurityResponse": {
+        "type": "integer",
+        "description": "Draft security token returned as a bare JSON number.",
+        "example": 111111111
+      },
+      "DraftPick": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "teamId": {
+            "type": "integer",
+            "example": 1
+          }
+        },
+        "required": [
+          "id",
+          "teamId"
+        ],
+        "additionalProperties": true
+      },
+      "DraftDetail": {
+        "type": "object",
+        "properties": {
+          "drafted": {
+            "type": "boolean",
+            "example": false
+          },
+          "inProgress": {
+            "type": "boolean",
+            "example": true
+          },
+          "picks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DraftPick"
+            }
+          }
+        },
+        "required": [
+          "drafted",
+          "inProgress",
+          "picks"
+        ],
+        "additionalProperties": true
+      },
+      "LeagueMember": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "{00000000-0000-0000-0000-000000000000}"
+          },
+          "isLeagueCreator": {
+            "type": "boolean",
+            "example": false
+          },
+          "isLeagueManager": {
+            "type": "boolean",
+            "example": false
+          }
+        },
+        "required": [
+          "id",
+          "isLeagueCreator",
+          "isLeagueManager"
+        ],
+        "additionalProperties": true
+      },
+      "DraftRank": {
+        "type": "object",
+        "properties": {
+          "auctionValue": {
+            "type": "integer",
+            "example": 0
+          },
+          "rank": {
+            "type": "integer",
+            "example": 1512
+          },
+          "rankSourceId": {
+            "type": "integer",
+            "example": 0
+          },
+          "slotId": {
+            "type": "integer",
+            "example": 0
+          }
+        },
+        "additionalProperties": true
+      },
+      "PlayerOwnership": {
+        "type": "object",
+        "properties": {
+          "auctionValueAverage": {
+            "type": "number",
+            "format": "double",
+            "example": 0.0
+          },
+          "auctionValueAverageChange": {
+            "type": "number",
+            "format": "double",
+            "example": 0.0
+          },
+          "averageDraftPosition": {
+            "type": "number",
+            "format": "double",
+            "example": 170.1
+          },
+          "averageDraftPositionPercentChange": {
+            "type": "number",
+            "format": "double",
+            "example": 0.0
+          },
+          "percentChange": {
+            "type": "number",
+            "format": "double",
+            "example": 0.0
+          },
+          "percentOwned": {
+            "type": "number",
+            "format": "double",
+            "example": 0.1
+          },
+          "percentStarted": {
+            "type": "number",
+            "format": "double",
+            "example": 0.04
+          }
+        },
+        "additionalProperties": true
+      },
+      "PlayerStatLine": {
+        "type": "object",
+        "properties": {
+          "appliedTotal": {
+            "type": "number",
+            "format": "double",
+            "example": 0.0
+          },
+          "externalId": {
+            "type": "string",
+            "example": "2025"
+          },
+          "statSourceId": {
+            "type": "integer",
+            "example": 0
+          },
+          "statSplitTypeId": {
+            "type": "integer",
+            "example": 0
+          },
+          "stats": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "example": {
+              "155": 5.0,
+              "210": 5.0
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "FantasyPlayer": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "example": true
+          },
+          "defaultPositionId": {
+            "type": "integer",
+            "example": 4
+          },
+          "draftRanksByRankType": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DraftRank"
+            },
+            "example": {
+              "STANDARD": {
+                "auctionValue": 0,
+                "rank": 1512,
+                "rankSourceId": 0,
+                "slotId": 0
+              },
+              "PPR": {
+                "auctionValue": 0,
+                "rank": 1512,
+                "rankSourceId": 0,
+                "slotId": 0
+              }
+            }
+          },
+          "eligibleSlots": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "example": [
+              5,
+              6,
+              7,
+              20,
+              21
+            ]
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Jaheim"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Jaheim Bell"
+          },
+          "id": {
+            "type": "integer",
+            "example": 4429262
+          },
+          "injured": {
+            "type": "boolean",
+            "example": false
+          },
+          "injuryStatus": {
+            "type": "string",
+            "example": "ACTIVE"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Bell"
+          },
+          "lastNewsDate": {
+            "type": "integer",
+            "format": "int64",
+            "example": 1776832305000
+          },
+          "ownership": {
+            "$ref": "#/components/schemas/PlayerOwnership"
+          },
+          "proTeamId": {
+            "type": "integer",
+            "example": 11
+          },
+          "stats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlayerStatLine"
+            }
+          },
+          "universeId": {
+            "type": "integer",
+            "example": 2
+          }
+        },
+        "required": [
+          "active",
+          "defaultPositionId",
+          "firstName",
+          "fullName",
+          "id",
+          "lastName"
+        ],
+        "additionalProperties": true
+      },
+      "DraftablePlayer": {
+        "type": "object",
+        "properties": {
+          "draftAuctionValue": {
+            "type": "integer",
+            "example": 0
+          },
+          "id": {
+            "type": "integer",
+            "example": 4429262
+          },
+          "player": {
+            "$ref": "#/components/schemas/FantasyPlayer"
+          }
+        },
+        "required": [
+          "id",
+          "player"
+        ],
+        "additionalProperties": true
+      },
+      "LeagueDraftInitResponse": {
+        "type": "object",
+        "description": "Inferred from the `draftInit` + `mSettings` response. The HAR response body was truncated at 1,048,576 characters, so the player schema was inferred from the first complete player objects.",
+        "properties": {
+          "draftDetail": {
+            "$ref": "#/components/schemas/DraftDetail"
+          },
+          "gameId": {
+            "type": "integer",
+            "example": 1
+          },
+          "id": {
+            "type": "integer",
+            "example": 123456789
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LeagueMember"
+            }
+          },
+          "players": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DraftablePlayer"
+            }
+          },
+          "settings": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Present when `view=mSettings` is requested; not fully captured because the HAR body was truncated."
+          }
+        },
+        "required": [
+          "draftDetail",
+          "gameId",
+          "id"
+        ],
+        "additionalProperties": true
+      },
+      "SeasonMetadataResponse": {
+        "type": "object",
+        "description": "Season-level metadata. Shape varies substantially by requested `view`.",
+        "properties": {
+          "display": {
+            "type": "boolean",
+            "example": true
+          },
+          "settings": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "KonaGameStateResponse": {
+        "type": "object",
+        "properties": {
+          "currentScoringPeriod": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "example": 1
+              }
+            },
+            "additionalProperties": true
+          },
+          "settings": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "allowLeagueCreation": {
+                "type": "boolean",
+                "example": true
+              },
+              "clientFlags": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "GraphQLRefreshTokenRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "example": "mutation refreshToken($input: RefreshTokenInput!) { refreshToken(refreshToken: $input) { activeSession { sessionId } } }"
+          },
+          "variables": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "description": "Opaque refresh token. Captured token value intentionally omitted.",
+                    "example": "<REFRESH_TOKEN>"
+                  }
+                },
+                "required": [
+                  "refreshToken"
+                ]
+              }
+            },
+            "required": [
+              "input"
+            ]
+          }
+        },
+        "required": [
+          "query",
+          "variables"
+        ],
+        "additionalProperties": true
+      },
+      "GraphQLRefreshTokenResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "refreshToken": {
+                "type": "object",
+                "properties": {
+                  "activeSession": {
+                    "type": "object",
+                    "properties": {
+                      "sessionId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "00000000-0000-0000-0000-000000000000"
+                      }
+                    },
+                    "required": [
+                      "sessionId"
+                    ],
+                    "additionalProperties": true
+                  }
+                },
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
+          },
+          "extensions": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "operation": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "operationType": {
+                    "type": "string",
+                    "example": "mutation"
+                  },
+                  "operations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "operation": {
+                          "type": "string",
+                          "example": "refreshToken"
+                        },
+                        "errorCode": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "example": null
+                        }
+                      },
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              },
+              "sdk": {
+                "type": "object",
+                "description": "Contains access/refresh token metadata in the observed response. Token strings omitted.",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "DraftPageHtml": {
+        "type": "string",
+        "description": "HTML document for the fantasy draft page."
+      }
+    }
+  }
+}
