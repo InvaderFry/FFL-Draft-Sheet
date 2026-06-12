@@ -92,9 +92,9 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
       leagueId: saved?.leagueId || '',
       // Prefer the season the sheet was generated for over the clock.
       season: saved?.season || defaultSeason || CURRENT_SEASON,
-      teamId: saved?.teamId || '',
       espn_s2: saved?.espn_s2 || '',
       swid: saved?.swid || '',
+      mock: saved?.mock || false,
       practice: saved?.practice || false,
     }
   })
@@ -119,6 +119,10 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
     return () => clearInterval(t)
   }, [status])
 
+  useEffect(() => {
+    if (form.mock) setShowPrivate(false)
+  }, [form.mock])
+
   const update = (field, value) => setForm(f => ({ ...f, [field]: value }))
 
   const handleConnect = (e) => {
@@ -128,9 +132,10 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
     // Carry the saved team choice forward only when reconnecting to the
     // league it belongs to.
     const myTeam = saved?.leagueId === form.leagueId ? saved?.myTeamId ?? null : null
-    persist({ ...form, myTeamId: myTeam })
+    const connectSettings = form.mock ? { ...form, espn_s2: '', swid: '' } : form
+    persist({ ...connectSettings, myTeamId: myTeam })
     setOpen(false)
-    connect(form)
+    connect(connectSettings)
   }
 
   const handlePickTeam = (teamId) => {
@@ -140,7 +145,14 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
 
   const handleForget = () => {
     forget()
-    setForm({ leagueId: '', season: defaultSeason || CURRENT_SEASON, teamId: '', espn_s2: '', swid: '', practice: false })
+    setForm({
+      leagueId: '',
+      season: defaultSeason || CURRENT_SEASON,
+      espn_s2: '',
+      swid: '',
+      mock: false,
+      practice: false,
+    })
     disconnect()
   }
 
@@ -160,9 +172,9 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
             <div className={styles.panelTitle}>Live ESPN draft sync</div>
             <p className={styles.hint}>
               Picks made in your ESPN draft room are crossed off here automatically.
-              For a Mock Draft Lobby room, enter the league ID from the draft
-              page URL and your espn_s2/SWID cookies, and connect before the
-              draft starts.
+              For a Mock Draft Lobby room, install the tap userscript, set its
+              SHEET_API value, check Live ESPN mock draft here, and connect
+              before the draft starts.
             </p>
             <label className={styles.field}>
               <span>League ID</span>
@@ -186,16 +198,31 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
                 required
               />
             </label>
-            <label className={styles.field}>
-              <span>Team ID (optional — mock drafts)</span>
+            <label className={styles.checkField}>
               <input
-                type="text"
-                inputMode="numeric"
-                value={form.teamId}
-                onChange={e => update('teamId', e.target.value.replace(/\D/g, ''))}
-                placeholder="teamId from the draft URL"
+                type="checkbox"
+                checked={form.mock}
+                onChange={e => update('mock', e.target.checked)}
               />
+              <span>
+                Live ESPN mock draft — use the browser socket tap instead of
+                ESPN REST polling
+              </span>
             </label>
+            {form.mock && (
+              <div className={styles.mockHelp}>
+                Install{' '}
+                <a
+                  href="https://github.com/InvaderFry/FFL-Draft-Sheet/raw/main/tools/espn-draft-tap.user.js"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  espn-draft-tap.user.js
+                </a>
+                , set SHEET_API in the script to this backend, then reload the
+                ESPN mock draft page before the draft starts.
+              </div>
+            )}
             <label className={styles.checkField}>
               <input
                 type="checkbox"
@@ -207,14 +234,16 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
                 (set season to last year)
               </span>
             </label>
-            <button
-              type="button"
-              className={styles.privateToggle}
-              onClick={() => setShowPrivate(s => !s)}
-            >
-              {showPrivate ? '▾' : '▸'} Private league?
-            </button>
-            {showPrivate && (
+            {!form.mock && (
+              <button
+                type="button"
+                className={styles.privateToggle}
+                onClick={() => setShowPrivate(s => !s)}
+              >
+                {showPrivate ? '▾' : '▸'} Private league?
+              </button>
+            )}
+            {!form.mock && showPrivate && (
               <div className={styles.privateSection}>
                 <p className={styles.warning}>
                   ⚠ espn_s2 and SWID are cookies from espn.com that grant full

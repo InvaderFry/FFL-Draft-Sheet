@@ -382,9 +382,30 @@ class EspnDraftRequest(BaseModel):
     # SecretStr so the credentials never appear in reprs/validation errors.
     espn_s2: SecretStr | None = None
     swid: SecretStr | None = None
-    # Mock-lobby escape hatch: the user's team in the room (from the draft
-    # page URL) when SWID→team matching can't find it.
-    team_id: int | None = None
+    # Explicitly poll the browser-side mock-draft ingest store. This avoids
+    # relying on ESPN's REST API while the userscript is feeding picks.
+    mock_ingest: bool = False
+
+
+class EspnDraftIngestRequest(BaseModel):
+    league_id: int
+    season: int = Field(ge=2018, le=2035)
+    lines: list[str] = Field(default_factory=list)
+    complete: bool = False
+
+
+# Unauthenticated by design: the userscript posts from fantasy.espn.com using
+# wildcard CORS/no credentials, and draft pick lines are low-sensitivity state
+# keyed only by league id + season.
+@app.post("/api/draft/espn/ingest")
+async def espn_draft_ingest(req: EspnDraftIngestRequest) -> dict:
+    picks = espn_ws.ingest(
+        req.league_id,
+        req.season,
+        req.lines,
+        complete=req.complete,
+    )
+    return {"ok": True, "picks": picks}
 
 
 # Stateless per-request proxy: draft picks must be fresh, so no caching here
@@ -393,21 +414,25 @@ class EspnDraftRequest(BaseModel):
 @app.post("/api/draft/espn", response_model=DraftStatus)
 async def espn_draft_status(req: EspnDraftRequest) -> DraftStatus:
     try:
+        if req.mock_ingest:
+            return espn_ws.snapshot(req.league_id, req.season)
+
         result = await espn_provider.fetch_draft(
             league_id=req.league_id,
             season=req.season,
             espn_s2=req.espn_s2.get_secret_value() if req.espn_s2 else None,
             swid=req.swid.get_secret_value() if req.swid else None,
-            team_id=req.team_id,
         )
         # Mock Draft Lobby picks never reach the REST API — serve them from
-        # the draft-room WebSocket session instead. Polling stays the
-        # frontend contract; the session accumulates picks between polls.
+        # the browser-side socket ingest store. Polling stays the frontend
+        # contract; the userscript accumulates picks between polls.
         if isinstance(result, espn_provider.MockLobbyDraft):
-            return espn_ws.get_or_create(result).status()
+            return espn_ws.snapshot(
+                result.league_id,
+                result.season,
+                teams=result.teams,
+            )
         return result
-    except espn_provider.EspnMockLobbyError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
     except espn_provider.EspnAuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
     except espn_provider.EspnNotFoundError as exc:

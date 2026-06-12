@@ -11,10 +11,9 @@ to ESPN as request cookies and MUST never be logged, cached, or echoed in
 error messages — log only league_id/season/has_cookies.
 
 See docs/espn-draft-api.md for the full observed API surface, including the
-draft room's WebSocket feed (a possible future alternative to polling).
-Mock Draft Lobby rooms cannot be synced by polling — ESPN never writes
-their picks to this API while the draft runs. With cookies they are routed
-to the draft-room WebSocket session in espn_ws.py instead; without, rejected.
+draft room's WebSocket feed. Mock Draft Lobby rooms cannot be synced by
+polling — ESPN never writes their picks to this API while the draft runs.
+They are routed to the browser-side socket tap ingest store in espn_ws.py.
 """
 
 from __future__ import annotations
@@ -35,24 +34,20 @@ ESPN_LEAGUE_URL = (
     "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl"
     "/seasons/{season}/segments/0/leagues/{league_id}"
 )
-ESPN_DRAFT_SECURITY_URL = ESPN_LEAGUE_URL + "/teams/{team_id}/draftSecurity"
 
 
 @dataclass
 class MockLobbyDraft:
-    """A live Mock Draft Lobby league the caller should sync via WebSocket.
+    """A live Mock Draft Lobby league the caller should sync via ingest.
 
     Returned by fetch_draft instead of DraftStatus when the league is a mock
-    lobby room, the user supplied cookies, and their SWID matched a team —
-    REST never reflects mock picks, so the draft-room socket is the only
-    live source. Carries everything the socket session needs to join.
+    lobby room. REST never reflects mock picks, so the browser userscript's
+    socket tap is the only live source; this marker carries league metadata
+    and team names for the poll snapshot.
     """
 
     league_id: int
     season: int
-    team_id: int
-    espn_s2: str
-    swid: str
     teams: list[DraftTeam] = field(default_factory=list)
 
 
@@ -61,10 +56,6 @@ class EspnError(Exception):
 
 
 class EspnAuthError(EspnError):
-    pass
-
-
-class EspnMockLobbyError(EspnError):
     pass
 
 
@@ -89,7 +80,6 @@ async def fetch_draft(
     season: int,
     espn_s2: str | None = None,
     swid: str | None = None,
-    team_id: int | None = None,
 ) -> DraftStatus | MockLobbyDraft:
     url = ESPN_LEAGUE_URL.format(season=season, league_id=league_id)
     params = [("view", "mDraftDetail"), ("view", "mTeams")]
@@ -146,9 +136,9 @@ async def fetch_draft(
 
     # Mock Draft Lobby rooms are temporary leagues whose picks ESPN never
     # writes back to this read API while the draft runs (verified live: every
-    # slot stayed a placeholder mid-mock) — polling would wait forever. With
-    # cookies and a team owned by this SWID we can sync the draft-room
-    # WebSocket instead; without them, fail fast with the alternative.
+    # slot stayed a placeholder mid-mock) — polling would wait forever. The
+    # live source is the browser-side socket tap; cookies/team id are not
+    # needed because the user's browser already owns the draft connection.
     sub_type = (
         (data.get("settings") or {}).get("draftSettings") or {}
     ).get("leagueSubType")
@@ -158,26 +148,11 @@ async def fetch_draft(
             # Room's over and gone — nothing to join. Whatever REST kept
             # (possibly zero picks) is all there is.
             pass
-        elif not (espn_s2 and swid):
-            raise EspnMockLobbyError(
-                "This is an ESPN Mock Draft Lobby room — ESPN only publishes "
-                "mock picks over the draft-room connection, which requires "
-                "your espn_s2 and SWID cookies (open 'Private league?' on "
-                "the connect form). Or use Practice replay with your league "
-                "ID and last season."
-            )
         else:
-            if team_id is None:
-                team_id = _find_member_team(data, swid)
-            if team_id is None:
-                raise EspnMockLobbyError(
-                    "Couldn't find your team in this mock room (join the "
-                    "room first, then connect). If it persists, enter the "
-                    "teamId from the draft page URL in the connect form."
-                )
             return MockLobbyDraft(
-                league_id=league_id, season=season, team_id=team_id,
-                espn_s2=espn_s2, swid=swid, teams=_parse_teams(data),
+                league_id=league_id,
+                season=season,
+                teams=_parse_teams(data),
             )
 
     # Warm the player map before parsing: once memoized, per-pick lookups in
@@ -204,67 +179,6 @@ def _parse_teams(data: dict) -> list[DraftTeam]:
             abbrev=t.get("abbrev"),
         ))
     return teams
-
-
-def _find_member_team(data: dict, swid: str) -> int | None:
-    """Team id owned by this SWID (brace/case-tolerant).
-
-    Checks both `owners` and `primaryOwner` — mock-lobby teams have been
-    seen carrying the member only in one of the two.
-    """
-    want = swid.strip().strip("{}").upper()
-    for t in data.get("teams") or []:
-        owners = list(t.get("owners") or [])
-        if t.get("primaryOwner"):
-            owners.append(t["primaryOwner"])
-        if any(str(o).strip().strip("{}").upper() == want for o in owners):
-            tid = t.get("id")
-            return int(tid) if tid is not None else None
-    return None
-
-
-async def fetch_draft_security(
-    league_id: int,
-    season: int,
-    team_id: int,
-    espn_s2: str,
-    swid: str,
-) -> int:
-    """Fetch the draft-room join token (a bare JSON integer).
-
-    The draft client calls this immediately before opening the draft-room
-    WebSocket; the token goes into the composite join credential.
-    """
-    url = ESPN_DRAFT_SECURITY_URL.format(
-        season=season, league_id=league_id, team_id=team_id,
-    )
-    cookies = {"espn_s2": espn_s2, "SWID": swid}
-    try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            resp = await client.get(
-                url,
-                cookies=cookies,
-                headers={"Accept": "application/json"},
-                timeout=10,
-            )
-    except httpx.TimeoutException as exc:
-        raise EspnTimeoutError("ESPN request timed out — try again.") from exc
-    except httpx.RequestError as exc:
-        raise EspnUpstreamError("Could not reach ESPN — try again.") from exc
-
-    if resp.status_code in (401, 403):
-        raise EspnAuthError(
-            "ESPN denied the draft-room token request — check that espn_s2 "
-            "and SWID are current."
-        )
-    if resp.status_code != 200:
-        raise EspnUpstreamError(f"ESPN returned HTTP {resp.status_code}.")
-    try:
-        return int(resp.json())
-    except (ValueError, TypeError) as exc:
-        raise EspnSchemaError(
-            "ESPN draftSecurity response was not a numeric token."
-        ) from exc
 
 
 def _parse_league(data: dict) -> DraftStatus:

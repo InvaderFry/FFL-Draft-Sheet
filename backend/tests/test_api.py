@@ -39,6 +39,49 @@ def test_health(client):
     assert resp.json()["status"] == "ok"
 
 
+# ---- ESPN mock ingest --------------------------------------------------------
+
+def test_espn_ingest_then_mock_poll_returns_picks(client):
+    from app.providers import espn_ws
+
+    espn_ws._sessions.clear()
+    try:
+        with patch("app.providers.espn.get_player_by_espn_id", return_value=None), patch(
+            "app.providers.espn_ws.load_espn_directory",
+            return_value={"3929630": {
+                "name": "Christian McCaffrey",
+                "pos": "RB",
+                "team": "SF",
+            }},
+        ):
+            ingest = client.post("/api/draft/espn/ingest", json={
+                "league_id": 1242111363,
+                "season": 2026,
+                "lines": [
+                    "STATE 1\nSELECTING 4 30000\n",
+                    "SELECTED 4 3929630 2 {SWID}\n",
+                ],
+            })
+
+        assert ingest.status_code == 200
+        assert ingest.json() == {"ok": True, "picks": 1}
+
+        poll = client.post("/api/draft/espn", json={
+            "league_id": 1242111363,
+            "season": 2026,
+            "mock_ingest": True,
+        })
+
+        assert poll.status_code == 200
+        data = poll.json()
+        assert data["in_progress"] is True
+        assert data["complete"] is False
+        assert data["picks"][0]["player_name"] == "Christian McCaffrey"
+        assert data["picks"][0]["team_id"] == "4"
+    finally:
+        espn_ws._sessions.clear()
+
+
 # ---- default 12-team request -------------------------------------------------
 
 def _mock_scrape_result():

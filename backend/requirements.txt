@@ -11,5 +11,3 @@ nfl-data-py==0.3.1
 selectolax==0.3.21
 rapidfuzz==3.9.7
 python-dotenv==1.0.1
-# Draft-room WebSocket client (ESPN mock-lobby live sync).
-websockets==15.0.1
