@@ -12,6 +12,8 @@ error messages — log only league_id/season/has_cookies.
 
 See docs/espn-draft-api.md for the full observed API surface, including the
 draft room's WebSocket feed (a possible future alternative to polling).
+Mock Draft Lobby rooms cannot be synced at all: ESPN never writes their
+picks to this API while the draft runs, so they are detected and rejected.
 """
 
 from __future__ import annotations
@@ -38,6 +40,10 @@ class EspnError(Exception):
 
 
 class EspnAuthError(EspnError):
+    pass
+
+
+class EspnMockLobbyError(EspnError):
     pass
 
 
@@ -114,6 +120,21 @@ async def fetch_draft(
         raise EspnSchemaError(
             "ESPN response did not contain draft data — the league may be "
             "private (provide cookies) or ESPN's API may have changed."
+        )
+
+    # Mock Draft Lobby rooms are temporary leagues whose picks ESPN never
+    # writes back to this read API while the draft runs (verified live: every
+    # slot stayed a placeholder mid-mock) — polling would wait forever, so
+    # fail fast with the working alternative instead.
+    sub_type = (
+        (data.get("settings") or {}).get("draftSettings") or {}
+    ).get("leagueSubType")
+    if sub_type == "MOCKDRAFT_LOBBY":
+        raise EspnMockLobbyError(
+            "This is an ESPN Mock Draft Lobby room — ESPN does not publish "
+            "mock-lobby picks to its API, so live sync cannot work. To "
+            "practice, use Practice replay with your league ID and last "
+            "season instead."
         )
 
     # Warm the player map before parsing: once memoized, per-pick lookups in

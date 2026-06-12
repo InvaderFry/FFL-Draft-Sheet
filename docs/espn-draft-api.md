@@ -88,6 +88,26 @@ The draft room web app uses the same base API but a different flow:
 Season-level metadata also observed (not needed here):
 `GET /seasons/{season}?view=proTeamSchedules_wl` and `?view=kona_game_state`.
 
+## Mock Draft Lobby leagues cannot be synced by polling
+
+Verified live (2026-06-12, mock league 283353968): the read API serves a
+Mock Draft Lobby league with cookies (`view=mDraftDetail` returns 200,
+`draftDetail.inProgress: true`, all pick slots pre-populated), **but the
+pick slots never fill in while the draft runs** — ~20 real picks were made
+in the room while every polled slot still carried a placeholder `playerId`.
+Mock picks travel only over the draft WebSocket.
+
+Mock-lobby leagues are identifiable in the response:
+
+- `settings.draftSettings.leagueSubType == "MOCKDRAFT_LOBBY"` (present even
+  with only `view=mDraftDetail`)
+- `status.isViewable: false`
+
+The backend detects the `leagueSubType` marker and rejects the league with
+an explanatory 400 instead of letting the sheet poll forever at "waiting
+for picks". Whether the slots backfill after a mock completes is unknown
+(the temporary league is deleted soon after).
+
 ## Future upgrade path: real-time sync
 
 If polling latency ever becomes a problem, the recipe is: fetch the

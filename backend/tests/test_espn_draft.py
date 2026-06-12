@@ -250,6 +250,32 @@ def test_espn_http_errors_mapped(client, espn_status, api_status):
     assert "detail" in resp.json()
 
 
+def test_mock_lobby_league_rejected_with_400(client):
+    """ESPN never publishes Mock Draft Lobby picks to the read API, so a
+    MOCKDRAFT_LOBBY league fails fast instead of polling forever."""
+    mock_lobby = json.loads(json.dumps(FIXTURE))
+    mock_lobby["settings"] = {"draftSettings": {"leagueSubType": "MOCKDRAFT_LOBBY"}}
+
+    with _patch_espn(payload=mock_lobby), _patch_players():
+        resp = client.post("/api/draft/espn", json=REQUEST)
+
+    assert resp.status_code == 400
+    assert "Mock Draft Lobby" in resp.json()["detail"]
+    assert "Practice replay" in resp.json()["detail"]
+
+
+def test_non_lobby_league_sub_type_still_parses(client):
+    """Only the mock-lobby marker is rejected — other sub types sync fine."""
+    normal = json.loads(json.dumps(FIXTURE))
+    normal["settings"] = {"draftSettings": {"leagueSubType": "NONE"}}
+
+    with _patch_espn(payload=normal), _patch_players():
+        resp = client.post("/api/draft/espn", json=REQUEST)
+
+    assert resp.status_code == 200
+    assert len(resp.json()["picks"]) == 4
+
+
 def test_missing_draft_detail_is_schema_error(client):
     with _patch_espn(payload={"messages": ["You are not authorized"]}), _patch_players():
         resp = client.post("/api/draft/espn", json=REQUEST)
