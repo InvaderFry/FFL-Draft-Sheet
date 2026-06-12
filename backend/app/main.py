@@ -382,6 +382,9 @@ class EspnDraftRequest(BaseModel):
     # SecretStr so the credentials never appear in reprs/validation errors.
     espn_s2: SecretStr | None = None
     swid: SecretStr | None = None
+    # Mock-lobby escape hatch: the user's team in the room (from the draft
+    # page URL) when SWID→team matching can't find it.
+    team_id: int | None = None
 
 
 # Stateless per-request proxy: draft picks must be fresh, so no caching here
@@ -395,6 +398,7 @@ async def espn_draft_status(req: EspnDraftRequest) -> DraftStatus:
             season=req.season,
             espn_s2=req.espn_s2.get_secret_value() if req.espn_s2 else None,
             swid=req.swid.get_secret_value() if req.swid else None,
+            team_id=req.team_id,
         )
         # Mock Draft Lobby picks never reach the REST API — serve them from
         # the draft-room WebSocket session instead. Polling stays the

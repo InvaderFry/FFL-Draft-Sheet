@@ -39,7 +39,12 @@ import websockets
 from app.data.espn_players import load_espn_directory_async
 from app.data.players import load_player_map_async
 from app.providers.base import DraftPick, DraftStatus
-from app.providers.espn import MockLobbyDraft, _enrich_pick, fetch_draft_security
+from app.providers.espn import (
+    EspnUpstreamError,
+    MockLobbyDraft,
+    _enrich_pick,
+    fetch_draft_security,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -184,9 +189,12 @@ class DraftRoomSession:
     async def _keepalive(self, ws) -> None:
         # Observed client behavior: "PING PING%20<ms-timestamp>" every ~15s,
         # echoed back as PONG. Without it the server drops idle members.
-        while True:
-            await asyncio.sleep(PING_INTERVAL_S)
-            await ws.send(f"PING PING%20{int(time.time() * 1000)}")
+        try:
+            while True:
+                await asyncio.sleep(PING_INTERVAL_S)
+                await ws.send(f"PING PING%20{int(time.time() * 1000)}")
+        except websockets.exceptions.ConnectionClosed:
+            return  # the listen loop handles the closure
 
     async def _handle(self, event: tuple | None) -> None:
         if event is None:
@@ -220,7 +228,13 @@ _sessions: dict[tuple[int, int], DraftRoomSession] = {}
 
 
 def get_or_create(lobby: MockLobbyDraft) -> DraftRoomSession:
-    """Session for this mock league, starting one (and evicting idle ones)."""
+    """Session for this mock league, starting one (and evicting idle ones).
+
+    Raises EspnUpstreamError when an existing session's connection gave up,
+    so the failure surfaces to the user instead of an eternal empty
+    "waiting for picks" — the session is dropped, and the frontend's retry
+    (or its next backoff poll) starts a fresh one.
+    """
     now = time.time()
     for key, session in list(_sessions.items()):
         if now - session.last_polled > IDLE_EVICT_S:
@@ -230,10 +244,14 @@ def get_or_create(lobby: MockLobbyDraft) -> DraftRoomSession:
 
     key = (lobby.league_id, lobby.season)
     session = _sessions.get(key)
-    if session is None or session._task.done() and not session.complete:
-        # No session, or one whose connection gave up — start fresh.
-        if session is not None:
-            session.close()
+    if session is not None and session._task.done() and not session.complete:
+        session.close()
+        del _sessions[key]
+        raise EspnUpstreamError(
+            "Lost the connection to the ESPN draft room — retrying. Picks "
+            "made while disconnected may be missing."
+        )
+    if session is None:
         session = DraftRoomSession(lobby)
         _sessions[key] = session
     return session

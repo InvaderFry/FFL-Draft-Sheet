@@ -183,6 +183,9 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
           season: Number(settings.season),
           espn_s2: settings.espn_s2 || null,
           swid: settings.swid || null,
+          // Mock-lobby escape hatch: the room's teamId from the draft URL,
+          // for when the backend can't match the SWID to a team.
+          team_id: settings.teamId ? Number(settings.teamId) : null,
         }),
       })
       if (!resp.ok) {

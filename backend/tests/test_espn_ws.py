@@ -170,6 +170,27 @@ async def test_session_rejoins_after_abnormal_disconnect(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_dead_session_surfaces_error_and_is_dropped(monkeypatch):
+    """A session whose connection gave up must not stall polls silently —
+    the next poll gets an upstream error and a fresh start after that."""
+    monkeypatch.setattr(espn_ws, "MAX_REJOIN_ATTEMPTS", 0)
+    with patch(
+        "app.providers.espn_ws.fetch_draft_security",
+        new_callable=AsyncMock, side_effect=Exception("room is gone"),
+    ), patch(
+        "app.providers.espn_ws.load_player_map_async",
+        new_callable=AsyncMock, return_value={},
+    ):
+        espn_ws._sessions.clear()
+        session = espn_ws.get_or_create(_lobby())
+        await _wait_for(lambda: session._task.done())
+
+        with pytest.raises(espn_ws.EspnUpstreamError):
+            espn_ws.get_or_create(_lobby())
+        assert espn_ws._sessions == {}
+
+
+@pytest.mark.asyncio
 async def test_registry_reuses_and_evicts_sessions(monkeypatch):
     async def room(ws):
         await ws.send("STATE 1\n")

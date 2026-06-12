@@ -105,9 +105,13 @@ Mock-lobby leagues are identifiable in the response:
 
 The backend detects the `leagueSubType` marker: with espn_s2/SWID cookies it
 syncs the league via the draft-room WebSocket (`app/providers/espn_ws.py`),
-deriving the user's team id by matching the SWID against `mTeams` owners;
-without cookies it returns an explanatory 400 instead of letting the sheet
-poll forever at "waiting for picks". Whether the REST slots backfill after a
+deriving the user's team id by matching the SWID against each team's
+`owners`/`primaryOwner` (join the room before connecting, or it isn't there
+yet; the connect form's optional Team ID — the `teamId` from the draft page
+URL — overrides the match). Without cookies it returns an explanatory 400
+instead of letting the sheet poll forever at "waiting for picks". A mock
+league whose `draftDetail.drafted` is already true parses via REST — the
+room no longer exists to join. Whether the REST slots backfill after a
 mock completes is unknown (the temporary league is deleted soon after).
 
 ## Draft-room WebSocket protocol

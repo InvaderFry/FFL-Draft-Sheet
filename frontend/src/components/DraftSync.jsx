@@ -92,6 +92,7 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
       leagueId: saved?.leagueId || '',
       // Prefer the season the sheet was generated for over the clock.
       season: saved?.season || defaultSeason || CURRENT_SEASON,
+      teamId: saved?.teamId || '',
       espn_s2: saved?.espn_s2 || '',
       swid: saved?.swid || '',
       practice: saved?.practice || false,
@@ -139,7 +140,7 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
 
   const handleForget = () => {
     forget()
-    setForm({ leagueId: '', season: defaultSeason || CURRENT_SEASON, espn_s2: '', swid: '', practice: false })
+    setForm({ leagueId: '', season: defaultSeason || CURRENT_SEASON, teamId: '', espn_s2: '', swid: '', practice: false })
     disconnect()
   }
 
@@ -183,6 +184,16 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
                 min="2018"
                 max="2035"
                 required
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Team ID (optional — mock drafts)</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={form.teamId}
+                onChange={e => update('teamId', e.target.value.replace(/\D/g, ''))}
+                placeholder="teamId from the draft URL"
               />
             </label>
             <label className={styles.checkField}>

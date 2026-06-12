@@ -250,9 +250,21 @@ def test_espn_http_errors_mapped(client, espn_status, api_status):
     assert "detail" in resp.json()
 
 
+def _empty_status():
+    from app.providers.base import DraftStatus
+    return DraftStatus(
+        provider="espn", in_progress=True, complete=False,
+        picks=[], teams=[], fetched_at=1.0,
+    )
+
+
 def _mock_lobby_payload(owner_swid=None):
     payload = json.loads(json.dumps(FIXTURE))
     payload["settings"] = {"draftSettings": {"leagueSubType": "MOCKDRAFT_LOBBY"}}
+    # A live mock room: the fixture's completed draft would (correctly) fall
+    # through to plain REST parsing instead of the socket path.
+    payload["draftDetail"]["drafted"] = False
+    payload["draftDetail"]["inProgress"] = True
     if owner_swid:
         payload["teams"][0]["owners"] = [owner_swid]
     return payload
@@ -278,6 +290,57 @@ def test_mock_lobby_with_unknown_swid_rejected_with_400(client):
             **REQUEST, "espn_s2": "s2-secret", "swid": "{SWID-VALUE}",
         })
     assert resp.status_code == 400
+    assert "teamId from the draft page URL" in resp.json()["detail"]
+
+
+def test_mock_lobby_matches_primary_owner(client):
+    """Mock teams sometimes carry the member only in primaryOwner."""
+    payload = _mock_lobby_payload()
+    payload["teams"][1]["primaryOwner"] = "{SWID-VALUE}"
+    session = MagicMock()
+    session.status.return_value = _empty_status()
+
+    with _patch_espn(payload=payload), _patch_players(), patch(
+        "app.providers.espn_ws.get_or_create", return_value=session,
+    ) as get_or_create:
+        resp = client.post("/api/draft/espn", json={
+            **REQUEST, "espn_s2": "s2-secret", "swid": "{SWID-VALUE}",
+        })
+
+    assert resp.status_code == 200
+    assert get_or_create.call_args.args[0].team_id == 7
+
+
+def test_mock_lobby_explicit_team_id_skips_owner_match(client):
+    """The form's team-id escape hatch wins over SWID→owner matching."""
+    payload = _mock_lobby_payload()  # no owners anywhere
+    session = MagicMock()
+    session.status.return_value = _empty_status()
+
+    with _patch_espn(payload=payload), _patch_players(), patch(
+        "app.providers.espn_ws.get_or_create", return_value=session,
+    ) as get_or_create:
+        resp = client.post("/api/draft/espn", json={
+            **REQUEST, "espn_s2": "s2-secret", "swid": "{SWID-VALUE}",
+            "team_id": 12,
+        })
+
+    assert resp.status_code == 200
+    assert get_or_create.call_args.args[0].team_id == 12
+
+
+def test_completed_mock_lobby_parses_from_rest(client):
+    """A drafted mock room is gone — don't try to join it, just parse REST."""
+    payload = _mock_lobby_payload(owner_swid="{SWID-VALUE}")
+    payload["draftDetail"]["drafted"] = True
+
+    with _patch_espn(payload=payload), _patch_players():
+        resp = client.post("/api/draft/espn", json={
+            **REQUEST, "espn_s2": "s2-secret", "swid": "{SWID-VALUE}",
+        })
+
+    assert resp.status_code == 200
+    assert resp.json()["complete"] is True
 
 
 def test_mock_lobby_with_cookies_served_from_ws_session(client):
