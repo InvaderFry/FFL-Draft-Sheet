@@ -249,6 +249,22 @@ describe('useEspnDraftSync', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it('treats 400 (unsyncable mock-lobby league) as permanent with the server message', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false, status: 400,
+      json: async () => ({ detail: 'This is an ESPN Mock Draft Lobby room — use Practice replay instead.' }),
+    })
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2026 }))
+    await flush()
+
+    expect(result.current.status).toBe('error')
+    expect(result.current.error).toContain('Mock Draft Lobby')
+    await act(async () => { await vi.advanceTimersByTimeAsync(120000) })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('pauses while the tab is hidden and resumes on visibility', async () => {
     fetchMock.mockResolvedValue(draftResponse({ picks: [CMC_PICK] }))
     const { result } = renderSync()

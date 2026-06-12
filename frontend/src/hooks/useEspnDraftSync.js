@@ -194,8 +194,9 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
           else if (resp.status === 422) detail = 'Invalid league ID or season — check the connect form.'
         } catch (_) {}
         // Auth/not-found/validation failures are permanent — retrying the
-        // same payload won't fix them.
-        const permanent = [401, 404, 422].includes(resp.status)
+        // same payload won't fix them. 400 = unsyncable league (e.g. an ESPN
+        // Mock Draft Lobby room, whose picks ESPN never publishes to its API).
+        const permanent = [400, 401, 404, 422].includes(resp.status)
         throw Object.assign(new Error(detail), { permanent })
       }
       const data = await resp.json()

@@ -395,6 +395,8 @@ async def espn_draft_status(req: EspnDraftRequest) -> DraftStatus:
             espn_s2=req.espn_s2.get_secret_value() if req.espn_s2 else None,
             swid=req.swid.get_secret_value() if req.swid else None,
         )
+    except espn_provider.EspnMockLobbyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except espn_provider.EspnAuthError as exc:
         raise HTTPException(status_code=401, detail=str(exc))
     except espn_provider.EspnNotFoundError as exc:
