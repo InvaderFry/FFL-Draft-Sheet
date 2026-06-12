@@ -89,6 +89,7 @@ async def fetch_draft(
     season: int,
     espn_s2: str | None = None,
     swid: str | None = None,
+    team_id: int | None = None,
 ) -> DraftStatus | MockLobbyDraft:
     url = ESPN_LEAGUE_URL.format(season=season, league_id=league_id)
     params = [("view", "mDraftDetail"), ("view", "mTeams")]
@@ -152,8 +153,12 @@ async def fetch_draft(
         (data.get("settings") or {}).get("draftSettings") or {}
     ).get("leagueSubType")
     if sub_type == "MOCKDRAFT_LOBBY":
-        team_id = _find_member_team(data, swid) if (espn_s2 and swid) else None
-        if team_id is None:
+        detail = data.get("draftDetail") or {}
+        if detail.get("drafted"):
+            # Room's over and gone — nothing to join. Whatever REST kept
+            # (possibly zero picks) is all there is.
+            pass
+        elif not (espn_s2 and swid):
             raise EspnMockLobbyError(
                 "This is an ESPN Mock Draft Lobby room — ESPN only publishes "
                 "mock picks over the draft-room connection, which requires "
@@ -161,10 +166,19 @@ async def fetch_draft(
                 "the connect form). Or use Practice replay with your league "
                 "ID and last season."
             )
-        return MockLobbyDraft(
-            league_id=league_id, season=season, team_id=team_id,
-            espn_s2=espn_s2, swid=swid, teams=_parse_teams(data),
-        )
+        else:
+            if team_id is None:
+                team_id = _find_member_team(data, swid)
+            if team_id is None:
+                raise EspnMockLobbyError(
+                    "Couldn't find your team in this mock room (join the "
+                    "room first, then connect). If it persists, enter the "
+                    "teamId from the draft page URL in the connect form."
+                )
+            return MockLobbyDraft(
+                league_id=league_id, season=season, team_id=team_id,
+                espn_s2=espn_s2, swid=swid, teams=_parse_teams(data),
+            )
 
     # Warm the player map before parsing: once memoized, per-pick lookups in
     # _parse_league are dict hits.
@@ -193,10 +207,16 @@ def _parse_teams(data: dict) -> list[DraftTeam]:
 
 
 def _find_member_team(data: dict, swid: str) -> int | None:
-    """Team id owned by this SWID, from mTeams `owners` (brace/case-tolerant)."""
+    """Team id owned by this SWID (brace/case-tolerant).
+
+    Checks both `owners` and `primaryOwner` — mock-lobby teams have been
+    seen carrying the member only in one of the two.
+    """
     want = swid.strip().strip("{}").upper()
     for t in data.get("teams") or []:
-        owners = t.get("owners") or []
+        owners = list(t.get("owners") or [])
+        if t.get("primaryOwner"):
+            owners.append(t["primaryOwner"])
         if any(str(o).strip().strip("{}").upper() == want for o in owners):
             tid = t.get("id")
             return int(tid) if tid is not None else None
