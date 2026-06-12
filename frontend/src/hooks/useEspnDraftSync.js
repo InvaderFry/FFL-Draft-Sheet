@@ -40,6 +40,14 @@ function sameTeams(a, b) {
     a.every((t, i) => t.team_id === b[i].team_id && t.name === b[i].name)
 }
 
+// Sources spell names differently ("D.J. Moore" vs "DJ Moore Jr."), so the
+// name-fallback index strips suffixes and punctuation before comparing.
+function normName(name) {
+  return name.toLowerCase()
+    .replace(/\b(jr|sr|ii|iii|iv|v)\.?$/, '')
+    .replace(/[^a-z0-9]/g, '')
+}
+
 export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   const [status, setStatus] = useState('disconnected') // disconnected | connecting | connected | complete | error
   const [teams, setTeams] = useState([])
@@ -64,25 +72,30 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   // reveal the next pick instead of fetching.
   const replayRef = useRef(null)
 
-  // espn_id → board entry, so synced picks cross off the same row the user
+  // Board-entry lookups, so synced picks cross off the same row the user
   // would have clicked (PlayerTable keys rows by sleeper_id || player_name).
-  const espnIndex = useMemo(() => {
-    const index = new Map()
+  // byEspnId is the primary match; byNamePos catches picks whose espn_id the
+  // sheet row is missing but that the backend identified by name anyway.
+  const sheetIndex = useMemo(() => {
+    const byEspnId = new Map()
+    const byNamePos = new Map()
     for (const players of Object.values(sheetData?.positions || {})) {
       for (const p of players) {
-        if (p.espn_id) {
-          index.set(String(p.espn_id), {
-            id: p.sleeper_id || p.player_name,
-            name: p.player_name,
-            pos: p.pos,
-          })
+        const entry = {
+          id: p.sleeper_id || p.player_name,
+          name: p.player_name,
+          pos: p.pos,
+        }
+        if (p.espn_id) byEspnId.set(String(p.espn_id), entry)
+        if (p.player_name && p.pos) {
+          byNamePos.set(`${normName(p.player_name)}|${p.pos.toUpperCase()}`, entry)
         }
       }
     }
-    return index
+    return { byEspnId, byNamePos }
   }, [sheetData])
-  const espnIndexRef = useRef(espnIndex)
-  espnIndexRef.current = espnIndex
+  const sheetIndexRef = useRef(sheetIndex)
+  sheetIndexRef.current = sheetIndex
 
   const applyRef = useRef(applySyncedPicks)
   applyRef.current = applySyncedPicks
@@ -164,7 +177,11 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
 
       const teamNames = new Map((data.teams || []).map(t => [t.team_id, t.name]))
       const picks = (data.picks || []).map(pick => {
-        const onSheet = espnIndexRef.current.get(pick.provider_player_id)
+        const { byEspnId, byNamePos } = sheetIndexRef.current
+        const onSheet = byEspnId.get(pick.provider_player_id) ||
+          (pick.player_name && pick.pos
+            ? byNamePos.get(`${normName(pick.player_name)}|${pick.pos.toUpperCase()}`)
+            : undefined)
         return {
           // Off-sheet picks get a synthetic id so they still show in the
           // drafted list without colliding with board keys.

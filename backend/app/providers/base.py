@@ -20,8 +20,10 @@ class DraftPick(BaseModel):
     round_pick: int | None = None
     team_id: str
     provider_player_id: str
-    # Enriched via the Sleeper player map when the provider id bridges;
-    # None means the pick is real but we couldn't identify the player.
+    # Enriched via the Sleeper player map when the provider id bridges; when
+    # it doesn't, name/pos/team may still come from the provider's own player
+    # directory with sleeper_id left None. All-None identity fields mean the
+    # pick is real but we couldn't identify the player.
     sleeper_id: str | None = None
     player_name: str | None = None
     pos: str | None = None

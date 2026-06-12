@@ -18,6 +18,7 @@ import time
 
 import httpx
 
+from app.data.espn_players import ESPN_PRO_TEAMS, load_espn_directory_async
 from app.data.players import get_player_by_espn_id, load_player_map_async
 from app.providers.base import DraftPick, DraftStatus, DraftTeam
 
@@ -27,15 +28,6 @@ ESPN_LEAGUE_URL = (
     "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl"
     "/seasons/{season}/segments/0/leagues/{league_id}"
 )
-
-# ESPN encodes a D/ST pick as playerId = -16000 - proTeamId.
-ESPN_PRO_TEAMS = {
-    1: "ATL", 2: "BUF", 3: "CHI", 4: "CIN", 5: "CLE", 6: "DAL", 7: "DEN",
-    8: "DET", 9: "GB", 10: "TEN", 11: "IND", 12: "KC", 13: "LV", 14: "LAR",
-    15: "MIA", 16: "MIN", 17: "NE", 18: "NO", 19: "NYG", 20: "NYJ",
-    21: "PHI", 22: "ARI", 23: "PIT", 24: "LAC", 25: "SF", 26: "SEA",
-    27: "TB", 28: "WSH", 29: "CAR", 30: "JAX", 33: "BAL", 34: "HOU",
-}
 
 
 class EspnError(Exception):
@@ -125,7 +117,9 @@ async def fetch_draft(
     # _parse_league are dict hits.
     await load_player_map_async()
 
-    return _parse_league(data)
+    status = _parse_league(data)
+    await _resolve_unknown_picks(status, season)
+    return status
 
 
 def _parse_league(data: dict) -> DraftStatus:
@@ -194,3 +188,34 @@ def _enrich_pick(pick: DraftPick, player_id: int) -> None:
         pick.player_name = rec.full_name
         pick.pos = rec.position
         pick.nfl_team = rec.team
+
+
+async def _resolve_unknown_picks(status: DraftStatus, season: int) -> None:
+    """Name picks the Sleeper bridge missed via ESPN's own player directory.
+
+    Covers kickers (never ingested from Sleeper), Sleeper records lacking an
+    espn_id, and a degraded Sleeper load. Best-effort: the draft data itself
+    is fine, so a directory failure never raises — those picks just stay
+    unidentified, as before.
+    """
+    unresolved = [p for p in status.picks if p.player_name is None]
+    if not unresolved:
+        return
+    try:
+        directory = await load_espn_directory_async(season)
+    except Exception as exc:
+        logger.warning("ESPN directory lookup failed: %s", exc)
+        return
+    resolved = 0
+    for pick in unresolved:
+        entry = directory.get(pick.provider_player_id)
+        if entry is None:
+            continue
+        pick.player_name = entry.get("name")
+        pick.pos = pick.pos or entry.get("pos")
+        pick.nfl_team = pick.nfl_team or entry.get("team")
+        resolved += 1
+    logger.info(
+        "Resolved %d/%d unidentified picks via ESPN player directory",
+        resolved, len(unresolved),
+    )

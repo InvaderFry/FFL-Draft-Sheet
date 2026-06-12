@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -33,10 +34,18 @@ logger = logging.getLogger(__name__)
 SLEEPER_PLAYERS_URL = "https://api.sleeper.app/v1/players/nfl"
 CACHE_KEY = "sleeper_players"
 # Ingest the scored positions (config.POSITIONS) plus Sleeper's "DEF" spelling,
-# which _parse_sleeper_response normalises to "DST".
+# which _parse_sleeper_response normalises to "DST". Deliberately no "K":
+# kickers have no projection sources here, and adding them would pollute
+# find_player's cross-position fuzzy scan during sheet building. Draft picks
+# of kickers are still named via the ESPN player directory fallback
+# (app.data.espn_players).
 POSITIONS_OF_INTEREST = set(POSITIONS) | {"DEF"}
+# After a failed Sleeper fetch, retry on the next call after this window
+# instead of memoizing the empty map for the process lifetime.
+RETRY_AFTER_FAILURE = 300
 
 _player_map: dict[str, "PlayerRecord"] | None = None
+_load_failed_at: float | None = None
 _name_index: dict[str, list["PlayerRecord"]] = {}
 _pos_index: dict[str, list["PlayerRecord"]] = {}
 _espn_index: dict[str, "PlayerRecord"] = {}
@@ -154,19 +163,33 @@ def _build_indexes(
     return name_idx, pos_idx, espn_idx
 
 
+def _memo_usable() -> bool:
+    """True if the memoized map can be returned without a reload.
+
+    A map left empty by a failed fetch only counts while the retry cooldown
+    is running — after that the next caller retries Sleeper instead of
+    serving the degraded map for the rest of the process lifetime.
+    """
+    if _player_map is None:
+        return False
+    if _player_map or _load_failed_at is None:
+        return True
+    return time.time() - _load_failed_at < RETRY_AFTER_FAILURE
+
+
 def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
     """
     Return the full Sleeper player map.  Results are cached (file cache + module-level).
     """
-    global _player_map, _name_index, _pos_index, _espn_index
+    global _player_map, _name_index, _pos_index, _espn_index, _load_failed_at
 
-    if _player_map is not None and not force_refresh:
+    if not force_refresh and _memo_usable():
         return _player_map
 
     with _load_lock:
         # Re-check under the lock: another thread may have finished loading
         # while this one waited.
-        if _player_map is not None and not force_refresh:
+        if not force_refresh and _memo_usable():
             return _player_map
 
         # Try file cache first
@@ -177,6 +200,7 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
                 # Reconstruct dataclasses from dicts
                 player_map = {sid: PlayerRecord(**v) for sid, v in cached.items()}
                 _name_index, _pos_index, _espn_index = _build_indexes(player_map)
+                _load_failed_at = None
                 _player_map = player_map
                 return _player_map
 
@@ -188,6 +212,7 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
             raw = resp.json()
         except Exception as exc:
             logger.error("Sleeper API fetch failed: %s", exc)
+            _load_failed_at = time.time()
             _player_map = {}
             _name_index = {}
             _pos_index = {}
@@ -204,6 +229,7 @@ def load_player_map(force_refresh: bool = False) -> dict[str, PlayerRecord]:
         _name_index, _pos_index, _espn_index = _build_indexes(records)
         # Assign _player_map last: lock-free readers (get_player_by_espn_id)
         # treat it as the "loaded" flag, so the indexes must be in place first.
+        _load_failed_at = None
         _player_map = records
         return _player_map
 

@@ -1,5 +1,8 @@
 """Tests for data/players.py identity matching (U2)."""
 
+import time
+from unittest.mock import MagicMock
+
 import pytest
 
 from app.data import players as players_mod
@@ -101,6 +104,47 @@ def test_no_match_returns_none(seeded_map):
 def test_no_candidates_for_unknown_position(seeded_map):
     # Position with no records → no crash, returns None.
     assert find_player("Anyone", "DST", "KC") is None
+
+
+def test_failed_sleeper_fetch_retries_after_cooldown(monkeypatch):
+    """A failed Sleeper load must not poison the process: the empty map is
+    served only during the cooldown, then the next call retries."""
+    monkeypatch.setattr(players_mod, "_player_map", None)
+    monkeypatch.setattr(players_mod, "_load_failed_at", None)
+    # load_player_map rebinds the indexes; setattr them so teardown restores.
+    monkeypatch.setattr(players_mod, "_name_index", {})
+    monkeypatch.setattr(players_mod, "_pos_index", {})
+    monkeypatch.setattr(players_mod, "_espn_index", {})
+    monkeypatch.setattr(players_mod.cache, "get", lambda key: None)
+    monkeypatch.setattr(players_mod.cache, "set", lambda key, value: None)
+    monkeypatch.setattr(players_mod, "_bridge_gsis_ids", lambda records: None)
+
+    get_mock = MagicMock(side_effect=RuntimeError("sleeper down"))
+    monkeypatch.setattr(players_mod.httpx, "get", get_mock)
+
+    assert players_mod.load_player_map() == {}
+    assert players_mod._load_failed_at is not None
+
+    # Within the cooldown the degraded empty map is served without a refetch.
+    assert players_mod.load_player_map() == {}
+    assert get_mock.call_count == 1
+
+    # After the cooldown the next call retries and recovers.
+    players_mod._load_failed_at = time.time() - players_mod.RETRY_AFTER_FAILURE - 1
+    resp = MagicMock()
+    resp.json.return_value = {
+        "999": {
+            "position": "QB", "first_name": "Test", "last_name": "Player",
+            "full_name": "Test Player", "team": "KC", "espn_id": 42,
+        },
+    }
+    get_mock.side_effect = None
+    get_mock.return_value = resp
+
+    result = players_mod.load_player_map()
+    assert "999" in result
+    assert players_mod._load_failed_at is None
+    assert players_mod.get_player_by_espn_id("42") is result["999"]
 
 
 def test_canonical_key_prefers_sleeper_id():
