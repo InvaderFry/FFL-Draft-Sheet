@@ -40,6 +40,38 @@ function sameTeams(a, b) {
     a.every((t, i) => t.team_id === b[i].team_id && t.name === b[i].name)
 }
 
+// Sources spell names differently ("D.J. Moore" vs "DJ Moore Jr."), so the
+// name-fallback index strips suffixes and punctuation before comparing.
+function normName(name) {
+  return name.toLowerCase()
+    .replace(/\b(jr|sr|ii|iii|iv|v)\.?$/, '')
+    .replace(/[^a-z0-9]/g, '')
+}
+
+// Team codes are spelled differently across sources (sheet rows come from
+// scraped projections, pick teams from Sleeper/ESPN) — canonicalize the
+// known splits before comparing.
+const TEAM_ALIASES = { JAX: 'JAC', WSH: 'WAS', LAR: 'LA' }
+function normTeam(team) {
+  const t = (team || '').toUpperCase()
+  return TEAM_ALIASES[t] || t
+}
+
+// Resolve a backend-named pick to a sheet row by name+pos. Sheet rows can
+// share a name+pos key (the NFL has had duplicate names within a position),
+// so only match when the candidate is unique — or when the pick's NFL team
+// singles one out. An ambiguous key stays unmatched: a correctly-named
+// off-sheet entry beats crossing off the wrong row.
+function matchByNamePos(byNamePos, pick) {
+  if (!pick.player_name || !pick.pos) return undefined
+  const candidates = byNamePos.get(`${normName(pick.player_name)}|${pick.pos.toUpperCase()}`)
+  if (!candidates) return undefined
+  if (candidates.length === 1) return candidates[0]
+  if (!pick.nfl_team) return undefined
+  const sameTeam = candidates.filter(c => normTeam(c.team) === normTeam(pick.nfl_team))
+  return sameTeam.length === 1 ? sameTeam[0] : undefined
+}
+
 export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   const [status, setStatus] = useState('disconnected') // disconnected | connecting | connected | complete | error
   const [teams, setTeams] = useState([])
@@ -64,25 +96,34 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   // reveal the next pick instead of fetching.
   const replayRef = useRef(null)
 
-  // espn_id → board entry, so synced picks cross off the same row the user
+  // Board-entry lookups, so synced picks cross off the same row the user
   // would have clicked (PlayerTable keys rows by sleeper_id || player_name).
-  const espnIndex = useMemo(() => {
-    const index = new Map()
+  // byEspnId is the primary match; byNamePos catches picks whose espn_id the
+  // sheet row is missing but that the backend identified by name anyway.
+  const sheetIndex = useMemo(() => {
+    const byEspnId = new Map()
+    const byNamePos = new Map() // key → candidate entries; >1 means ambiguous
     for (const players of Object.values(sheetData?.positions || {})) {
       for (const p of players) {
-        if (p.espn_id) {
-          index.set(String(p.espn_id), {
-            id: p.sleeper_id || p.player_name,
-            name: p.player_name,
-            pos: p.pos,
-          })
+        const entry = {
+          id: p.sleeper_id || p.player_name,
+          name: p.player_name,
+          pos: p.pos,
+          team: p.team,
+        }
+        if (p.espn_id) byEspnId.set(String(p.espn_id), entry)
+        if (p.player_name && p.pos) {
+          const key = `${normName(p.player_name)}|${p.pos.toUpperCase()}`
+          const candidates = byNamePos.get(key)
+          if (candidates) candidates.push(entry)
+          else byNamePos.set(key, [entry])
         }
       }
     }
-    return index
+    return { byEspnId, byNamePos }
   }, [sheetData])
-  const espnIndexRef = useRef(espnIndex)
-  espnIndexRef.current = espnIndex
+  const sheetIndexRef = useRef(sheetIndex)
+  sheetIndexRef.current = sheetIndex
 
   const applyRef = useRef(applySyncedPicks)
   applyRef.current = applySyncedPicks
@@ -164,7 +205,9 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
 
       const teamNames = new Map((data.teams || []).map(t => [t.team_id, t.name]))
       const picks = (data.picks || []).map(pick => {
-        const onSheet = espnIndexRef.current.get(pick.provider_player_id)
+        const { byEspnId, byNamePos } = sheetIndexRef.current
+        const onSheet = byEspnId.get(pick.provider_player_id) ||
+          matchByNamePos(byNamePos, pick)
         return {
           // Off-sheet picks get a synthetic id so they still show in the
           // drafted list without colliding with board keys.

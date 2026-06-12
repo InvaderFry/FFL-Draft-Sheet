@@ -45,6 +45,21 @@ const OFFSHEET_PICK = {
   player_name: null, pos: null, nfl_team: null,
 }
 
+// Backend named the pick (e.g. via ESPN's player directory) but its espn_id
+// is missing from the sheet row — and the spelling differs slightly.
+const NAME_FALLBACK_PICK = {
+  overall: 3, round: 1, round_pick: 3, team_id: '4',
+  provider_player_id: '5555555', sleeper_id: null,
+  player_name: 'Justin Jefferson Jr.', pos: 'WR', nfl_team: 'MIN',
+}
+
+// Backend-named kicker: correct name, but no K rows exist on the sheet.
+const KICKER_PICK = {
+  overall: 4, round: 2, round_pick: 1, team_id: '7',
+  provider_player_id: '7777777', sleeper_id: null,
+  player_name: 'Harrison Butker', pos: 'K', nfl_team: 'KC',
+}
+
 describe('useEspnDraftSync', () => {
   let fetchMock
   let applySyncedPicks
@@ -61,8 +76,8 @@ describe('useEspnDraftSync', () => {
     vi.useRealTimers()
   })
 
-  function renderSync() {
-    return renderHook(() => useEspnDraftSync({ sheetData: SHEET, applySyncedPicks }))
+  function renderSync(sheetData = SHEET) {
+    return renderHook(() => useEspnDraftSync({ sheetData, applySyncedPicks }))
   }
 
   async function flush() {
@@ -95,6 +110,80 @@ describe('useEspnDraftSync', () => {
     // Off-sheet unknown pick gets a synthetic id and fallback name
     expect(picks[1]).toMatchObject({
       id: 'espn:9999999', name: 'ESPN pick #2', teamName: 'Old School Squad',
+    })
+  })
+
+  it('matches a backend-named pick to its sheet row by name+pos when espn_id misses', async () => {
+    fetchMock.mockResolvedValue(draftResponse({ picks: [NAME_FALLBACK_PICK] }))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2026 }))
+    await flush()
+
+    const picks = applySyncedPicks.mock.calls.at(-1)[0]
+    // Resolved to the sheet's WR row (sleeper_id null → keyed by player_name),
+    // using the sheet's canonical spelling, so the board row crosses off.
+    expect(picks[0]).toMatchObject({
+      id: 'Justin Jefferson', name: 'Justin Jefferson', pos: 'WR',
+      teamId: '4', teamName: 'Team Derrick', overall: 3,
+    })
+  })
+
+  describe('duplicate name+pos on the sheet', () => {
+    // Two distinct WRs sharing a name (it happens — the NFL has had two
+    // active Mike Williams WRs). 'LA' vs the pick's 'LAR' also exercises
+    // the team-code alias normalization.
+    const DUPE_SHEET = {
+      positions: {
+        WR: [
+          { sleeper_id: 'mw_rams', espn_id: '111', player_name: 'Mike Williams', pos: 'WR', team: 'LA' },
+          { sleeper_id: 'mw_pit', espn_id: '222', player_name: 'Mike Williams', pos: 'WR', team: 'PIT' },
+        ],
+      },
+    }
+    const dupePick = (nflTeam) => ({
+      overall: 1, round: 1, round_pick: 1, team_id: '4',
+      provider_player_id: '333', sleeper_id: null,
+      player_name: 'Mike Williams', pos: 'WR', nfl_team: nflTeam,
+    })
+
+    it('disambiguates by NFL team (through code aliases)', async () => {
+      fetchMock.mockResolvedValue(draftResponse({ picks: [dupePick('LAR')] }))
+      const { result } = renderSync(DUPE_SHEET)
+
+      act(() => result.current.connect({ leagueId: '123', season: 2026 }))
+      await flush()
+
+      expect(applySyncedPicks.mock.calls.at(-1)[0][0]).toMatchObject({
+        id: 'mw_rams', name: 'Mike Williams', pos: 'WR',
+      })
+    })
+
+    it('stays off-sheet when the team cannot single out a row', async () => {
+      fetchMock.mockResolvedValue(draftResponse({ picks: [dupePick(null)] }))
+      const { result } = renderSync(DUPE_SHEET)
+
+      act(() => result.current.connect({ leagueId: '123', season: 2026 }))
+      await flush()
+
+      // Correctly named, but no board row claimed — neither sleeper_id key.
+      expect(applySyncedPicks.mock.calls.at(-1)[0][0]).toMatchObject({
+        id: 'Mike Williams', name: 'Mike Williams', pos: 'WR',
+      })
+    })
+  })
+
+  it('keeps a backend-named pick that matches no sheet row as an off-sheet entry', async () => {
+    fetchMock.mockResolvedValue(draftResponse({ picks: [KICKER_PICK] }))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2026 }))
+    await flush()
+
+    const picks = applySyncedPicks.mock.calls.at(-1)[0]
+    expect(picks[0]).toMatchObject({
+      id: 'Harrison Butker', name: 'Harrison Butker', pos: 'K',
+      teamName: 'Old School Squad', overall: 4,
     })
   })
 

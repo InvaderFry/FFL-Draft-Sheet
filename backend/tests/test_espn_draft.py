@@ -55,12 +55,21 @@ def _patch_espn(status_code=200, payload=None):
 
 
 @contextlib.contextmanager
-def _patch_players():
+def _patch_players(directory=None):
+    """Stub the Sleeper map and the ESPN player-directory fallback.
+
+    The directory defaults to empty so existing tests keep their
+    "unknown pick stays unidentified" expectations; yields the directory
+    mock so tests can assert on or break it.
+    """
+    directory_mock = AsyncMock(return_value=directory or {})
     with patch(
         "app.providers.espn.get_player_by_espn_id",
         side_effect=lambda eid: KNOWN_PLAYERS.get(eid),
-    ), patch("app.providers.espn.load_player_map_async", return_value={}):
-        yield
+    ), patch("app.providers.espn.load_player_map_async", return_value={}), patch(
+        "app.providers.espn.load_espn_directory_async", directory_mock,
+    ):
+        yield directory_mock
 
 
 REQUEST = {"league_id": 12345678, "season": 2025}
@@ -104,6 +113,43 @@ def test_completed_draft_parses_and_enriches(client):
     assert unknown["provider_player_id"] == "9999999"
     assert unknown["sleeper_id"] is None
     assert unknown["player_name"] is None
+
+
+def test_unknown_pick_resolved_via_espn_directory(client):
+    """A pick the Sleeper bridge misses gets named from ESPN's own directory."""
+    directory = {"9999999": {"name": "Saquon Barkley", "pos": "RB", "team": "PHI"}}
+    with _patch_espn(payload=FIXTURE), _patch_players(directory=directory):
+        resp = client.post("/api/draft/espn", json=REQUEST)
+
+    pick = resp.json()["picks"][3]
+    assert pick["player_name"] == "Saquon Barkley"
+    assert pick["pos"] == "RB"
+    assert pick["nfl_team"] == "PHI"
+    assert pick["sleeper_id"] is None  # named, but not bridged to Sleeper
+
+
+def test_directory_failure_degrades_gracefully(client):
+    """The draft data is fine even if the directory fetch blows up — the
+    unknown pick just stays unidentified, exactly as before the fallback."""
+    with _patch_espn(payload=FIXTURE), _patch_players() as directory_mock:
+        directory_mock.side_effect = Exception("espn players endpoint down")
+        resp = client.post("/api/draft/espn", json=REQUEST)
+
+    assert resp.status_code == 200
+    pick = resp.json()["picks"][3]
+    assert pick["player_name"] is None
+
+
+def test_directory_not_fetched_when_all_picks_resolve(client):
+    """Zero extra ESPN traffic when the Sleeper bridge covers every pick."""
+    known_only = json.loads(json.dumps(FIXTURE))
+    known_only["draftDetail"]["picks"] = known_only["draftDetail"]["picks"][:3]
+
+    with _patch_espn(payload=known_only), _patch_players() as directory_mock:
+        resp = client.post("/api/draft/espn", json=REQUEST)
+
+    assert len(resp.json()["picks"]) == 3
+    directory_mock.assert_not_awaited()
 
 
 def test_team_names_with_location_nickname_fallback(client):
