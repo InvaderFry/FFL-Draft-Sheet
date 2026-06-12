@@ -159,8 +159,9 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
             <div className={styles.panelTitle}>Live ESPN draft sync</div>
             <p className={styles.hint}>
               Picks made in your ESPN draft room are crossed off here automatically.
-              Mock Draft Lobby rooms run outside your league — to practice, use
-              the replay below instead.
+              For a Mock Draft Lobby room, enter the league ID from the draft
+              page URL and your espn_s2/SWID cookies, and connect before the
+              draft starts.
             </p>
             <label className={styles.field}>
               <span>League ID</span>

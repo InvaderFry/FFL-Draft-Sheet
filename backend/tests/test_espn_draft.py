@@ -250,18 +250,88 @@ def test_espn_http_errors_mapped(client, espn_status, api_status):
     assert "detail" in resp.json()
 
 
+def _mock_lobby_payload(owner_swid=None):
+    payload = json.loads(json.dumps(FIXTURE))
+    payload["settings"] = {"draftSettings": {"leagueSubType": "MOCKDRAFT_LOBBY"}}
+    if owner_swid:
+        payload["teams"][0]["owners"] = [owner_swid]
+    return payload
+
+
 def test_mock_lobby_league_rejected_with_400(client):
     """ESPN never publishes Mock Draft Lobby picks to the read API, so a
-    MOCKDRAFT_LOBBY league fails fast instead of polling forever."""
-    mock_lobby = json.loads(json.dumps(FIXTURE))
-    mock_lobby["settings"] = {"draftSettings": {"leagueSubType": "MOCKDRAFT_LOBBY"}}
-
-    with _patch_espn(payload=mock_lobby), _patch_players():
+    MOCKDRAFT_LOBBY league without cookies fails fast instead of polling
+    forever (the WebSocket path needs the cookies to join the room)."""
+    with _patch_espn(payload=_mock_lobby_payload()), _patch_players():
         resp = client.post("/api/draft/espn", json=REQUEST)
 
     assert resp.status_code == 400
     assert "Mock Draft Lobby" in resp.json()["detail"]
     assert "Practice replay" in resp.json()["detail"]
+
+
+def test_mock_lobby_with_unknown_swid_rejected_with_400(client):
+    """Cookies whose SWID owns no team in the mock league can't join its room."""
+    payload = _mock_lobby_payload(owner_swid="{SOMEONE-ELSE}")
+    with _patch_espn(payload=payload), _patch_players():
+        resp = client.post("/api/draft/espn", json={
+            **REQUEST, "espn_s2": "s2-secret", "swid": "{SWID-VALUE}",
+        })
+    assert resp.status_code == 400
+
+
+def test_mock_lobby_with_cookies_served_from_ws_session(client):
+    """Mock league + cookies + SWID-owned team routes to the draft-room
+    socket session; the poll response is the session's snapshot."""
+    from app.providers.base import DraftStatus
+
+    payload = _mock_lobby_payload(owner_swid="{SWID-VALUE}")
+    session = MagicMock()
+    session.status.return_value = DraftStatus(
+        provider="espn", in_progress=True, complete=False,
+        picks=[], teams=[], fetched_at=1.0,
+    )
+
+    with _patch_espn(payload=payload), _patch_players(), patch(
+        "app.providers.espn_ws.get_or_create", return_value=session,
+    ) as get_or_create:
+        resp = client.post("/api/draft/espn", json={
+            **REQUEST, "espn_s2": "s2-secret", "swid": "{swid-value}",  # case-insensitive
+        })
+
+    assert resp.status_code == 200
+    assert resp.json()["in_progress"] is True
+    lobby = get_or_create.call_args.args[0]
+    assert lobby.team_id == 4  # fixture team owned by the SWID
+    assert lobby.league_id == REQUEST["league_id"]
+    assert lobby.teams[0].name == "Team Derrick"
+
+
+@pytest.mark.parametrize("espn_status", [401, 403, 500])
+def test_draft_security_http_errors_mapped(espn_status):
+    """fetch_draft_security maps ESPN failures onto the shared error taxonomy."""
+    import asyncio
+    from app.providers import espn as espn_provider
+
+    with _patch_espn(status_code=espn_status, payload={}):
+        with pytest.raises(espn_provider.EspnError):
+            asyncio.run(espn_provider.fetch_draft_security(
+                1242111363, 2026, 12, espn_s2="s2", swid="{S}",
+            ))
+
+
+def test_draft_security_returns_bare_int_token():
+    import asyncio
+    from app.providers import espn as espn_provider
+
+    with _patch_espn(payload=1821426335) as mock_get:
+        token = asyncio.run(espn_provider.fetch_draft_security(
+            1242111363, 2026, 12, espn_s2="s2-secret", swid="{S}",
+        ))
+    assert token == 1821426335
+    kwargs = mock_get.call_args.kwargs
+    assert kwargs["cookies"] == {"espn_s2": "s2-secret", "SWID": "{S}"}
+    assert "/teams/12/draftSecurity" in mock_get.call_args.args[0]
 
 
 def test_non_lobby_league_sub_type_still_parses(client):
