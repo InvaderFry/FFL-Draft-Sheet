@@ -9,6 +9,9 @@ league id; private leagues additionally need the espn_s2 + SWID cookies.
 SECURITY: espn_s2/SWID are full ESPN account credentials. They are forwarded
 to ESPN as request cookies and MUST never be logged, cached, or echoed in
 error messages — log only league_id/season/has_cookies.
+
+See docs/espn-draft-api.md for the full observed API surface, including the
+draft room's WebSocket feed (a possible future alternative to polling).
 """
 
 from __future__ import annotations

@@ -113,7 +113,8 @@ Live draft-room sync. A stateless proxy in front of ESPN's (undocumented) v3
 fantasy API: fetches the league with `view=mDraftDetail&view=mTeams`,
 normalizes picks, and enriches them with player names via the Sleeper map.
 The frontend polls this every ~5s during a draft — ESPN is the source of
-truth, so nothing is stored server-side.
+truth, so nothing is stored server-side. Notes on ESPN's API surface (and the
+draft room's WebSocket feed) live in [docs/espn-draft-api.md](docs/espn-draft-api.md).
 
 **Request body:**
 ```json
