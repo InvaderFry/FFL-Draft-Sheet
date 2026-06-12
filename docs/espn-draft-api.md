@@ -78,9 +78,9 @@ The draft room web app uses the same base API but a different flow:
        &6=false&7=false&8=KONA&nocache={random}
    ```
 
-   Param `5` is the composite join credential. Picks and clock events travel
-   over this socket; the HAR contained no decoded frames, so the message
-   protocol (the "KONA" channel format) is **not** reverse-engineered.
+   Param `5` is the composite join credential. The handshake sends
+   `Origin: https://fantasy.espn.com` and a browser User-Agent; the join URL
+   itself carries all auth. See the protocol reference below.
 4. **Disney/BAM token refresh** via GraphQL at
    `https://espn.api.edge.bamgrid.com/graph/v1/device/graphql` — Disney SSO
    plumbing for the web shell, irrelevant to this app's cookie-based reads.
@@ -103,20 +103,52 @@ Mock-lobby leagues are identifiable in the response:
   with only `view=mDraftDetail`)
 - `status.isViewable: false`
 
-The backend detects the `leagueSubType` marker and rejects the league with
-an explanatory 400 instead of letting the sheet poll forever at "waiting
-for picks". Whether the slots backfill after a mock completes is unknown
-(the temporary league is deleted soon after).
+The backend detects the `leagueSubType` marker: with espn_s2/SWID cookies it
+syncs the league via the draft-room WebSocket (`app/providers/espn_ws.py`),
+deriving the user's team id by matching the SWID against `mTeams` owners;
+without cookies it returns an explanatory 400 instead of letting the sheet
+poll forever at "waiting for picks". Whether the REST slots backfill after a
+mock completes is unknown (the temporary league is deleted soon after).
 
-## Future upgrade path: real-time sync
+## Draft-room WebSocket protocol
 
-If polling latency ever becomes a problem, the recipe is: fetch the
-`draftSecurity` token with the user's cookies, then open the `JOIN` WebSocket
-above and decode the pick frames. Polling was deliberately kept instead
-because:
+Decoded from a Chrome HAR (`_webSocketMessages`) of a live mock draft
+(2026-06-12, league 1242111363). Line-based text frames, newline-terminated.
 
-- it works for **public leagues with zero credentials**, while the socket
-  requires SWID + teamId, i.e. an authenticated league member;
-- the backend stays stateless (no per-draft socket connections to manage);
-- the socket frame protocol still needs reverse-engineering (capture a draft
-  with WebSocket frame recording enabled to get it).
+Server → client:
+
+| Frame | Meaning |
+|---|---|
+| `TOKEN 1:{leagueId}:{teamId}:{SWID}:{token}` | join acknowledged (echoes the credential) |
+| `INIT <binary blob>` | pre-draft room state; **undecoded** — picks made before connecting are not recoverable from it |
+| `STATE 1` | draft started |
+| `SELECTING <teamId> <msBudget>` | team on the clock (e.g. `SELECTING 12 30000`) |
+| `SELECTED <teamId> <playerId> <slotId> [{memberSWID}]` | pick made; SWID absent on autopicks; playerIds are real ESPN ids |
+| `CLOCK <phase> <msRemaining> [teamId]` | countdown ticks (~5s apart); phase 0 = pre-draft lobby, 6 = picking |
+| `JOINED <teamId> {SWID}` / `LEFT <teamId> {SWID} <n>` | room presence |
+| `AUTODRAFT <teamId> <bool>` | autopick toggled |
+| `AUTOSUGGEST <playerId>` | the room's suggested next pick |
+| `PONG PING%20<ts>` | keepalive echo |
+
+Client → server:
+
+| Frame | Meaning |
+|---|---|
+| `PING PING%20<msTimestamp>` | keepalive, sent every ~15s — required or the server drops idle members |
+| `SELECT <playerId>` | make a pick (this app never sends it) |
+| `DRAFT_LIST <playerId> [...]` | sync the draft queue (echoed back) |
+
+Notes:
+
+- **Overall pick number = SELECTED event sequence.** The first frame field
+  is the team/slot id; snake order is visible as `SELECTING 1…12, 12…1`.
+- `SELECTED`'s third number tracks the player's lineup-slot/position id
+  (2 = RB, 4 = WR observed); not needed when the player map has the id.
+- This app's session (`espn_ws.py`) is a read-only member: it joins,
+  keepalives, and accumulates `SELECTED` events into the same `DraftStatus`
+  the polling endpoint already serves, so the frontend needs no changes.
+  Connect **before the draft starts** — INIT is undecoded, so a mid-draft
+  join starts with an empty pick list.
+
+For regular (non-mock) leagues, REST polling remains the path: it works for
+public leagues with zero credentials and keeps the backend stateless.

@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field, SecretStr
 from app.config import LeagueConfig, POSITIONS
 from app import cache
 from app.providers import espn as espn_provider
+from app.providers import espn_ws
 from app.providers.base import DraftStatus
 from app.data.players import canonical_key, load_player_map_async
 from app.data.scraper import scrape_all
@@ -389,12 +390,18 @@ class EspnDraftRequest(BaseModel):
 @app.post("/api/draft/espn", response_model=DraftStatus)
 async def espn_draft_status(req: EspnDraftRequest) -> DraftStatus:
     try:
-        return await espn_provider.fetch_draft(
+        result = await espn_provider.fetch_draft(
             league_id=req.league_id,
             season=req.season,
             espn_s2=req.espn_s2.get_secret_value() if req.espn_s2 else None,
             swid=req.swid.get_secret_value() if req.swid else None,
         )
+        # Mock Draft Lobby picks never reach the REST API — serve them from
+        # the draft-room WebSocket session instead. Polling stays the
+        # frontend contract; the session accumulates picks between polls.
+        if isinstance(result, espn_provider.MockLobbyDraft):
+            return espn_ws.get_or_create(result).status()
+        return result
     except espn_provider.EspnMockLobbyError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except espn_provider.EspnAuthError as exc:
