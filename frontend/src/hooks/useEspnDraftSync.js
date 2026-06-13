@@ -21,10 +21,12 @@
  * draft (e.g. last season's) one pick every REPLAY_MS instead of applying it
  * wholesale, so the live-draft flow — picks streaming in, board crossing
  * off, team panel filling — can be rehearsed without a live draft. ESPN
- * mock-lobby rooms run in temporary leagues the API may not expose, so this
- * is the dependable practice path. Replay ticks reuse the poll scheduler
- * (and its hidden-tab pause) but never refetch; a practice connect to a
- * draft that is NOT complete falls through to normal live polling.
+ * mock-lobby rooms can also sync live when settings.mock is enabled and the
+ * ESPN draft tab runs the userscript socket tap; the hook keeps polling the
+ * backend ingest snapshot while the userscript feeds picks. Replay ticks
+ * reuse the poll scheduler (and its hidden-tab pause) but never refetch; a
+ * practice connect to a draft that is NOT complete falls through to normal
+ * live polling.
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
@@ -183,9 +185,7 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
           season: Number(settings.season),
           espn_s2: settings.espn_s2 || null,
           swid: settings.swid || null,
-          // Mock-lobby escape hatch: the room's teamId from the draft URL,
-          // for when the backend can't match the SWID to a team.
-          team_id: settings.teamId ? Number(settings.teamId) : null,
+          mock_ingest: Boolean(settings.mock),
         }),
       })
       if (!resp.ok) {
@@ -197,8 +197,7 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
           else if (resp.status === 422) detail = 'Invalid league ID or season — check the connect form.'
         } catch (_) {}
         // Auth/not-found/validation failures are permanent — retrying the
-        // same payload won't fix them. 400 = unsyncable league (e.g. an ESPN
-        // Mock Draft Lobby room, whose picks ESPN never publishes to its API).
+        // same payload won't fix them.
         const permanent = [400, 401, 404, 422].includes(resp.status)
         throw Object.assign(new Error(detail), { permanent })
       }

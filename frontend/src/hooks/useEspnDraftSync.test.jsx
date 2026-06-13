@@ -95,7 +95,13 @@ describe('useEspnDraftSync', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, opts] = fetchMock.mock.calls[0]
     expect(url).toContain('/api/draft/espn')
-    expect(JSON.parse(opts.body)).toMatchObject({ league_id: 123, season: 2026, espn_s2: null, swid: null })
+    expect(JSON.parse(opts.body)).toMatchObject({
+      league_id: 123,
+      season: 2026,
+      espn_s2: null,
+      swid: null,
+      mock_ingest: false,
+    })
 
     expect(result.current.status).toBe('connected')
     expect(result.current.pickCount).toBe(2)
@@ -110,6 +116,27 @@ describe('useEspnDraftSync', () => {
     // Off-sheet unknown pick gets a synthetic id and fallback name
     expect(picks[1]).toMatchObject({
       id: 'espn:9999999', name: 'ESPN pick #2', teamName: 'Old School Squad',
+    })
+  })
+
+  it('mock-mode connect posts mock_ingest:true and renders ingested picks', async () => {
+    fetchMock.mockResolvedValue(draftResponse({ picks: [CMC_PICK] }))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2026, mock: true }))
+    await flush()
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      league_id: 123,
+      season: 2026,
+      mock_ingest: true,
+    })
+    expect(result.current.status).toBe('connected')
+    expect(result.current.pickCount).toBe(1)
+    expect(applySyncedPicks.mock.calls.at(-1)[0][0]).toMatchObject({
+      id: 'cmc_sleeper',
+      teamName: 'Team Derrick',
+      overall: 1,
     })
   })
 
@@ -249,10 +276,10 @@ describe('useEspnDraftSync', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('treats 400 (unsyncable mock-lobby league) as permanent with the server message', async () => {
+  it('treats 400 as permanent with the server message', async () => {
     fetchMock.mockResolvedValue({
       ok: false, status: 400,
-      json: async () => ({ detail: 'This is an ESPN Mock Draft Lobby room — use Practice replay instead.' }),
+      json: async () => ({ detail: 'Could not sync this ESPN draft.' }),
     })
     const { result } = renderSync()
 
@@ -260,7 +287,7 @@ describe('useEspnDraftSync', () => {
     await flush()
 
     expect(result.current.status).toBe('error')
-    expect(result.current.error).toContain('Mock Draft Lobby')
+    expect(result.current.error).toContain('Could not sync')
     await act(async () => { await vi.advanceTimersByTimeAsync(120000) })
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })

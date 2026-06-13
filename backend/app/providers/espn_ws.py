@@ -1,9 +1,13 @@
 """
-ESPN draft-room WebSocket sessions (Mock Draft Lobby live sync).
+ESPN draft-room socket ingest store (Mock Draft Lobby live sync).
 
-ESPN never writes mock-lobby picks back to its REST API, so the only live
-source is the draft room's socket at wss://fantasydraft.espn.com. The
-protocol (decoded from a browser capture, see docs/espn-draft-api.md) is
+ESPN allows one active draft socket per (member, team), so the backend must not
+join the room with the user's credentials. Instead, a browser userscript taps
+the draft tab's existing socket and POSTs the line-based draft-room frames to
+the backend. This module parses those frames, accumulates picks in memory, and
+serves DraftStatus snapshots to the existing polling endpoint.
+
+The protocol (decoded from a browser capture, see docs/espn-draft-api.md) is
 line-based text:
 
     TOKEN 1:<leagueId>:<teamId>:<SWID>:<token>      join ack
@@ -12,54 +16,25 @@ line-based text:
     SELECTED <teamId> <playerId> <slotId> [{SWID}]  pick made (no SWID = auto)
     CLOCK / JOINED / LEFT / AUTODRAFT / AUTOSUGGEST room noise (ignored)
 
-Overall pick number is the SELECTED event sequence (snake order is the
-server's concern). The INIT frame is an undecoded binary blob, so picks made
-before the session connects are not recoverable — connect before the draft
-starts. The client must send "PING PING%20<ms>" keepalives (~15s).
-
-One session per (league, season), owned by the asyncio loop the API runs on.
-The polling endpoint reads snapshots via status(); sessions are evicted when
-nobody has polled for a while. This module never SENDs draft actions
-(SELECT) — it is a read-only room member.
-
-SECURITY: sessions hold espn_s2/SWID to (re)join. Same rules as espn.py —
-never log, cache, or echo them.
+Overall pick number is the SELECTED event sequence. Picks made before the
+userscript wraps WebSocket are not recoverable from the tapped text lines, so
+install and open the ESPN draft page before the room starts.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import os
-import random
 import time
+from dataclasses import dataclass, field
 
-import websockets
-
-from app.data.espn_players import load_espn_directory_async
-from app.data.players import load_player_map_async
-from app.providers.base import DraftPick, DraftStatus
-from app.providers.espn import (
-    EspnUpstreamError,
-    MockLobbyDraft,
-    _enrich_pick,
-    fetch_draft_security,
-)
+from app.data.espn_players import load_espn_directory
+from app.providers.base import DraftPick, DraftStatus, DraftTeam
+from app.providers.espn import _enrich_pick
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_WS_BASE = "wss://fantasydraft.espn.com"
-PING_INTERVAL_S = 15
-MAX_REJOIN_ATTEMPTS = 3
 # Sessions nobody polls are abandoned drafts (tab closed / disconnected).
 IDLE_EVICT_S = 120
-# Browser-like headers: the join URL carries all auth, but stay close to the
-# observed handshake so we aren't filtered as a bot.
-ORIGIN = "https://fantasy.espn.com"
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
-)
 
 
 def parse_frame(line: str) -> tuple | None:
@@ -86,124 +61,55 @@ def parse_frame(line: str) -> tuple | None:
     return None
 
 
-def _join_url(lobby: MockLobbyDraft, token: int) -> str:
-    base = os.environ.get("ESPN_WS_BASE", DEFAULT_WS_BASE)
-    credential = (
-        f"1:{lobby.league_id}:{lobby.team_id}:{lobby.swid}:{token}"
-    )
-    return (
-        f"{base}/game-1/league-{lobby.league_id}/JOIN"
-        f"?1=1&2={lobby.league_id}&3={lobby.team_id}&4={lobby.swid}"
-        f"&5={credential}&6=false&7=false&8=KONA"
-        f"&nocache={random.randint(1, 999999)}"
-    )
+@dataclass
+class IngestSession:
+    """Accumulated browser-tapped draft-room lines for one mock draft."""
 
+    league_id: int
+    season: int
+    teams: list[DraftTeam] = field(default_factory=list)
+    picks: list[DraftPick] = field(default_factory=list)
+    seen_player_ids: set[int] = field(default_factory=set)
+    in_progress: bool = False
+    complete: bool = False
+    last_updated: float = field(default_factory=time.time)
+    last_polled: float = field(default_factory=time.time)
 
-class DraftRoomSession:
-    """One live draft-room connection, accumulating picks for poll reads."""
+    def ingest(self, lines: list[str], complete: bool = False) -> int:
+        for raw in lines:
+            for line in raw.splitlines():
+                self._handle(parse_frame(line))
+        if complete:
+            self.complete = True
+            self.in_progress = False
+        self.last_updated = time.time()
+        return len(self.picks)
 
-    def __init__(self, lobby: MockLobbyDraft):
-        self._lobby = lobby
-        self.picks: list[DraftPick] = []
-        self.in_progress = False
-        self.complete = False
-        self.last_polled = time.time()
-        self._task = asyncio.create_task(self._run())
-
-    def status(self) -> DraftStatus:
+    def status(self, teams: list[DraftTeam] | None = None) -> DraftStatus:
+        if teams is not None:
+            self.teams = teams
         self.last_polled = time.time()
         return DraftStatus(
             provider="espn",
             in_progress=self.in_progress and not self.complete,
             complete=self.complete,
             picks=list(self.picks),
-            teams=self._lobby.teams,
+            teams=list(self.teams),
             fetched_at=time.time(),
         )
 
-    def close(self) -> None:
-        self._task.cancel()
-
-    async def _run(self) -> None:
-        lobby = self._lobby
-        # Warm the Sleeper bridge once so per-pick enrichment is a dict hit.
-        try:
-            await load_player_map_async()
-        except Exception as exc:
-            logger.warning("Player map warmup failed: %s", exc)
-
-        attempts = 0
-        while not self.complete and attempts <= MAX_REJOIN_ATTEMPTS:
-            try:
-                token = await fetch_draft_security(
-                    lobby.league_id, lobby.season, lobby.team_id,
-                    espn_s2=lobby.espn_s2, swid=lobby.swid,
-                )
-                async with websockets.connect(
-                    _join_url(lobby, token),
-                    origin=ORIGIN,
-                    user_agent_header=USER_AGENT,
-                    # ESPN's keepalive is the application-level PING below;
-                    # leave protocol pings on as a safety net.
-                ) as ws:
-                    logger.info(
-                        "Joined ESPN draft room: league=%s team=%s",
-                        lobby.league_id, lobby.team_id,
-                    )
-                    attempts = 0
-                    await self._listen(ws)
-                # Server closed cleanly. Mid-draft that means the room ended
-                # (mock rooms shut down right after the last pick).
-                if self.in_progress and self.picks:
-                    self.complete = True
-                    logger.info(
-                        "Draft room closed after %d picks; marking complete "
-                        "(league=%s)", len(self.picks), lobby.league_id,
-                    )
-                    return
-                attempts += 1
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                attempts += 1
-                logger.warning(
-                    "Draft room connection lost (league=%s, attempt %d/%d): %s",
-                    lobby.league_id, attempts, MAX_REJOIN_ATTEMPTS, exc,
-                )
-            if not self.complete and attempts <= MAX_REJOIN_ATTEMPTS:
-                # Picks made while disconnected are lost (INIT is undecoded);
-                # rejoin quickly to keep the gap small.
-                await asyncio.sleep(min(2 ** attempts, 10))
-
-    async def _listen(self, ws) -> None:
-        ping = asyncio.create_task(self._keepalive(ws))
-        try:
-            async for message in ws:
-                if isinstance(message, bytes):
-                    continue  # INIT-style binary frames: undecoded room state
-                for line in message.splitlines():
-                    await self._handle(parse_frame(line))
-        finally:
-            ping.cancel()
-
-    async def _keepalive(self, ws) -> None:
-        # Observed client behavior: "PING PING%20<ms-timestamp>" every ~15s,
-        # echoed back as PONG. Without it the server drops idle members.
-        try:
-            while True:
-                await asyncio.sleep(PING_INTERVAL_S)
-                await ws.send(f"PING PING%20{int(time.time() * 1000)}")
-        except websockets.exceptions.ConnectionClosed:
-            return  # the listen loop handles the closure
-
-    async def _handle(self, event: tuple | None) -> None:
+    def _handle(self, event: tuple | None) -> None:
         if event is None:
             return
         kind = event[0]
         if kind in ("state", "selecting"):
-            self.in_progress = True
+            if not self.complete:
+                self.in_progress = True
             return
+
         _, team_id, player_id = event
+        if player_id in self.seen_player_ids:
+            return
         pick = DraftPick(
             overall=len(self.picks) + 1,
             team_id=str(team_id),
@@ -212,7 +118,7 @@ class DraftRoomSession:
         _enrich_pick(pick, player_id)
         if pick.player_name is None:
             try:
-                directory = await load_espn_directory_async(self._lobby.season)
+                directory = load_espn_directory(self.season)
                 entry = directory.get(str(player_id))
                 if entry:
                     pick.player_name = entry.get("name")
@@ -220,38 +126,48 @@ class DraftRoomSession:
                     pick.nfl_team = pick.nfl_team or entry.get("team")
             except Exception as exc:
                 logger.warning("ESPN directory lookup failed: %s", exc)
+        self.seen_player_ids.add(player_id)
         self.in_progress = True
         self.picks.append(pick)
 
 
-_sessions: dict[tuple[int, int], DraftRoomSession] = {}
+_sessions: dict[tuple[int, int], IngestSession] = {}
 
 
-def get_or_create(lobby: MockLobbyDraft) -> DraftRoomSession:
-    """Session for this mock league, starting one (and evicting idle ones).
-
-    Raises EspnUpstreamError when an existing session's connection gave up,
-    so the failure surfaces to the user instead of an eternal empty
-    "waiting for picks" — the session is dropped, and the frontend's retry
-    (or its next backoff poll) starts a fresh one.
-    """
-    now = time.time()
+def _evict_idle(now: float | None = None) -> None:
+    now = now or time.time()
     for key, session in list(_sessions.items()):
         if now - session.last_polled > IDLE_EVICT_S:
-            session.close()
             del _sessions[key]
-            logger.info("Evicted idle draft-room session: league=%s", key[0])
+            logger.info("Evicted idle draft ingest session: league=%s", key[0])
 
-    key = (lobby.league_id, lobby.season)
+
+def _get_session(league_id: int, season: int) -> IngestSession:
+    _evict_idle()
+    key = (league_id, season)
     session = _sessions.get(key)
-    if session is not None and session._task.done() and not session.complete:
-        session.close()
-        del _sessions[key]
-        raise EspnUpstreamError(
-            "Lost the connection to the ESPN draft room — retrying. Picks "
-            "made while disconnected may be missing."
-        )
     if session is None:
-        session = DraftRoomSession(lobby)
+        session = IngestSession(league_id=league_id, season=season)
         _sessions[key] = session
     return session
+
+
+def ingest(
+    league_id: int,
+    season: int,
+    lines: list[str],
+    complete: bool = False,
+) -> int:
+    """Ingest tapped draft-room lines and return the accumulated pick count."""
+    session = _get_session(league_id, season)
+    return session.ingest(lines, complete=complete)
+
+
+def snapshot(
+    league_id: int,
+    season: int,
+    teams: list[DraftTeam] | None = None,
+) -> DraftStatus:
+    """Return a pollable DraftStatus for the tapped mock-draft session."""
+    session = _get_session(league_id, season)
+    return session.status(teams=teams)

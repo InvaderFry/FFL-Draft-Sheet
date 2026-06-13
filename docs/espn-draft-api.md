@@ -36,10 +36,12 @@ GET /seasons/{season}/segments/0/leagues/{leagueId}?view=...
 |---|---|---|
 | League endpoint, `view=mDraftDetail&view=mTeams` | `backend/app/providers/espn.py` | Draft picks (`draftDetail.picks`, `inProgress`, `drafted`) and team names. Lean payload, safe to poll. |
 | `GET /seasons/{season}/players` | `backend/app/data/espn_players.py` | Player-id → name/pos/team directory, used as a fallback when the Sleeper bridge can't identify a pick. |
+| `POST /api/draft/espn/ingest` | `backend/app/providers/espn_ws.py` | Browser userscript ingress for mock-draft socket lines (`SELECTED`, `SELECTING`, `STATE`). |
 
-The frontend polls the backend proxy (`POST /api/draft/espn`) every ~5s during
-a draft; the backend is a stateless pass-through in front of the league
-endpoint.
+For regular drafts, the frontend polls the backend proxy
+(`POST /api/draft/espn`) every ~5s during a draft; the backend is a stateless
+pass-through in front of the league endpoint. Mock Draft Lobby rooms use the
+browser-side ingest store described below.
 
 Parsing quirks handled in `espn.py`:
 
@@ -88,7 +90,7 @@ The draft room web app uses the same base API but a different flow:
 Season-level metadata also observed (not needed here):
 `GET /seasons/{season}?view=proTeamSchedules_wl` and `?view=kona_game_state`.
 
-## Mock Draft Lobby leagues cannot be synced by polling
+## Mock Draft Lobby live sync uses a browser-side socket tap
 
 Verified live (2026-06-12, mock league 283353968): the read API serves a
 Mock Draft Lobby league with cookies (`view=mDraftDetail` returns 200,
@@ -97,22 +99,53 @@ pick slots never fill in while the draft runs** — ~20 real picks were made
 in the room while every polled slot still carried a placeholder `playerId`.
 Mock picks travel only over the draft WebSocket.
 
+The backend originally joined that WebSocket as a second room member using
+the user's SWID + team id. That syncs picks, but ESPN allows only one active
+draft socket for a `(member, team)` pair: the backend join kicks the browser,
+the browser reconnect kicks the backend, and the user sees a broken draft
+room. A kicked backend socket also looks like a clean room close, which can
+produce a false "Draft complete" state.
+
+The current architecture keeps one ESPN draft socket:
+
+```
+ESPN draft tab (tools/espn-draft-tap.user.js)
+  -> POST /api/draft/espn/ingest
+  -> in-memory store keyed by (league_id, season)
+  <- POST /api/draft/espn with mock_ingest=true
+sheet tab
+```
+
+The Tampermonkey userscript runs at `document-start`, wraps `window.WebSocket`,
+listens only to sockets whose URL contains `fantasydraft.espn.com`, and
+forwards `SELECTED` / `SELECTING` / `STATE` lines to the sheet backend. The
+backend reuses the same `parse_frame` decoder and pick enrichment path as the
+old socket client. No ESPN cookies are sent to the sheet backend for mock
+drafts; the browser is already authenticated to ESPN.
+
 Mock-lobby leagues are identifiable in the response:
 
 - `settings.draftSettings.leagueSubType == "MOCKDRAFT_LOBBY"` (present even
   with only `view=mDraftDetail`)
 - `status.isViewable: false`
 
-The backend detects the `leagueSubType` marker: with espn_s2/SWID cookies it
-syncs the league via the draft-room WebSocket (`app/providers/espn_ws.py`),
-deriving the user's team id by matching the SWID against each team's
-`owners`/`primaryOwner` (join the room before connecting, or it isn't there
-yet; the connect form's optional Team ID — the `teamId` from the draft page
-URL — overrides the match). Without cookies it returns an explanatory 400
-instead of letting the sheet poll forever at "waiting for picks". A mock
-league whose `draftDetail.drafted` is already true parses via REST — the
-room no longer exists to join. Whether the REST slots backfill after a
-mock completes is unknown (the temporary league is deleted soon after).
+The backend detects the `leagueSubType` marker and returns a snapshot from
+the ingest store. The frontend can also force that path with
+`mock_ingest: true`, which is the reliable path when the userscript is
+installed. A mock league whose `draftDetail.drafted` is already true parses
+via REST — the room no longer exists to tap. Whether the REST slots backfill
+after a mock completes is unknown (the temporary league is deleted soon
+after).
+
+Known limitations:
+
+- The userscript must be installed once and its `SHEET_API` constant must be
+  set to the deployed backend base URL.
+- Picks made before the userscript loads are not captured. Install it and
+  load the ESPN draft page before the draft starts.
+- Navigating away from the draft page closes the browser socket. The
+  userscript posts `complete: true` on close, so the sheet ends that sync
+  session.
 
 ## Draft-room WebSocket protocol
 
@@ -148,11 +181,10 @@ Notes:
   is the team/slot id; snake order is visible as `SELECTING 1…12, 12…1`.
 - `SELECTED`'s third number tracks the player's lineup-slot/position id
   (2 = RB, 4 = WR observed); not needed when the player map has the id.
-- This app's session (`espn_ws.py`) is a read-only member: it joins,
-  keepalives, and accumulates `SELECTED` events into the same `DraftStatus`
-  the polling endpoint already serves, so the frontend needs no changes.
-  Connect **before the draft starts** — INIT is undecoded, so a mid-draft
-  join starts with an empty pick list.
+- This app no longer joins the room. The userscript reads the browser's own
+  socket frames and accumulates `SELECTED` events into the same `DraftStatus`
+  the polling endpoint already serves. Connect **before the draft starts** —
+  INIT is undecoded, so picks made before the tap loads are unavailable.
 
 For regular (non-mock) leagues, REST polling remains the path: it works for
 public leagues with zero credentials and keeps the backend stateless.
