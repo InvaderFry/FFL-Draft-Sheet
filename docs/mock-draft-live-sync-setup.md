@@ -53,6 +53,19 @@ You'll paste this into the userscript in the next step.
 
 The script is now active on any `https://fantasy.espn.com/football/draft*` URL.
 
+> **If you installed a previous version of this script**, delete it and
+> reinstall. The current version (0.2.0) adds two Tampermonkey grants in the
+> header (`GM_xmlhttpRequest`, `unsafeWindow`) that are required for local
+> development and correct WebSocket patching. An old copy without those grants
+> will silently fail to send picks when your backend is on `http://localhost`.
+
+### Why those grants are needed
+
+| Grant | Purpose |
+|---|---|
+| `GM_xmlhttpRequest` + `@connect *` | Lets Tampermonkey make the POST from its own privileged extension context, bypassing the browser's mixed-content block (HTTPS ESPN page → HTTP localhost). Without this, Chrome silently drops every request to `http://localhost`. |
+| `unsafeWindow` | Lets the script patch the real `window.WebSocket`, not Tampermonkey's sandbox proxy of it. Without this, ESPN's draft code never sees the patched constructor and the socket goes untapped. |
+
 ---
 
 ## Step 3 — Open the Draft Sheet tab
@@ -116,8 +129,11 @@ and the sheet marks the session complete and stops polling.
 
 | Symptom | Cause | Fix |
 |---|---|---|
+| No pill visible at all | Old script version (pre-0.2.0) missing `unsafeWindow` grant | Delete old script, reinstall from `tools/espn-draft-tap.user.js` |
+| No pill visible at all | Tampermonkey not enabled or script not saved | Open Tampermonkey dashboard, confirm script is listed and toggled on |
 | Pill says "configure SHEET_API" | Placeholder URL still in script | Edit line 16 in Tampermonkey |
 | Pill says "missing leagueId" | Page URL missing `leagueId` param | Use ESPN's built-in draft lobby link |
+| Pill says "send failed – retrying" on localhost | Old script missing `GM_xmlhttpRequest` grant (mixed-content block) | Delete old script, reinstall from `tools/espn-draft-tap.user.js` |
 | Pill counter stays at 0 | Opened the draft page after picks started | Refresh the ESPN tab before the draft starts |
 | Sheet shows 0 picks despite picks on pill | `mock_ingest` not checked | Check the "Live ESPN mock draft" box in Draft Sync |
 | CORS error in browser console | Backend URL has a trailing slash | Remove the trailing `/` from `SHEET_API` |
