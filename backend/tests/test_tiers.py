@@ -26,18 +26,21 @@ def _make_rbs(vals):
 
 # ---- basic functionality -----------------------------------------------------
 
-def test_qb_has_8_or_fewer_tiers():
-    players = _make_qbs([50 - i * 2 for i in range(40)])  # 40 QBs
+def test_qb_positive_players_have_7_or_fewer_tiers():
+    players = _make_qbs([50 - i * 2 for i in range(40)])  # 40 QBs, mixed +/- vals
     result = assign_tiers(players)
-    tiers = {p.tier for p in result}
-    assert max(tiers) <= 8
+    pos_tiers = {p.tier for p in result if p.val > 0}
+    assert max(pos_tiers) <= 7  # positive players use at most k-1 tiers
+    # Overall tier numbers stay bounded even with the sub-baseline tail tiered
+    assert max(p.tier for p in result) <= 15  # 2k - 1 for QB (k=8)
 
 
-def test_rb_has_12_or_fewer_tiers():
-    players = _make_rbs([80 - i for i in range(60)])
+def test_rb_positive_players_have_11_or_fewer_tiers():
+    players = _make_rbs([80 - i for i in range(120)])  # vals 80 down to -39
     result = assign_tiers(players)
-    tiers = {p.tier for p in result}
-    assert max(tiers) <= 12
+    pos_tiers = {p.tier for p in result if p.val > 0}
+    assert max(pos_tiers) <= 11
+    assert max(p.tier for p in result) <= 23  # 2k - 1 for RB (k=12)
 
 
 def test_tier_1_contains_highest_val_players():
@@ -67,27 +70,33 @@ def test_degenerate_all_same_val():
     assert len(tiers) == 1
 
 
-def test_sub_baseline_players_land_on_last_tier():
+def test_sub_baseline_players_tiered_below_positive():
     vals = [20, 15, 10, 5, 0, -2, -5, -8, -12]
     players = _make_qbs(vals)
     result = assign_tiers(players)
     sub_tiers = {p.tier for p in result if p.val <= 0}
     pos_tiers = {p.tier for p in result if p.val > 0}
 
-    assert sub_tiers == {8}
-    assert all(t < 8 for t in pos_tiers)
+    # Sub-baseline tiers continue contiguously after the last positive tier
+    assert min(sub_tiers) == max(pos_tiers) + 1
+    assert min(sub_tiers) > max(pos_tiers)
     assert len(pos_tiers) >= 2
 
 
-def test_all_sub_baseline_players_land_on_last_tier():
+def test_all_sub_baseline_pool_still_gets_tiered():
     players = _make_qbs([0, -2, -5, -8, -12])
     result = assign_tiers(players)
 
-    assert {p.tier for p in result} == {8}
+    tier_set = sorted({p.tier for p in result})
+    # Tiers start at 1 and are contiguous
+    assert tier_set == list(range(1, max(tier_set) + 1))
+    # Lower val never gets a better (lower) tier number
+    for a, b in zip(result, result[1:]):
+        assert a.tier <= b.tier
 
 
 def test_tier_is_even_flag():
-    players = _make_qbs([50 - i * 2 for i in range(20)])
+    players = _make_qbs([50 - i * 4 for i in range(25)])  # includes negative vals
     result = assign_tiers(players)
     for p in result:
         assert p.tier_is_even == (p.tier % 2 == 0)
@@ -102,6 +111,52 @@ def test_mutates_in_place():
 
 def test_empty_list():
     assert assign_tiers([]) == []
+
+
+# ---- sub-baseline tiering ----------------------------------------------------
+
+def test_tiers_contiguous_across_baseline_boundary():
+    """Mixed positive/negative pool: tier numbers have no gap at the 0-VAL boundary."""
+    players = _make_qbs([60 - i * 3 for i in range(40)])  # 60 down to -57
+    result = assign_tiers(players)
+    tier_set = sorted({p.tier for p in result})
+    assert tier_set == list(range(1, max(tier_set) + 1))
+
+
+def test_sub_baseline_split_into_multiple_tiers():
+    """A long, clearly clustered negative tail should produce >= 2 sub tiers."""
+    pos_vals = [50, 45, 30, 25, 12, 10, 4, 2]
+    sub_vals = [-1, -2, -3, -4, -20, -22, -24, -26, -50, -52, -54, -56,
+                -80, -82, -84, -86, -110, -112, -114, -116]
+    players = _make_qbs(pos_vals + sub_vals)
+    result = assign_tiers(players)
+    sub_tiers = {p.tier for p in result if p.val <= 0}
+    assert len(sub_tiers) >= 2
+
+
+def test_single_sub_baseline_player():
+    players = _make_qbs([40, 30, 20, -5])
+    result = assign_tiers(players)
+    pos_tiers = {p.tier for p in result if p.val > 0}
+    sub = [p for p in result if p.val <= 0]
+    assert len(sub) == 1
+    assert sub[0].tier == max(pos_tiers) + 1
+
+
+def test_sub_tier_count_capped():
+    """Even a huge distinct negative tail uses at most k extra tiers."""
+    players = _make_qbs([30, 20, 10] + [-float(i) for i in range(1, 201)])
+    result = assign_tiers(players)
+    sub_tiers = {p.tier for p in result if p.val <= 0}
+    assert len(sub_tiers) <= 8  # k for QB
+
+
+def test_tier_monotonic_in_val():
+    """Across the whole list (sorted desc by val), tier numbers never decrease."""
+    players = _make_qbs([55 - i * 2.5 for i in range(50)])
+    result = assign_tiers(players)
+    for a, b in zip(result, result[1:]):
+        assert a.tier <= b.tier
 
 
 # ---- degenerate: fewer distinct values than tier count -----------------------
@@ -129,7 +184,7 @@ def test_few_distinct_values_each_get_own_contiguous_tier():
 
 
 def test_few_distinct_values_with_sub_baseline():
-    """Sub-baseline players land on tier k; positive players get contiguous tiers."""
+    """Positive players get contiguous tiers; sub-baseline tiers continue after them."""
     vals = [40, 30, 20, 0, -5, -5]
     players = _make_qbs(vals)
     result = assign_tiers(players)
@@ -138,8 +193,8 @@ def test_few_distinct_values_with_sub_baseline():
     assert by_val[40] == 1
     assert by_val[30] == 2
     assert by_val[20] == 3
-    assert by_val[0] == 8
-    assert by_val[-5] == 8
+    assert by_val[0] == 4          # first sub tier = last positive tier + 1
+    assert by_val[-5] >= by_val[0]
 
     pos_tier_set = sorted({p.tier for p in result if p.val > 0})
     assert pos_tier_set == list(range(1, max(pos_tier_set) + 1))
