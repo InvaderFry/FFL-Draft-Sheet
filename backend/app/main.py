@@ -430,7 +430,7 @@ async def espn_draft_status(req: EspnDraftRequest) -> DraftStatus:
             return espn_ws.snapshot(
                 result.league_id,
                 result.season,
-                teams=result.teams,
+                result.teams,
             )
         return result
     except espn_provider.EspnAuthError as exc:
