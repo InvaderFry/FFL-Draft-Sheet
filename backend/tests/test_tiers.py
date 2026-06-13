@@ -31,8 +31,6 @@ def test_qb_positive_players_have_7_or_fewer_tiers():
     result = assign_tiers(players)
     pos_tiers = {p.tier for p in result if p.val > 0}
     assert max(pos_tiers) <= 7  # positive players use at most k-1 tiers
-    # Overall tier numbers stay bounded even with the sub-baseline tail tiered
-    assert max(p.tier for p in result) <= 15  # 2k - 1 for QB (k=8)
 
 
 def test_rb_positive_players_have_11_or_fewer_tiers():
@@ -40,7 +38,6 @@ def test_rb_positive_players_have_11_or_fewer_tiers():
     result = assign_tiers(players)
     pos_tiers = {p.tier for p in result if p.val > 0}
     assert max(pos_tiers) <= 11
-    assert max(p.tier for p in result) <= 23  # 2k - 1 for RB (k=12)
 
 
 def test_tier_1_contains_highest_val_players():
@@ -134,6 +131,19 @@ def test_sub_baseline_split_into_multiple_tiers():
     assert len(sub_tiers) >= 2
 
 
+def test_dense_near_zero_cluster_still_splits():
+    """The dense cluster just below baseline must split into multiple tiers
+    even when a sparse deep tail follows (Jenks lumps the dense cluster into
+    one giant tier; rank bands must not)."""
+    pos_vals = [60, 50, 40, 30, 20, 10, 5, 2]
+    dense = [-(0.1 * i) for i in range(1, 31)]       # 30 players, -0.1 .. -3.0
+    sparse = [-50, -100, -150, -200, -250, -300]
+    players = _make_qbs(pos_vals + dense + sparse)
+    result = assign_tiers(players)
+    dense_tiers = {p.tier for p in result if -3.5 <= p.val <= 0}
+    assert len(dense_tiers) >= 3
+
+
 def test_single_sub_baseline_player():
     players = _make_qbs([40, 30, 20, -5])
     result = assign_tiers(players)
@@ -143,12 +153,26 @@ def test_single_sub_baseline_player():
     assert sub[0].tier == max(pos_tiers) + 1
 
 
-def test_sub_tier_count_capped():
-    """Even a huge distinct negative tail uses at most k extra tiers."""
+def test_sub_tier_bands_are_even():
+    """Tail tiers are equal-count bands; no tier swallows the whole tail."""
     players = _make_qbs([30, 20, 10] + [-float(i) for i in range(1, 201)])
     result = assign_tiers(players)
-    sub_tiers = {p.tier for p in result if p.val <= 0}
-    assert len(sub_tiers) <= 8  # k for QB
+    sub = [p for p in result if p.val <= 0]
+    from collections import Counter
+    sizes = Counter(p.tier for p in sub)
+    band_sizes = [sizes[t] for t in sorted(sizes)]
+    # All distinct vals: every band except possibly the last has the same size
+    assert len(set(band_sizes[:-1])) == 1
+    assert max(band_sizes) <= band_sizes[0]
+
+
+def test_ties_do_not_straddle_tier_boundary():
+    """Players with equal val always share a tier, even at a band boundary."""
+    # band size will be 3 (floor); the run of -5s crosses a boundary
+    players = _make_qbs([40, 30, 20, -1, -2, -5, -5, -5, -5, -9, -10, -11])
+    result = assign_tiers(players)
+    tied = {p.tier for p in result if p.val == -5}
+    assert len(tied) == 1
 
 
 def test_tier_monotonic_in_val():
