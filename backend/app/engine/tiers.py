@@ -7,16 +7,18 @@ using Jenks natural breaks on the VAL distribution.
 N_TIERS_BY_POS: QB/TE → 8, RB/WR → 12, DST/K → 6
 (matches beersheet_clone.R and the plan)
 
-Positive players (val > 0) are tiered over k-1 tiers (1 through k-1) exactly
-as before. Sub-baseline players (val <= 0) are no longer lumped into a single
-last tier: they get their own Jenks tiers, numbered contiguously after the
-last positive tier, sized to match the average positive tier and capped at k
-extra tiers (so the worst tier number is at most ~2k-1).
+Positive players (val > 0) are tiered over k-1 tiers (1 through k-1) using
+Jenks. Sub-baseline players (val <= 0) get equal-count rank bands instead:
+the VAL distribution just below baseline is dense and the deep tail sparse,
+so Jenks would lump everyone near zero into one giant tier. Rank bands keep
+the visual tier granularity consistent all the way down the list (like
+BeerSheets), numbered contiguously after the last positive tier with no cap.
 
 Edge cases:
-- Fewer unique values in a group than requested tiers → direct contiguous tier mapping
+- Fewer unique positive values than requested tiers → direct contiguous tier mapping
 - All same value in a group → everyone shares one tier
-- No positive players → sub-baseline tiers start at 1
+- Equal sub-baseline values never straddle a band boundary
+- No positive players → sub-baseline bands start at 1
 
 Also sets tier_is_even (bool) for alternating row shading.
 """
@@ -101,6 +103,36 @@ def _assign_group_tiers(group: list[PlayerVBD], n_tiers: int, offset: int) -> in
     return max_assigned
 
 
+def _sub_tier_size(n_positive: int, last_pos_tier: int, n_players: int, k: int) -> int:
+    """
+    Target band size for sub-baseline tiers: match the average positive tier
+    size, floored at 3 so thin positive tiers don't create 1-2 player bands.
+    """
+    if last_pos_tier:
+        return max(3, ceil(n_positive / last_pos_tier))
+    return max(3, ceil(n_players / k))
+
+
+def _assign_rank_band_tiers(group: list[PlayerVBD], band_size: int, offset: int) -> int:
+    """
+    Tier `group` (sorted descending by val) into equal-count bands of
+    `band_size` players, extending a band so equal values never straddle a
+    boundary. Tiers are numbered offset+1, offset+2, ... Returns the highest
+    tier number assigned (offset if group is empty).
+    """
+    tier = offset
+    in_band = band_size  # force a new band on the first player
+    for i, p in enumerate(group):
+        starts_new_band = in_band >= band_size and (i == 0 or p.val != group[i - 1].val)
+        if starts_new_band:
+            tier += 1
+            in_band = 0
+        p.tier = tier
+        p.tier_is_even = (tier % 2 == 0)
+        in_band += 1
+    return tier
+
+
 def assign_tiers(players: list[PlayerVBD]) -> list[PlayerVBD]:
     """
     Assign tier and tier_is_even to each player in the list (mutates in place).
@@ -120,13 +152,7 @@ def assign_tiers(players: list[PlayerVBD]) -> list[PlayerVBD]:
     last_pos_tier = _assign_group_tiers(positive_players, max(1, k - 1), offset=0)
 
     if sub_players:
-        # Match the granularity of the positive tiers: target sub-tier size
-        # ≈ average positive tier size, capped at k extra tiers.
-        if last_pos_tier:
-            avg = max(1, ceil(len(positive_players) / last_pos_tier))
-        else:
-            avg = max(1, ceil(len(players) / k))
-        n_sub = min(k, max(1, ceil(len(sub_players) / avg)))
-        _assign_group_tiers(sub_players, n_sub, offset=last_pos_tier)
+        target = _sub_tier_size(len(positive_players), last_pos_tier, len(players), k)
+        _assign_rank_band_tiers(sub_players, target, offset=last_pos_tier)
 
     return players
