@@ -61,6 +61,13 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
     setValidationError(e => ({ ...e, [field]: undefined }))
   }
 
+  // One-click FLEX-split presets. Superflex routes the flex slot to QB; standard
+  // restores the RB/WR/TE split. Both sum to 1.0, clearing the flex error.
+  function applyFlexPreset(alloc) {
+    setSettings(s => ({ ...s, ...alloc }))
+    setValidationError(e => ({ ...e, flex: undefined }))
+  }
+
   function validate() {
     const errs = {}
     if (settings.n_teams < 8 || settings.n_teams > 16)
@@ -283,6 +290,17 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
         {parseInt(settings.flex_slots) > 0 && (
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>FLEX split <span className={styles.hint}>(must sum to 1.0)</span></h3>
+            <div className={styles.presetRow}>
+              <span className={styles.presetLabel}>Preset:</span>
+              <button type="button" className={styles.presetBtn}
+                onClick={() => applyFlexPreset({ flex_rb: 0.5, flex_wr: 0.4, flex_te: 0.1, flex_qb: 0.0 })}>
+                Standard
+              </button>
+              <button type="button" className={styles.presetBtn}
+                onClick={() => applyFlexPreset({ flex_rb: 0.0, flex_wr: 0.0, flex_te: 0.0, flex_qb: 1.0 })}>
+                Superflex
+              </button>
+            </div>
             {[['flex_rb','RB'],['flex_wr','WR'],['flex_te','TE'],['flex_qb','QB (superflex)']].map(([field, label]) => (
               <label key={field} className={styles.field}>
                 <span>{label}</span>

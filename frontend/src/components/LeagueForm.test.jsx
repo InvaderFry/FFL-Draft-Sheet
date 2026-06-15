@@ -59,6 +59,20 @@ describe('LeagueForm', () => {
     await vi.waitFor(() => expect(onSheet).toHaveBeenCalledWith(sheet, payload))
   })
 
+  it('the Superflex preset routes the flex slot to QB and submits it', async () => {
+    const sheet = { positions: {}, metadata: {} }
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => sheet })
+    vi.stubGlobal('fetch', fetch)
+    renderForm()
+
+    await userEvent.click(screen.getByRole('button', { name: /^Superflex$/ }))
+    await submit()
+
+    const payload = JSON.parse(fetch.mock.calls[0][1].body)
+    expect(payload.flex_qb).toBe(1.0)
+    expect(payload.flex_rb + payload.flex_wr + payload.flex_te).toBe(0)
+  })
+
   it('surfaces a backend error via onError without calling onSheet', async () => {
     const fetch = vi.fn().mockResolvedValue({
       ok: false, status: 500, json: async () => ({ detail: 'projection source down' }),

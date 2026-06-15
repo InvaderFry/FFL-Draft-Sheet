@@ -9,8 +9,26 @@
 import { ecrColor, ecrColorStyle } from '../utils/ecrColor'
 import { fmtVal } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle } from '../utils/valGradient'
+import { survivalStatus } from '../utils/draftStrategy'
 import { useTheme } from '../context/ThemeContext'
 import styles from './PlayerTable.module.css'
+
+// Tooltip + dot class for the "survives to your next pick?" marker. Both
+// 'gone' (already past ADP — a falling player still on the board) and 'risky'
+// (likely drafted before your next pick) share the urgent amber dot.
+function survivalMarker(adpRank, currentPick, nextPick) {
+  const status = survivalStatus(adpRank, currentPick, nextPick)
+  if (status === 'gone') {
+    return { cls: styles.survRisky, title: `ADP ${adpRank} · already past ADP — likely gone any pick now` }
+  }
+  if (status === 'risky') {
+    return { cls: styles.survRisky, title: `ADP ${adpRank} · likely gone before your pick ${nextPick}` }
+  }
+  if (status === 'safe') {
+    return { cls: styles.survSafe, title: `ADP ${adpRank} · should reach your pick ${nextPick}` }
+  }
+  return null
+}
 
 const COLUMNS = [
   { key: 'player_name', label: 'NAME',   align: 'left',   width: '130px' },
@@ -22,7 +40,7 @@ const COLUMNS = [
   { key: 'ps_pct',      label: 'PS%',    align: 'right',  width: '44px'  },
 ]
 
-export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auctionMode, wrapStyle, minVal = 0, maxVal = 0 }) {
+export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auctionMode, wrapStyle, minVal = 0, maxVal = 0, strategy = null }) {
   const { theme } = useTheme()
   const cols = auctionMode
     ? [...COLUMNS, { key: 'auction_price', label: '$', align: 'right', width: '42px' }]
@@ -51,6 +69,9 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
             const ecrStyle = { color: ecrColorStyle(ecr) }
             const valStyle = valBgStyle(player.val, minVal, maxVal, theme)
             const psStyle  = psPctBgStyle(player.ps_pct, theme)
+            const surv = strategy
+              ? survivalMarker(player.adp_rank, strategy.currentPick, strategy.nextPick)
+              : null
 
             return (
               <tr
@@ -60,6 +81,7 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
                 title="Click to mark as drafted"
               >
                 <td className={styles.nameCell}>
+                  {surv && <span className={`${styles.survDot} ${surv.cls}`} title={surv.title} />}
                   {player.player_name}
                 </td>
                 <td className={styles.teamCell}>

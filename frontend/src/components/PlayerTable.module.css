@@ -80,6 +80,20 @@
   font-weight: 500;
 }
 
+/* "Survives to your next pick?" marker, shown only when a live draft with a
+   selected My Team gives us a next-pick number. */
+.survDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.survRisky { background: var(--c-amber); }
+.survSafe  { background: var(--c-green); }
+
 .teamCell {
   padding: 4px 3px;
   white-space: nowrap;

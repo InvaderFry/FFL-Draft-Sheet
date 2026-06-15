@@ -1,0 +1,22 @@
+{
+  "provider": "espn",
+  "in_progress": true,
+  "complete": false,
+  "fetched_at": 1750000000.0,
+  "teams": [
+    { "team_id": "4", "name": "Team Derrick", "abbrev": "ZD" },
+    { "team_id": "7", "name": "Old School Squad", "abbrev": "OLD" }
+  ],
+  "picks": [
+    {
+      "overall": 1, "round": 1, "round_pick": 1, "team_id": "4",
+      "provider_player_id": "3929630", "sleeper_id": "4034",
+      "player_name": "Christian McCaffrey", "pos": "RB", "nfl_team": "SF"
+    },
+    {
+      "overall": 2, "round": 1, "round_pick": 2, "team_id": "7",
+      "provider_player_id": "4262921", "sleeper_id": "6794",
+      "player_name": "Justin Jefferson", "pos": "WR", "nfl_team": "MIN"
+    }
+  ]
+}

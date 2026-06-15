@@ -14,6 +14,12 @@ import DraftSync from './DraftSync'
 import Legend from './Legend'
 import { useTheme } from '../context/ThemeContext'
 import { valRangeFromPositions } from '../utils/valGradient'
+import {
+  currentOverall,
+  nextUserPickOverall,
+  positionRunsSinceLastPick,
+  rosterNeeds,
+} from '../utils/draftStrategy'
 import styles from './DraftBoard.module.css'
 
 const TAB_ORDER = ['ALL', 'QB', 'RB', 'WR', 'TE', 'DST']
@@ -91,6 +97,36 @@ export default function DraftBoard({
     [positions]
   )
   const sourceCount = sourceDetails.used.length
+
+  // Strategy tools need a chosen "My Team". Roster needs/byes are useful in any
+  // format and after the draft ends; next-pick, runs, and the per-row survival
+  // markers are snake-only, so they're gated to a *live snake* draft (no auction,
+  // not yet complete) to avoid showing confidently-wrong advice.
+  const myTeamId = espnSync?.myTeamId || null
+  const rosterActive = !!myTeamId &&
+    (espnSync?.status === 'connected' || espnSync?.status === 'complete')
+  const snakeLive = !!myTeamId && espnSync?.status === 'connected' && !auctionMode
+
+  const strategy = useMemo(() => {
+    if (!rosterActive) return null
+    // id → bye_week across the whole sheet, so My Team picks can resolve byes.
+    const byeById = new Map()
+    for (const rows of Object.values(positions)) {
+      for (const p of rows) byeById.set(p.sleeper_id || p.player_name, p.bye_week)
+    }
+    const myPicks = draftedList.filter(p => p.teamId === myTeamId)
+    return {
+      currentPick: snakeLive ? currentOverall(draftedList) : null,
+      nextPick: snakeLive ? nextUserPickOverall(draftedList, myTeamId, nTeams) : null,
+      runs: snakeLive ? positionRunsSinceLastPick(draftedList, myTeamId, nTeams) : null,
+      needs: rosterNeeds(myPicks, config, id => byeById.get(id)),
+    }
+  }, [rosterActive, snakeLive, myTeamId, draftedList, nTeams, positions, config])
+
+  // The per-row survival marker only needs the two pick numbers.
+  const tableStrategy = strategy && strategy.nextPick != null
+    ? { currentPick: strategy.currentPick, nextPick: strategy.nextPick }
+    : null
 
   return (
     <div className={styles.board}>
@@ -266,6 +302,7 @@ export default function DraftBoard({
               auctionMode={auctionMode}
               minVal={minVal}
               maxVal={maxVal}
+              strategy={tableStrategy}
             />
           ) : (
             <PlayerTable
@@ -277,6 +314,7 @@ export default function DraftBoard({
               auctionMode={auctionMode}
               minVal={minVal}
               maxVal={maxVal}
+              strategy={tableStrategy}
               wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
             />
           )}
@@ -287,6 +325,9 @@ export default function DraftBoard({
           onRemove={onRemoveDrafted}
           myTeamId={espnSync?.myTeamId}
           syncActive={espnSync?.status === 'connected' || espnSync?.status === 'connecting'}
+          needs={strategy?.needs}
+          runs={strategy?.runs}
+          nextPick={strategy?.nextPick}
         />
       </div>
     </div>
