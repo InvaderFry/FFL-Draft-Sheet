@@ -84,4 +84,28 @@ describe('DraftedPanel', () => {
     render(<DraftedPanel draftedList={[SYNCED_MINE]} onToggle={() => {}} />)
     expect(screen.queryByText('MY TEAM')).toBeNull()
   })
+
+  it('renders the strategy block: next pick, roster needs, runs, bye conflicts', () => {
+    render(
+      <DraftedPanel
+        draftedList={[SYNCED_MINE]}
+        onToggle={() => {}}
+        myTeamId="4"
+        nextPick={22}
+        needs={{
+          positions: { QB: { filled: 0, need: 1 }, RB: { filled: 2, need: 2 }, WR: { filled: 0, need: 3 }, TE: { filled: 0, need: 1 }, DST: { filled: 0, need: 1 } },
+          flex: { filled: 0, need: 1 },
+          byeConflicts: [{ week: 9, count: 2, names: ['A', 'B'] }],
+        }}
+        runs={{ RB: 4, WR: 2, QB: 0, TE: 0, DST: 0 }}
+      />
+    )
+
+    expect(screen.getByText('#22')).toBeInTheDocument()
+    expect(screen.getByText('RB 2/2')).toBeInTheDocument()
+    expect(screen.getByText('WR 0/3')).toBeInTheDocument()
+    expect(screen.getByText('FLX 0/1')).toBeInTheDocument()
+    expect(screen.getByText(/4 RB, 2 WR off the board/)).toBeInTheDocument()
+    expect(screen.getByText(/2 starters on bye wk 9/)).toBeInTheDocument()
+  })
 })

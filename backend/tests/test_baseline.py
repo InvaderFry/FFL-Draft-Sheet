@@ -74,6 +74,33 @@ def test_superflex_pushes_qb_baseline_deeper(make_league):
     assert baseline_rank("QB", cfg_sf, curve) > baseline_rank("QB", cfg_1qb, curve)
 
 
+def test_flex_qb_superflex_deepens_qb_baseline(make_league):
+    """A superflex *flex slot* (flex_qb > 0), not just extra QB starters, must
+    raise QB games_needed and push the QB baseline rank deeper."""
+    cfg_std = make_league()  # flex_qb defaults to 0.0
+    cfg_sf = make_league(flex_rb=0.0, flex_wr=0.0, flex_te=0.0, flex_qb=1.0)
+    curve = [14.0] * 80
+    # Standard QB: 12*(1+0)*14 = 168; superflex: 12*(1+1.0)*14 = 336.
+    assert games_needed("QB", cfg_sf) == pytest.approx(336.0)
+    assert games_needed("QB", cfg_sf) > games_needed("QB", cfg_std)
+    assert baseline_rank("QB", cfg_sf, curve) > baseline_rank("QB", cfg_std, curve)
+
+
+def test_flex_qb_superflex_lowers_qb_baseline_points(make_league):
+    """Deeper QB baseline rank → a lower-scoring replacement QB → lower QB
+    baseline points (which is what raises every QB's VBD)."""
+    curve = [14.0] * 80
+    qb_proj = [300.0 - i for i in range(60)]  # strictly descending
+    pos_proj = {"QB": qb_proj, "RB": qb_proj, "WR": qb_proj, "TE": qb_proj, "DST": qb_proj}
+    curves = {pos: curve for pos in ("QB", "RB", "WR", "TE", "DST")}
+
+    std = compute_baselines(make_league(), curves, pos_proj)
+    sf = compute_baselines(
+        make_league(flex_rb=0.0, flex_wr=0.0, flex_te=0.0, flex_qb=1.0), curves, pos_proj
+    )
+    assert sf["QB"] < std["QB"]
+
+
 # ---- compute_baselines -------------------------------------------------------
 
 def test_compute_baselines_returns_all_positions(canonical_cfg, flat_curve):

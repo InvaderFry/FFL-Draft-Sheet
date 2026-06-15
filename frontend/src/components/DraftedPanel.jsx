@@ -1,4 +1,52 @@
+import { STARTER_POS } from '../utils/draftStrategy'
 import styles from './DraftedPanel.module.css'
+
+// Compact roster-needs + run-alert block shown under MY TEAM during a live
+// draft. Renders nothing useful until there's strategy data to show.
+function StrategyBlock({ needs, runs, nextPick }) {
+  if (!needs && !runs && nextPick == null) return null
+
+  const runEntries = runs
+    ? Object.entries(runs).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])
+    : []
+
+  return (
+    <div className={styles.strategy}>
+      {nextPick != null && (
+        <div className={styles.nextPick}>Your next pick: <strong>#{nextPick}</strong></div>
+      )}
+      {needs && (
+        <div className={styles.needsGrid}>
+          {STARTER_POS.map(pos => {
+            const slot = needs.positions[pos]
+            if (!slot || slot.need === 0) return null
+            const done = slot.filled >= slot.need
+            return (
+              <span key={pos} className={`${styles.needChip} ${done ? styles.needChipDone : ''}`}>
+                {pos} {slot.filled}/{slot.need}
+              </span>
+            )
+          })}
+          {needs.flex.need > 0 && (
+            <span className={`${styles.needChip} ${needs.flex.filled >= needs.flex.need ? styles.needChipDone : ''}`}>
+              FLX {needs.flex.filled}/{needs.flex.need}
+            </span>
+          )}
+        </div>
+      )}
+      {runEntries.length > 0 && (
+        <div className={styles.runLine}>
+          Since your last pick: {runEntries.map(([pos, n]) => `${n} ${pos}`).join(', ')} off the board
+        </div>
+      )}
+      {needs?.byeConflicts?.map(c => (
+        <div key={c.week} className={styles.byeWarn}>
+          ⚠ {c.count} starters on bye wk {c.week}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 function PickItem({ pick, onToggle, onRemove, syncActive }) {
   const { id, name, pos, source, teamName } = pick
@@ -29,7 +77,10 @@ function PickItem({ pick, onToggle, onRemove, syncActive }) {
   )
 }
 
-export default function DraftedPanel({ draftedList, onToggle, onRemove = () => {}, myTeamId = null, syncActive = false }) {
+export default function DraftedPanel({
+  draftedList, onToggle, onRemove = () => {}, myTeamId = null, syncActive = false,
+  needs = null, runs = null, nextPick = null,
+}) {
   const myPicks = myTeamId
     ? draftedList
         .filter(p => p.teamId === myTeamId)
@@ -41,6 +92,7 @@ export default function DraftedPanel({ draftedList, onToggle, onRemove = () => {
       {myTeamId && (
         <>
           <div className={styles.header}>MY TEAM</div>
+          <StrategyBlock needs={needs} runs={runs} nextPick={nextPick} />
           <ul className={`${styles.list} ${styles.myList}`}>
             {myPicks.map(pick => (
               <PickItem key={pick.id} pick={pick} onToggle={onToggle} onRemove={onRemove} syncActive={syncActive} />

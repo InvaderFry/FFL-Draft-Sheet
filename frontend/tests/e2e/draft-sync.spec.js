@@ -23,6 +23,25 @@ test.describe('live ESPN draft sync', () => {
     await expect(page.getByText(/Draft complete · 2 picks/)).toBeVisible()
   })
 
+  test('strategy tools appear once a My Team is selected', async ({ page }) => {
+    await stubSheet(page)
+    await stubDraft(page)
+    await page.goto('/')
+    await page.getByRole('button', { name: /generate draft sheet/i }).click()
+    await page.getByRole('button', { name: /sync espn draft/i }).click()
+    await page.getByPlaceholder(/12345678/).fill('99887766')
+    await page.getByRole('button', { name: /^Connect$/ }).click()
+    await expect(page.getByText(/Draft complete · 2 picks/)).toBeVisible()
+
+    // Pick the user's team (owns the McCaffrey pick at overall 1).
+    await page.locator('select').filter({ hasText: 'Team Derrick' }).selectOption({ label: 'Team Derrick' })
+
+    // Roster-needs chip, run alert, and next-pick line all render.
+    await expect(page.getByText(/Your next pick:/)).toBeVisible()
+    await expect(page.getByText('RB 1/2')).toBeVisible()
+    await expect(page.getByText(/1 WR off the board/)).toBeVisible()
+  })
+
   test('pre-flight test connection reports a reachable league', async ({ page }) => {
     await stubSheet(page)
     await stubDraft(page)

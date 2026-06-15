@@ -3,7 +3,9 @@
 from types import SimpleNamespace
 
 import pytest
+from app.engine.baseline import compute_baselines
 from app.engine.vbd import aggregate_projections, SD_FALLBACK_RATIO
+from tests.factories import build_league
 
 
 def _make_row(player_name, team, pts, source, sleeper_id=None, pos="RB"):
@@ -169,3 +171,22 @@ def test_multiple_players_grouped_by_sleeper_id():
 
 def test_empty_rows_returns_empty():
     assert aggregate_projections([], "QB", baseline=100.0) == []
+
+
+def test_superflex_raises_qb_val_end_to_end():
+    """Superflex deepens the QB baseline, so the same QB projections produce a
+    higher VBD val than in a standard league — the full baseline→VBD path."""
+    curve = [14.0] * 80
+    qb_proj = [300.0 - i for i in range(60)]
+    pos_proj = {pos: qb_proj for pos in ("QB", "RB", "WR", "TE", "DST")}
+    curves = {pos: curve for pos in ("QB", "RB", "WR", "TE", "DST")}
+
+    std_base = compute_baselines(build_league(), curves, pos_proj)["QB"]
+    sf_base = compute_baselines(
+        build_league(flex_rb=0.0, flex_wr=0.0, flex_te=0.0, flex_qb=1.0), curves, pos_proj
+    )["QB"]
+
+    rows = [_make_row("Elite QB", "KC", 300.0, "ESPN", "qb_id", pos="QB")]
+    std_val = aggregate_projections(rows, "QB", baseline=std_base)[0].val
+    sf_val = aggregate_projections(rows, "QB", baseline=sf_base)[0].val
+    assert sf_val > std_val
