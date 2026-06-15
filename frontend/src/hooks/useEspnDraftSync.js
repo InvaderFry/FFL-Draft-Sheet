@@ -30,6 +30,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { espnDraftBody } from '../api'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 const POLL_MS = 5000
@@ -79,6 +80,9 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   const [teams, setTeams] = useState([])
   const [myTeamId, setMyTeamId] = useState(null)
   const [error, setError] = useState(null)
+  // True when the last failure was a 401: cookies are stale/missing, so the
+  // fix is re-entering credentials, not retrying the same request.
+  const [authExpired, setAuthExpired] = useState(false)
   const [pickCount, setPickCount] = useState(0)
   // Total picks of an active practice replay; null during real syncs.
   const [replayTotal, setReplayTotal] = useState(null)
@@ -180,13 +184,7 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
       const resp = await fetch(`${API_URL}/api/draft/espn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          league_id: Number(settings.leagueId),
-          season: Number(settings.season),
-          espn_s2: settings.espn_s2 || null,
-          swid: settings.swid || null,
-          mock_ingest: Boolean(settings.mock),
-        }),
+        body: JSON.stringify(espnDraftBody(settings)),
       })
       if (!resp.ok) {
         let detail = `Sync failed (HTTP ${resp.status})`
@@ -197,9 +195,10 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
           else if (resp.status === 422) detail = 'Invalid league ID or season — check the connect form.'
         } catch (_) {}
         // Auth/not-found/validation failures are permanent — retrying the
-        // same payload won't fix them.
+        // same payload won't fix them. A 401 specifically means stale/missing
+        // cookies, which the user fixes by re-entering them, not by retrying.
         const permanent = [400, 401, 404, 422].includes(resp.status)
-        throw Object.assign(new Error(detail), { permanent })
+        throw Object.assign(new Error(detail), { permanent, auth: resp.status === 401 })
       }
       const data = await resp.json()
       // Abandon the response if disconnect()/connect() ran while in flight —
@@ -228,6 +227,7 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
       setTeams(prev => sameTeams(prev, data.teams || []) ? prev : (data.teams || []))
       lastSyncAtRef.current = Date.now()
       setError(null)
+      setAuthExpired(false)
       failuresRef.current = 0
 
       // Practice replay: hold the completed draft back and deal it out one
@@ -260,6 +260,7 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
         stoppedRef.current = true
         setStatus('error')
         setError(err.message)
+        if (err.auth) setAuthExpired(true)
         return // no reschedule; user must fix the input and reconnect
       }
       if (failuresRef.current >= MAX_SOFT_FAILURES) {
@@ -288,6 +289,7 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
     setReplayTotal(null)
     setStatus('connecting')
     setError(null)
+    setAuthExpired(false)
     poll()
   }, [poll])
 
@@ -303,6 +305,7 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
     setPickCount(0)
     lastSyncAtRef.current = null
     setError(null)
+    setAuthExpired(false)
   }, [stopTimer])
 
   // Pause while hidden; fetch immediately on return. Resumes any non-stopped
@@ -330,11 +333,12 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
     stoppedRef.current = false
     setStatus('connecting')
     setError(null)
+    setAuthExpired(false)
     poll()
   }, [poll])
 
   return {
-    status, teams, myTeamId, setMyTeamId, error, lastSyncAtRef, pickCount,
-    replayTotal, connect, disconnect, retry,
+    status, teams, myTeamId, setMyTeamId, error, authExpired, lastSyncAtRef,
+    pickCount, replayTotal, connect, disconnect, retry,
   }
 }
