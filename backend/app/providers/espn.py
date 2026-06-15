@@ -75,6 +75,26 @@ class EspnUpstreamError(EspnError):
     pass
 
 
+# Hosts ESPN redirects to when a session is unauthenticated/expired.
+_AUTH_HOSTS = ("registerdisney", "logon", "cdn.registerdisney")
+
+
+def _is_login_redirect(resp: httpx.Response) -> bool:
+    """True when ESPN bounced an expired-cookie request to its login page.
+
+    The read API answers with JSON; a redirect chain ending on a Disney/login
+    host, or an HTML body where JSON is expected, means the session is no
+    longer authenticated rather than that the API genuinely returned HTML.
+    """
+    if not resp.history:
+        return False
+    host = (resp.url.host or "").lower()
+    if any(marker in host for marker in _AUTH_HOSTS):
+        return True
+    ctype = resp.headers.get("content-type", "").lower()
+    return ctype.startswith("text/html")
+
+
 async def fetch_draft(
     league_id: int,
     season: int,
@@ -116,6 +136,15 @@ async def fetch_draft(
     if resp.status_code == 404:
         raise EspnNotFoundError(
             f"ESPN league {league_id} not found for season {season}."
+        )
+    # Expired cookies don't always 401 — ESPN often 302-redirects to its
+    # Disney/login page, which (because we follow redirects) returns 200 HTML.
+    # Classify that as an auth failure so the user is told to refresh cookies
+    # instead of seeing a confusing "non-JSON" upstream error.
+    if _is_login_redirect(resp):
+        raise EspnAuthError(
+            "ESPN credentials look expired — refresh your espn_s2 and SWID "
+            "cookies and reconnect."
         )
     if resp.status_code != 200:
         raise EspnUpstreamError(f"ESPN returned HTTP {resp.status_code}.")

@@ -11,19 +11,39 @@
  * mismapped/reversed picks once polling has stopped (the UI only offers it
  * then — while live, a removed synced pick re-hydrates within one poll).
  *
- * State persists for the lifetime of the session (React state; not
- * localStorage). clear({keepSynced}) wipes manual marks and, by default,
+ * State is mirrored to localStorage so a mid-draft tab refresh or crash keeps
+ * the board's marks. clear({keepSynced}) wipes manual marks and, by default,
  * synced picks too; callers pass keepSynced while a sync session exists,
  * because once polling has stopped (draft complete, permanent error) wiped
  * picks would NOT re-hydrate.
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
+
+const STORAGE_KEY = 'beersheet_draft_state'
+
+function loadPersisted() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY))
+    return Array.isArray(parsed) ? parsed : []
+  } catch (_) {
+    return []
+  }
+}
 
 export function useDraftState() {
   // Ordered array of {id, name, pos, source, teamId?, teamName?, overall?},
-  // newest first
-  const [draftedList, setDraftedList] = useState([])
+  // newest first. Lazily restored from localStorage on mount.
+  const [draftedList, setDraftedList] = useState(loadPersisted)
+
+  // Persist every change. Synced ('espn') picks are saved too: while live they
+  // re-hydrate from polling anyway, and once polling has stopped they survive a
+  // refresh here exactly when they no longer would re-hydrate.
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(draftedList))
+    } catch (_) { /* storage full or unavailable — marks stay in memory */ }
+  }, [draftedList])
 
   const drafted = useMemo(() => new Set(draftedList.map(p => p.id)), [draftedList])
 

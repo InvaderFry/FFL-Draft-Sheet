@@ -111,6 +111,35 @@ describe('useDraftState', () => {
     expect(result.current.isDrafted('m1')).toBe(true)
   })
 
+  describe('persistence', () => {
+    it('restores marks from localStorage on a fresh mount (refresh survival)', () => {
+      const first = renderHook(() => useDraftState())
+      act(() => {
+        first.result.current.toggle('p1', 'Player One', 'RB')
+        first.result.current.applySyncedPicks([
+          { id: 'a', name: 'Player a', pos: 'WR', teamId: 't1', teamName: 'T', overall: 1 },
+        ])
+      })
+      first.unmount()
+
+      // A new hook instance == a page refresh: state comes back from storage.
+      const second = renderHook(() => useDraftState())
+      expect(second.result.current.count).toBe(2)
+      expect(second.result.current.isDrafted('p1')).toBe(true)
+      expect(second.result.current.isDrafted('a')).toBe(true)
+    })
+
+    it('clear() empties the persisted store too', () => {
+      const { result, unmount } = renderHook(() => useDraftState())
+      act(() => result.current.toggle('p1', 'Player One', 'RB'))
+      act(() => result.current.clear())
+      unmount()
+
+      const next = renderHook(() => useDraftState())
+      expect(next.result.current.count).toBe(0)
+    })
+  })
+
   it('clear({keepSynced: true}) wipes manual marks but keeps synced picks', () => {
     const { result } = renderHook(() => useDraftState())
     act(() => {
