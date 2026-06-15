@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -36,9 +37,15 @@ def client():
     return TestClient(app, raise_server_exceptions=False)
 
 
-def _mock_response(status_code=200, payload=None):
+def _mock_response(
+    status_code=200, payload=None, *, redirected_to=None, content_type=None
+):
     resp = MagicMock()
     resp.status_code = status_code
+    # Default: a direct (non-redirected) JSON response from the read API.
+    resp.history = [MagicMock()] if redirected_to else []
+    resp.url = httpx.URL(redirected_to or "https://lm-api-reads.fantasy.espn.com/x")
+    resp.headers = {"content-type": content_type or "application/json"}
     if payload is not None:
         resp.json.return_value = payload
     else:
@@ -46,11 +53,14 @@ def _mock_response(status_code=200, payload=None):
     return resp
 
 
-def _patch_espn(status_code=200, payload=None):
+def _patch_espn(status_code=200, payload=None, *, redirected_to=None, content_type=None):
     return patch(
         "httpx.AsyncClient.get",
         new_callable=AsyncMock,
-        return_value=_mock_response(status_code, payload),
+        return_value=_mock_response(
+            status_code, payload,
+            redirected_to=redirected_to, content_type=content_type,
+        ),
     )
 
 
@@ -248,6 +258,31 @@ def test_espn_http_errors_mapped(client, espn_status, api_status):
         resp = client.post("/api/draft/espn", json=REQUEST)
     assert resp.status_code == api_status
     assert "detail" in resp.json()
+
+
+def test_login_redirect_to_disney_host_maps_to_401(client):
+    """Expired cookies often 302 to ESPN's Disney login instead of 401 —
+    treat the followed redirect as an auth failure, not a 502."""
+    with _patch_espn(
+        status_code=200, payload={},
+        redirected_to="https://cdn.registerdisney.go.com/v4/login",
+    ), _patch_players():
+        resp = client.post("/api/draft/espn", json=REQUEST)
+    assert resp.status_code == 401
+    assert "expired" in resp.json()["detail"].lower()
+
+
+def test_login_redirect_to_html_maps_to_401(client):
+    """A followed redirect that returns an HTML body where JSON is expected
+    is the unauthenticated login page, not a genuine API response."""
+    with _patch_espn(
+        status_code=200,
+        redirected_to="https://www.espn.com/login",
+        content_type="text/html; charset=utf-8",
+    ), _patch_players():
+        resp = client.post("/api/draft/espn", json=REQUEST)
+    assert resp.status_code == 401
+    assert "expired" in resp.json()["detail"].lower()
 
 
 def _mock_lobby_payload(owner_swid=None):

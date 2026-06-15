@@ -18,6 +18,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { testEspnConnection } from '../api'
 import styles from './DraftSync.module.css'
 
 const STORAGE_KEY = 'beersheet_espn_sync'
@@ -81,11 +82,13 @@ function agoLabel(ts, now) {
 
 export default function DraftSync({ espnSync, defaultSeason = null }) {
   const {
-    status, teams, myTeamId, setMyTeamId, error, lastSyncAtRef, pickCount,
-    replayTotal, connect, disconnect, retry,
+    status, teams, myTeamId, setMyTeamId, error, authExpired, lastSyncAtRef,
+    pickCount, replayTotal, connect, disconnect, retry,
   } = espnSync
   const [open, setOpen] = useState(false)
   const [showPrivate, setShowPrivate] = useState(false)
+  // Pre-flight result: null | { state: 'testing'|'ok'|'fail', msg }
+  const [test, setTest] = useState(null)
   const [form, setForm] = useState(() => {
     const saved = loadSaved()
     return {
@@ -123,7 +126,38 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
     if (form.mock) setShowPrivate(false)
   }, [form.mock])
 
-  const update = (field, value) => setForm(f => ({ ...f, [field]: value }))
+  const update = (field, value) => {
+    setForm(f => ({ ...f, [field]: value }))
+    // A stale pass/fail must not linger once the inputs it judged have changed.
+    setTest(null)
+  }
+
+  // Pre-flight: validate league access (and cookies, for private leagues)
+  // before the draft starts, so a stale espn_s2/SWID surfaces here instead of
+  // on the first mid-draft poll.
+  const handleTest = async () => {
+    if (!form.leagueId || !form.season) return
+    setTest({ state: 'testing', msg: 'Checking ESPN…' })
+    const res = await testEspnConnection(form)
+    if (res.ok) {
+      setTest({ state: 'ok', msg: '✅ League reachable — credentials look good.' })
+    } else if (res.status === 401) {
+      setTest({ state: 'fail', msg: '⚠️ Expired or wrong cookies — refresh espn_s2 / SWID and try again.' })
+    } else if (res.status === 404) {
+      setTest({ state: 'fail', msg: 'League not found — check the league ID and season.' })
+    } else {
+      setTest({ state: 'fail', msg: res.detail || 'Could not validate the connection — try again.' })
+    }
+  }
+
+  // From the auth-expired chip: drop the dead session and reopen the form with
+  // the private section expanded so the user can paste fresh cookies.
+  const handleReconnect = () => {
+    setTest(null)
+    setShowPrivate(true)
+    setOpen(true)
+    disconnect()
+  }
 
   const handleConnect = (e) => {
     e.preventDefault()
@@ -275,6 +309,26 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
                 </button>
               </div>
             )}
+            {!form.mock && (
+              <button
+                type="button"
+                className={styles.testBtn}
+                onClick={handleTest}
+                disabled={!form.leagueId || !form.season || test?.state === 'testing'}
+              >
+                {test?.state === 'testing' ? 'Testing…' : 'Test connection'}
+              </button>
+            )}
+            {test && test.state !== 'testing' && (
+              <p
+                className={`${styles.testMsg} ${
+                  test.state === 'ok' ? styles.testMsgOk : styles.testMsgFail
+                }`}
+                role="status"
+              >
+                {test.msg}
+              </p>
+            )}
             <button type="submit" className={styles.submitBtn} disabled={!form.leagueId || !form.season}>
               Connect
             </button>
@@ -303,7 +357,15 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
             ? `Connected · waiting for picks · ${agoLabel(lastSyncAt, now)}`
             : `Live · ${pickCount} picks · ${agoLabel(lastSyncAt, now)}`)}
         {status === 'complete' && `Draft complete · ${pickCount} picks`}
-        {status === 'error' && (
+        {status === 'error' && authExpired && (
+          <>
+            <span className={styles.errorText} title={error || 'Credentials expired'}>
+              Credentials expired — re-enter cookies
+            </span>
+            <button type="button" className={styles.linkBtn} onClick={handleReconnect}>reconnect</button>
+          </>
+        )}
+        {status === 'error' && !authExpired && (
           <>
             <span className={styles.errorText} title={error || 'Sync failed'}>
               {error || 'Sync failed'}

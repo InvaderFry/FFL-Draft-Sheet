@@ -1,0 +1,75 @@
+{
+  "positions": {
+    "QB": [
+      {
+        "sleeper_id": "qb1", "espn_id": "5083", "player_name": "Josh Allen", "pos": "QB", "team": "BUF",
+        "bye_week": 12, "mean_pts": 380.0, "baseline": 260.0, "val": 120.0, "floor": 100.0, "ceil": 140.0,
+        "ps_pct": 18.0, "n_sources": 4, "pos_rank": 1, "adp_rank": 18, "ecr_rank": 18, "ecr_fmt": "2|6",
+        "tier": 1, "tier_is_even": false, "auction_price": 22.0
+      },
+      {
+        "sleeper_id": "qb2", "espn_id": "3139477", "player_name": "Patrick Mahomes", "pos": "QB", "team": "KC",
+        "bye_week": 6, "mean_pts": 372.0, "baseline": 260.0, "val": 112.0, "floor": 95.0, "ceil": 132.0,
+        "ps_pct": 30.0, "n_sources": 4, "pos_rank": 2, "adp_rank": 26, "ecr_rank": 26, "ecr_fmt": "3|2",
+        "tier": 1, "tier_is_even": false, "auction_price": 18.0
+      }
+    ],
+    "RB": [
+      {
+        "sleeper_id": "4034", "espn_id": "3929630", "player_name": "Christian McCaffrey", "pos": "RB", "team": "SF",
+        "bye_week": 9, "mean_pts": 330.0, "baseline": 110.0, "val": 220.0, "floor": 180.0, "ceil": 260.0,
+        "ps_pct": 9.0, "n_sources": 4, "pos_rank": 1, "adp_rank": 1, "ecr_rank": 1, "ecr_fmt": "1|1",
+        "tier": 1, "tier_is_even": false, "auction_price": 58.0
+      },
+      {
+        "sleeper_id": "rb2", "espn_id": "4239993", "player_name": "Bijan Robinson", "pos": "RB", "team": "ATL",
+        "bye_week": 12, "mean_pts": 300.0, "baseline": 110.0, "val": 190.0, "floor": 160.0, "ceil": 225.0,
+        "ps_pct": 16.0, "n_sources": 4, "pos_rank": 2, "adp_rank": 3, "ecr_rank": 3, "ecr_fmt": "1|3",
+        "tier": 1, "tier_is_even": false, "auction_price": 52.0
+      }
+    ],
+    "WR": [
+      {
+        "sleeper_id": "6794", "espn_id": "4262921", "player_name": "Justin Jefferson", "pos": "WR", "team": "MIN",
+        "bye_week": 6, "mean_pts": 310.0, "baseline": 120.0, "val": 190.0, "floor": 155.0, "ceil": 230.0,
+        "ps_pct": 11.0, "n_sources": 4, "pos_rank": 1, "adp_rank": 2, "ecr_rank": 2, "ecr_fmt": "1|2",
+        "tier": 1, "tier_is_even": false, "auction_price": 54.0
+      },
+      {
+        "sleeper_id": "wr2", "espn_id": "4430807", "player_name": "Ja'Marr Chase", "pos": "WR", "team": "CIN",
+        "bye_week": 10, "mean_pts": 305.0, "baseline": 120.0, "val": 185.0, "floor": 150.0, "ceil": 225.0,
+        "ps_pct": 17.0, "n_sources": 4, "pos_rank": 2, "adp_rank": 4, "ecr_rank": 4, "ecr_fmt": "1|4",
+        "tier": 1, "tier_is_even": false, "auction_price": 51.0
+      }
+    ],
+    "TE": [
+      {
+        "sleeper_id": "te1", "espn_id": "15847", "player_name": "Travis Kelce", "pos": "TE", "team": "KC",
+        "bye_week": 6, "mean_pts": 210.0, "baseline": 95.0, "val": 115.0, "floor": 90.0, "ceil": 145.0,
+        "ps_pct": 22.0, "n_sources": 4, "pos_rank": 1, "adp_rank": 22, "ecr_rank": 22, "ecr_fmt": "2|10",
+        "tier": 1, "tier_is_even": false, "auction_price": 20.0
+      }
+    ],
+    "DST": [
+      {
+        "sleeper_id": null, "espn_id": "-16025", "player_name": "SF DST", "pos": "DST", "team": "SF",
+        "bye_week": 9, "mean_pts": 140.0, "baseline": 95.0, "val": 45.0, "floor": 30.0, "ceil": 62.0,
+        "ps_pct": 28.0, "n_sources": 3, "pos_rank": 1, "adp_rank": 120, "ecr_rank": 120, "ecr_fmt": "10|12",
+        "tier": 1, "tier_is_even": false, "auction_price": 2.0
+      }
+    ]
+  },
+  "metadata": {
+    "season": 2026, "n_teams": 12, "ppr": 0.5,
+    "sources_used": ["FantasyPros", "ESPN", "NumberFire"], "sources_dropped": ["FFToday"],
+    "source_statuses": [
+      { "source": "FantasyPros", "status": "used", "used": true, "positions": ["QB", "RB", "WR", "TE", "DST"], "reason": null, "failures": [] },
+      { "source": "ESPN", "status": "used", "used": true, "positions": ["QB", "RB", "WR", "TE", "DST"], "reason": null, "failures": [] },
+      { "source": "NumberFire", "status": "used", "used": true, "positions": ["QB", "RB", "WR"], "reason": null, "failures": [] },
+      { "source": "FFToday", "status": "unavailable", "used": false, "positions": [], "reason": "HTTP 403", "failures": [{ "position": "RB", "reason": "HTTP 403" }] }
+    ],
+    "baselines": { "QB": 260.0, "RB": 110.0, "WR": 120.0, "TE": 95.0, "DST": 95.0 },
+    "data_quality_warnings": [],
+    "adp_available": true, "cache_hit": false, "generation_time_s": 1.4
+  }
+}

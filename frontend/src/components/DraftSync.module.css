@@ -163,6 +163,41 @@
   cursor: default;
 }
 
+.testBtn {
+  background: none;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: 5px;
+  font-size: 11px;
+  font-family: var(--font-display);
+  color: var(--c-text-muted);
+  cursor: pointer;
+}
+
+.testBtn:hover:not(:disabled) {
+  color: var(--c-text);
+  border-color: var(--c-border2);
+}
+
+.testBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.testMsg {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--c-surface2);
+  border: 1px solid var(--c-border);
+  color: var(--c-text-muted);
+}
+
+.testMsgOk { color: #3fb950; }
+.testMsgFail { color: #f85149; }
+
 .chip {
   display: inline-flex;
   align-items: center;
