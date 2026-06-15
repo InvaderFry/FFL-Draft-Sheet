@@ -219,10 +219,17 @@ creates for the mock. Connecting with your home league ID while you mock
 draft will sync your *league's* draft (which hasn't started), not the mock
 room, so the sheet sits at "waiting for picks."
 
-You can try the `leagueId` from the mock draft room's URL, but ESPN doesn't
-officially expose mock leagues through its API, so it may come back as
-"league not found." The practice replay above is the dependable way to
-rehearse.
+For live mock-lobby sync, use the `leagueId` from the mock draft room's URL,
+install the browser tap userscript, and check **Live ESPN mock draft** in the
+Draft Sync panel. The userscript forwards mock-draft picks from your browser's
+existing ESPN socket and strips the credential-bearing join token down to only
+your team id, which lets the **My team** picker auto-fill when the script
+loads before the draft starts. See
+[`docs/mock-draft-live-sync-setup.md`](docs/mock-draft-live-sync-setup.md) for
+the setup steps.
+
+Practice replay is still the dependable way to rehearse without depending on
+a live ESPN mock room.
 
 ---
 

@@ -1,5 +1,6 @@
 """Tests for the ESPN draft-room userscript ingest layer (espn_ws)."""
 
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -32,10 +33,12 @@ def clear_sessions():
     ("LEFT 6 {69C876B8-2558-4F66-8876-B82558AF664E} 0\n", None),
     ("AUTODRAFT 12 false\n", None),
     ("PONG PING%201781294100752\n", None),
-    ("TOKEN 1:1242111363:12:" + SWID + ":1821426335\n", None),
+    ("TOKEN 12\n", ("token", 12)),
+    ("TOKEN 1:1242111363:12:" + SWID + ":1821426335\n", ("token", 12)),
     ("DRAFT_LIST 4429160 4241389\n", None),
     ("", None),
     ("SELECTED garbage not-an-int\n", None),  # malformed -> noise, not a crash
+    ("TOKEN 1:1242111363:not-a-team:" + SWID + ":1821426335\n", None),
 ])
 def test_parse_frame(line, expected):
     assert espn_ws.parse_frame(line) == expected
@@ -73,6 +76,73 @@ def test_ingest_accumulates_ordered_deduped_enriched_picks():
     assert status.picks[0].pos == "RB"
     assert status.picks[1].player_name == "CeeDee Lamb"
     assert status.teams[0].name == "First Team"
+    assert status.my_team_id == "12"
+
+
+def test_token_sets_my_team_id_without_creating_pick_or_retaining_swid():
+    espn_ws.ingest(1242111363, 2026, [
+        "TOKEN 1:1242111363:12:" + SWID + ":1821426335\n",
+    ])
+
+    session = espn_ws._sessions[(1242111363, 2026)]
+    status = espn_ws.snapshot(1242111363, 2026)
+
+    assert session.my_team_id == "12"
+    assert status.my_team_id == "12"
+    assert status.picks == []
+    assert status.teams == [DraftTeam(team_id="12", name="Team 12")]
+    assert SWID not in repr(session)
+    assert SWID not in status.model_dump_json()
+
+
+def test_malformed_raw_token_does_not_log_swid(caplog):
+    caplog.set_level(logging.DEBUG, logger="app.providers.espn_ws")
+
+    assert espn_ws.parse_frame(
+        "TOKEN 1:1242111363:not-a-team:" + SWID + ":1821426335\n",
+    ) is None
+
+    assert SWID not in caplog.text
+
+
+def test_snapshot_synthesizes_teams_from_picks_and_my_team_when_missing():
+    directory = {
+        "3929630": {"name": "Christian McCaffrey", "pos": "RB", "team": "SF"},
+        "4426515": {"name": "CeeDee Lamb", "pos": "WR", "team": "DAL"},
+    }
+    lines = [
+        "TOKEN 7\n",
+        "STATE 1\n",
+        "SELECTED 3 3929630 2\n",
+        "SELECTED 10 4426515 4\n",
+    ]
+    with patch("app.providers.espn.get_player_by_espn_id", return_value=None), patch(
+        "app.providers.espn_ws.load_espn_directory", return_value=directory,
+    ):
+        espn_ws.ingest(1242111363, 2026, lines)
+
+    status = espn_ws.snapshot(1242111363, 2026)
+
+    assert status.my_team_id == "7"
+    assert [team.team_id for team in status.teams] == ["3", "7", "10"]
+    assert [team.name for team in status.teams] == ["Team 3", "Team 7", "Team 10"]
+
+
+def test_snapshot_synthesizes_my_team_when_token_arrives_after_picks():
+    with patch("app.providers.espn.get_player_by_espn_id", return_value=None), patch(
+        "app.providers.espn_ws.load_espn_directory", return_value={},
+    ):
+        espn_ws.ingest(1242111363, 2026, [
+            "STATE 1\n",
+            "SELECTED 3 3929630 2\n",
+            "SELECTED 10 4426515 4\n",
+            "TOKEN 7\n",
+        ])
+
+    status = espn_ws.snapshot(1242111363, 2026)
+
+    assert status.my_team_id == "7"
+    assert [team.team_id for team in status.teams] == ["3", "7", "10"]
 
 
 def test_complete_flag_flips_snapshot_out_of_in_progress():

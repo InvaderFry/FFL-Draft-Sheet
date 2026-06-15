@@ -90,6 +90,8 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   // state would re-render the whole board every 5s for a value only the
   // status chip (which has its own 1s ticker) reads.
   const lastSyncAtRef = useRef(null)
+  const myTeamIdRef = useRef(myTeamId)
+  myTeamIdRef.current = myTeamId
 
   const settingsRef = useRef(null)
   const timerRef = useRef(null)
@@ -225,6 +227,9 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
       })
 
       setTeams(prev => sameTeams(prev, data.teams || []) ? prev : (data.teams || []))
+      if (data.my_team_id != null && !myTeamIdRef.current) {
+        setMyTeamId(String(data.my_team_id))
+      }
       lastSyncAtRef.current = Date.now()
       setError(null)
       setAuthExpired(false)
@@ -283,6 +288,9 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
     // A fresh object per connect, so in-flight polls from a previous session
     // fail the identity check and abandon their responses.
     settingsRef.current = { ...settings }
+    const initialMyTeamId = settings.myTeamId ? String(settings.myTeamId) : null
+    myTeamIdRef.current = initialMyTeamId
+    setMyTeamId(initialMyTeamId)
     failuresRef.current = 0
     stoppedRef.current = false
     replayRef.current = null

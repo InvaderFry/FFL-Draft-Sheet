@@ -36,7 +36,7 @@ GET /seasons/{season}/segments/0/leagues/{leagueId}?view=...
 |---|---|---|
 | League endpoint, `view=mDraftDetail&view=mTeams` | `backend/app/providers/espn.py` | Draft picks (`draftDetail.picks`, `inProgress`, `drafted`) and team names. Lean payload, safe to poll. |
 | `GET /seasons/{season}/players` | `backend/app/data/espn_players.py` | Player-id → name/pos/team directory, used as a fallback when the Sleeper bridge can't identify a pick. |
-| `POST /api/draft/espn/ingest` | `backend/app/providers/espn_ws.py` | Browser userscript ingress for mock-draft socket lines (`SELECTED`, `SELECTING`, `STATE`). |
+| `POST /api/draft/espn/ingest` | `backend/app/providers/espn_ws.py` | Browser userscript ingress for mock-draft socket lines (`SELECTED`, `SELECTING`, `STATE`, sanitized `TOKEN <teamId>`). |
 
 For regular drafts, the frontend polls the backend proxy
 (`POST /api/draft/espn`) every ~5s during a draft; the backend is a stateless
@@ -118,10 +118,13 @@ sheet tab
 
 The Tampermonkey userscript runs at `document-start`, wraps `window.WebSocket`,
 listens only to sockets whose URL contains `fantasydraft.espn.com`, and
-forwards `SELECTED` / `SELECTING` / `STATE` lines to the sheet backend. The
-backend reuses the same `parse_frame` decoder and pick enrichment path as the
-old socket client. No ESPN cookies are sent to the sheet backend for mock
-drafts; the browser is already authenticated to ESPN.
+forwards `SELECTED` / `SELECTING` / `STATE` lines to the sheet backend. It
+also rewrites ESPN's credential-bearing `TOKEN 1:{leagueId}:{teamId}:{SWID}:{token}`
+frame to `TOKEN <teamId>` before enqueueing it, so the backend can identify
+the user's team without receiving the SWID or socket token. The backend reuses
+the same `parse_frame` decoder and pick enrichment path as the old socket
+client. No ESPN cookies are sent to the sheet backend for mock drafts; the
+browser is already authenticated to ESPN.
 
 Mock-lobby leagues are identifiable in the response:
 
@@ -143,6 +146,9 @@ Known limitations:
   set to the deployed backend base URL.
 - Picks made before the userscript loads are not captured. Install it and
   load the ESPN draft page before the draft starts.
+- If the userscript loads after the room's `TOKEN` frame, the sheet can still
+  synthesize numbered teams from picks, but you may need to choose **My team**
+  manually.
 - Navigating away from the draft page closes the browser socket. The
   userscript posts `complete: true` on close, so the sheet ends that sync
   session.
@@ -183,8 +189,10 @@ Notes:
   (2 = RB, 4 = WR observed); not needed when the player map has the id.
 - This app no longer joins the room. The userscript reads the browser's own
   socket frames and accumulates `SELECTED` events into the same `DraftStatus`
-  the polling endpoint already serves. Connect **before the draft starts** —
-  INIT is undecoded, so picks made before the tap loads are unavailable.
+  the polling endpoint already serves. It forwards only the team id from
+  `TOKEN`, never the SWID/token credential. Connect **before the draft
+  starts** — INIT is undecoded, so picks made before the tap loads are
+  unavailable.
 
 For regular (non-mock) leagues, REST polling remains the path: it works for
 public leagues with zero credentials and keeps the backend stateless.

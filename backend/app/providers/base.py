@@ -42,6 +42,7 @@ class DraftStatus(BaseModel):
     complete: bool
     picks: list[DraftPick] = Field(default_factory=list)
     teams: list[DraftTeam] = Field(default_factory=list)
+    my_team_id: str | None = None
     fetched_at: float  # unix timestamp, lets the UI show "synced Xs ago"
 
 

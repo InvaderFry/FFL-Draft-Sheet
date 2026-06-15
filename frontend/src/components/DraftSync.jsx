@@ -166,7 +166,9 @@ export default function DraftSync({ espnSync, defaultSeason = null }) {
     // Carry the saved team choice forward only when reconnecting to the
     // league it belongs to.
     const myTeam = saved?.leagueId === form.leagueId ? saved?.myTeamId ?? null : null
-    const connectSettings = form.mock ? { ...form, espn_s2: '', swid: '' } : form
+    const connectSettings = form.mock
+      ? { ...form, myTeamId: myTeam, espn_s2: '', swid: '' }
+      : { ...form, myTeamId: myTeam }
     persist({ ...connectSettings, myTeamId: myTeam })
     setOpen(false)
     connect(connectSettings)
