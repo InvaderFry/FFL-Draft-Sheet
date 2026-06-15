@@ -41,8 +41,9 @@ def parse_frame(line: str) -> tuple | None:
     """Decode one socket line into an event tuple, or None for room noise.
 
     Events: ("selected", team_id, player_id), ("selecting", team_id),
-    ("state", n). Malformed lines are treated as noise — the protocol is
-    undocumented, so never let a surprise frame kill the session.
+    ("state", n), ("token", team_id). Malformed lines are treated as noise —
+    the protocol is undocumented, so never let a surprise frame kill the
+    session.
     """
     parts = line.strip().split()
     if not parts:
@@ -55,7 +56,14 @@ def parse_frame(line: str) -> tuple | None:
             return ("selecting", int(parts[1]))
         if verb == "STATE" and len(parts) >= 2:
             return ("state", int(parts[1]))
+        if verb == "TOKEN" and len(parts) >= 2:
+            token_parts = parts[1].split(":")
+            team_id = token_parts[2] if len(token_parts) >= 3 else parts[1]
+            return ("token", int(team_id))
     except ValueError:
+        if verb == "TOKEN":
+            logger.debug("Unparseable draft-room TOKEN frame")
+            return None
         logger.debug("Unparseable draft-room frame: %.80s", line)
         return None
     return None
@@ -72,6 +80,7 @@ class IngestSession:
     seen_player_ids: set[int] = field(default_factory=set)
     in_progress: bool = False
     complete: bool = False
+    my_team_id: str | None = None
     last_updated: float = field(default_factory=time.time)
     last_polled: float = field(default_factory=time.time)
 
@@ -94,7 +103,8 @@ class IngestSession:
             in_progress=self.in_progress and not self.complete,
             complete=self.complete,
             picks=list(self.picks),
-            teams=list(self.teams),
+            teams=self._status_teams(),
+            my_team_id=self.my_team_id,
             fetched_at=time.time(),
         )
 
@@ -102,6 +112,9 @@ class IngestSession:
         if event is None:
             return
         kind = event[0]
+        if kind == "token":
+            self.my_team_id = str(event[1])
+            return
         if kind in ("state", "selecting"):
             if not self.complete:
                 self.in_progress = True
@@ -129,6 +142,24 @@ class IngestSession:
         self.seen_player_ids.add(player_id)
         self.in_progress = True
         self.picks.append(pick)
+
+    def _status_teams(self) -> list[DraftTeam]:
+        if self.teams:
+            return list(self.teams)
+        team_ids = {pick.team_id for pick in self.picks}
+        if self.my_team_id is not None:
+            team_ids.add(self.my_team_id)
+        return [
+            DraftTeam(team_id=team_id, name=f"Team {team_id}")
+            for team_id in sorted(team_ids, key=_team_sort_key)
+        ]
+
+
+def _team_sort_key(team_id: str) -> tuple[int, int | str]:
+    try:
+        return (0, int(team_id))
+    except ValueError:
+        return (1, team_id)
 
 
 _sessions: dict[tuple[int, int], IngestSession] = {}

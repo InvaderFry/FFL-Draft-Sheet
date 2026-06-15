@@ -18,7 +18,9 @@ const TEAMS = [
   { team_id: '7', name: 'Old School Squad', abbrev: 'OLD' },
 ]
 
-function draftResponse({ picks = [], inProgress = true, complete = false } = {}) {
+function draftResponse({
+  picks = [], inProgress = true, complete = false, teams = TEAMS, myTeamId = null,
+} = {}) {
   return {
     ok: true,
     status: 200,
@@ -27,7 +29,8 @@ function draftResponse({ picks = [], inProgress = true, complete = false } = {})
       in_progress: inProgress,
       complete,
       picks,
-      teams: TEAMS,
+      teams,
+      my_team_id: myTeamId,
       fetched_at: Date.now() / 1000,
     }),
   }
@@ -138,6 +141,54 @@ describe('useEspnDraftSync', () => {
       teamName: 'Team Derrick',
       overall: 1,
     })
+  })
+
+  it('auto-selects backend-detected my_team_id when none is chosen', async () => {
+    fetchMock.mockResolvedValue(draftResponse({
+      picks: [CMC_PICK],
+      teams: [
+        { team_id: '4', name: 'Team 4' },
+        { team_id: '7', name: 'Team 7' },
+      ],
+      myTeamId: 7,
+    }))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2026, mock: true }))
+    await flush()
+
+    expect(result.current.teams).toMatchObject([
+      { team_id: '4', name: 'Team 4' },
+      { team_id: '7', name: 'Team 7' },
+    ])
+    expect(result.current.myTeamId).toBe('7')
+  })
+
+  it('does not override an already-selected team with backend my_team_id', async () => {
+    fetchMock
+      .mockResolvedValueOnce(draftResponse({ picks: [CMC_PICK] }))
+      .mockResolvedValueOnce(draftResponse({ picks: [CMC_PICK], myTeamId: 7 }))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({ leagueId: '123', season: 2026, mock: true }))
+    await flush()
+    act(() => result.current.setMyTeamId('4'))
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+
+    expect(result.current.myTeamId).toBe('4')
+  })
+
+  it('does not override a saved team supplied in connect settings', async () => {
+    fetchMock.mockResolvedValue(draftResponse({ picks: [CMC_PICK], myTeamId: 7 }))
+    const { result } = renderSync()
+
+    act(() => result.current.connect({
+      leagueId: '123', season: 2026, mock: true, myTeamId: '4',
+    }))
+    await flush()
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).not.toHaveProperty('myTeamId')
+    expect(result.current.myTeamId).toBe('4')
   })
 
   it('matches a backend-named pick to its sheet row by name+pos when espn_id misses', async () => {

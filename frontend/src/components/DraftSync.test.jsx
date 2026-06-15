@@ -34,6 +34,8 @@ describe('DraftSync', () => {
   beforeEach(() => {
     // The connect form is collapsed behind the "Sync ESPN draft" button.
     // Tests that need the form open click it first.
+    localStorage.clear()
+    sessionStorage.clear()
   })
 
   afterEach(() => {
@@ -73,6 +75,29 @@ describe('DraftSync', () => {
     expect(screen.getByRole('button', { name: /Test connection/i })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('checkbox', { name: /Live ESPN mock draft/i }))
     expect(screen.queryByRole('button', { name: /Test connection/i })).not.toBeInTheDocument()
+  })
+
+  it('carries a saved team choice into connect settings for the same league', async () => {
+    const connect = vi.fn()
+    localStorage.setItem('beersheet_espn_sync', JSON.stringify({
+      leagueId: '99887766',
+      season: 2026,
+      mock: true,
+      myTeamId: '7',
+    }))
+    render(<DraftSync espnSync={makeSync({ connect })} />)
+    await openForm()
+
+    await userEvent.click(screen.getByRole('button', { name: /^Connect$/i }))
+
+    expect(connect).toHaveBeenCalledWith(expect.objectContaining({
+      leagueId: '99887766',
+      season: 2026,
+      mock: true,
+      myTeamId: '7',
+      espn_s2: '',
+      swid: '',
+    }))
   })
 
   it('shows a distinct reconnect affordance when auth expired', async () => {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FFL Draft Sheet ESPN Draft Tap
 // @namespace    https://github.com/InvaderFry/FFL-Draft-Sheet
-// @version      0.2.0
+// @version      0.3.0
 // @description  Forward ESPN mock draft socket pick lines to FFL Draft Sheet.
 // @match        https://fantasy.espn.com/football/draft*
 // @run-at       document-start
@@ -132,12 +132,25 @@
   // ---------- frame accumulation ----------
 
   function wantedLine(line) {
-    return /^(SELECTED|SELECTING|STATE)\b/.test(line.trim())
+    return /^(SELECTED|SELECTING|STATE|TOKEN)\b/.test(line.trim())
+  }
+
+  function sanitizeLine(line) {
+    const trimmed = line.trim()
+    if (!trimmed.startsWith('TOKEN')) return trimmed
+    const parts = trimmed.split(/\s+/)
+    if (parts.length < 2) return null
+    const tokenParts = parts[1].split(':')
+    const teamId = tokenParts.length >= 3 ? tokenParts[2] : parts[1]
+    return /^\d+$/.test(teamId) ? `TOKEN ${teamId}` : null
   }
 
   function enqueue(lines) {
     for (const line of lines) {
-      if (wantedLine(line)) pending.push(line.trim())
+      if (wantedLine(line)) {
+        const sanitized = sanitizeLine(line)
+        if (sanitized) pending.push(sanitized)
+      }
     }
     if (pending.length === 0) return
     if (timer) clearTimeout(timer)
