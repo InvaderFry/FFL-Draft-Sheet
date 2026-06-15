@@ -113,7 +113,10 @@ FFL tap: 12 picks sent
 ```
 
 The sheet tab shows picks accumulating in the **Draft Sync** panel in real
-time. You don't need to do anything else.
+time. If the script was running when ESPN sent the room's join token, the
+**My team** picker auto-fills from that sanitized team id. If it still says
+**My team...**, choose your numbered team manually; the sheet can still infer
+the selectable teams from picks.
 
 ---
 
@@ -135,6 +138,7 @@ and the sheet marks the session complete and stops polling.
 | Pill says "missing leagueId" | Page URL missing `leagueId` param | Use ESPN's built-in draft lobby link |
 | Pill says "send failed – retrying" on localhost | Old script missing `GM_xmlhttpRequest` grant (mixed-content block) | Delete old script, reinstall from `tools/espn-draft-tap.user.js` |
 | Pill counter stays at 0 | Opened the draft page after picks started | Refresh the ESPN tab before the draft starts |
+| My team picker does not auto-fill | Old script version (pre-0.3.0) or the ESPN tab loaded after the `TOKEN` frame | Reinstall the userscript, then reload the ESPN tab before the draft starts; otherwise choose the numbered team manually |
 | Sheet shows 0 picks despite picks on pill | `mock_ingest` not checked | Check the "Live ESPN mock draft" box in Draft Sync |
 | CORS error in browser console | Backend URL has a trailing slash | Remove the trailing `/` from `SHEET_API` |
 | Sheet stops updating mid-draft | Navigated away from ESPN tab | Reload ESPN draft tab; picks resume on reconnect |

@@ -128,6 +128,23 @@ def test_snapshot_synthesizes_teams_from_picks_and_my_team_when_missing():
     assert [team.name for team in status.teams] == ["Team 3", "Team 7", "Team 10"]
 
 
+def test_snapshot_synthesizes_my_team_when_token_arrives_after_picks():
+    with patch("app.providers.espn.get_player_by_espn_id", return_value=None), patch(
+        "app.providers.espn_ws.load_espn_directory", return_value={},
+    ):
+        espn_ws.ingest(1242111363, 2026, [
+            "STATE 1\n",
+            "SELECTED 3 3929630 2\n",
+            "SELECTED 10 4426515 4\n",
+            "TOKEN 7\n",
+        ])
+
+    status = espn_ws.snapshot(1242111363, 2026)
+
+    assert status.my_team_id == "7"
+    assert [team.team_id for team in status.teams] == ["3", "7", "10"]
+
+
 def test_complete_flag_flips_snapshot_out_of_in_progress():
     with patch("app.providers.espn.get_player_by_espn_id", return_value=None), patch(
         "app.providers.espn_ws.load_espn_directory", return_value={},

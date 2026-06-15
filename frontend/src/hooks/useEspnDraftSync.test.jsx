@@ -87,6 +87,18 @@ describe('useEspnDraftSync', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(0) })
   }
 
+  function espnDraftPostCall() {
+    const call = fetchMock.mock.calls.find(([url, opts]) =>
+      String(url).endsWith('/api/draft/espn') && opts?.method === 'POST')
+    expect(call).toBeDefined()
+    return call
+  }
+
+  function espnDraftPostBody() {
+    const call = espnDraftPostCall()
+    return JSON.parse(call[1].body)
+  }
+
   it('connect() fetches immediately and maps picks onto the sheet', async () => {
     fetchMock.mockResolvedValue(draftResponse({ picks: [CMC_PICK, OFFSHEET_PICK] }))
     const { result } = renderSync()
@@ -96,7 +108,7 @@ describe('useEspnDraftSync', () => {
     await flush()
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [url, opts] = fetchMock.mock.calls[0]
+    const [url, opts] = espnDraftPostCall()
     expect(url).toContain('/api/draft/espn')
     expect(JSON.parse(opts.body)).toMatchObject({
       league_id: 123,
@@ -129,7 +141,7 @@ describe('useEspnDraftSync', () => {
     act(() => result.current.connect({ leagueId: '123', season: 2026, mock: true }))
     await flush()
 
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+    expect(espnDraftPostBody()).toMatchObject({
       league_id: 123,
       season: 2026,
       mock_ingest: true,
@@ -187,7 +199,7 @@ describe('useEspnDraftSync', () => {
     }))
     await flush()
 
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).not.toHaveProperty('myTeamId')
+    expect(espnDraftPostBody()).not.toHaveProperty('myTeamId')
     expect(result.current.myTeamId).toBe('4')
   })
 
