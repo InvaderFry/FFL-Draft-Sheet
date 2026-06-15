@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import PlayerTable from './PlayerTable'
 import styles from './PlayerTable.module.css'
 import { ThemeProvider } from '../context/ThemeContext'
@@ -24,18 +25,32 @@ function player(name, tier, tierIsEven, val = tier === 8 ? 0 : 40 - tier) {
   }
 }
 
-function renderTable(players, { minVal = 0, maxVal = 40, strategy = null } = {}) {
+function renderTable(players, {
+  minVal = 0,
+  maxVal = 40,
+  strategy = null,
+  search = '',
+  watchedOnly = false,
+  isWatched = () => false,
+  toggleWatch = vi.fn(),
+  isDrafted = () => false,
+  onToggle = vi.fn(),
+} = {}) {
   return render(
     <ThemeProvider>
       <PlayerTable
         players={players}
         nTeams={12}
-        isDrafted={() => false}
-        onToggle={vi.fn()}
+        isDrafted={isDrafted}
+        onToggle={onToggle}
         auctionMode={false}
         minVal={minVal}
         maxVal={maxVal}
         strategy={strategy}
+        search={search}
+        watchedOnly={watchedOnly}
+        isWatched={isWatched}
+        toggleWatch={toggleWatch}
       />
     </ThemeProvider>
   )
@@ -78,6 +93,41 @@ describe('PlayerTable', () => {
     expect(valCells[0]).not.toHaveStyle({ backgroundColor: 'rgba(96, 165, 250, 0.3)' })
     expect(valCells[0].style.backgroundColor).toBe('')
     expect(valCells[1].style.backgroundColor).toBe('')
+  })
+
+  it('filters visible rows by player name case-insensitively', () => {
+    renderTable([
+      player('Patrick Mahomes', 1, false),
+      player('Josh Allen', 1, false),
+    ], { search: 'allen' })
+
+    expect(screen.getByText('Josh Allen')).toBeInTheDocument()
+    expect(screen.queryByText('Patrick Mahomes')).not.toBeInTheDocument()
+  })
+
+  it('toggles the star watchlist button without drafting the player', async () => {
+    const user = userEvent.setup()
+    const toggleWatch = vi.fn()
+    const onToggle = vi.fn()
+    renderTable([player('Patrick Mahomes', 1, false)], { toggleWatch, onToggle })
+
+    await user.click(screen.getByRole('button', { name: /add patrick mahomes to watchlist/i }))
+
+    expect(toggleWatch).toHaveBeenCalledWith('patrick-mahomes')
+    expect(onToggle).not.toHaveBeenCalled()
+  })
+
+  it('filters to watched players only', () => {
+    renderTable([
+      player('Watched Sleeper', 1, false),
+      player('Unwatched Player', 1, false),
+    ], {
+      watchedOnly: true,
+      isWatched: id => id === 'watched-sleeper',
+    })
+
+    expect(screen.getByText('Watched Sleeper')).toBeInTheDocument()
+    expect(screen.queryByText('Unwatched Player')).not.toBeInTheDocument()
   })
 
   describe('survival markers', () => {

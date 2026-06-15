@@ -135,3 +135,25 @@
   color: var(--c-red);
   font-family: var(--font-data);
 }
+
+@media (max-width: 768px) {
+  .panel {
+    width: 100%;
+    max-height: 280px;
+    border-left: none;
+    border-top: 1px solid var(--c-border);
+  }
+
+  .header {
+    padding: 8px 10px;
+  }
+
+  .item {
+    min-height: 34px;
+    padding: 7px 10px;
+  }
+
+  .strategy {
+    padding: 8px 10px;
+  }
+}

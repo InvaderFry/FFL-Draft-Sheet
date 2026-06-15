@@ -13,6 +13,7 @@ import DraftedPanel from './DraftedPanel'
 import DraftSync from './DraftSync'
 import Legend from './Legend'
 import { useTheme } from '../context/ThemeContext'
+import { downloadCsv, toCsv } from '../utils/exportCsv'
 import { valRangeFromPositions } from '../utils/valGradient'
 import {
   currentOverall,
@@ -82,10 +83,14 @@ export default function DraftBoard({
   onRemoveDrafted,
   draftedList = [],
   espnSync = null,
+  isWatched = () => false,
+  toggleWatch = () => {},
 }) {
   const { posColors } = useTheme()
   const [activePos, setActivePos] = useState('ALL')
   const [sourceDetailsOpen, setSourceDetailsOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [watchedOnly, setWatchedOnly] = useState(false)
 
   const { positions, metadata } = sheetData
   const players = positions[activePos] || []
@@ -96,6 +101,15 @@ export default function DraftBoard({
     () => valRangeFromPositions(positions),
     [positions]
   )
+  const playersById = useMemo(() => {
+    const lookup = new Map()
+    for (const rows of Object.values(positions)) {
+      for (const player of rows) {
+        lookup.set(player.sleeper_id || player.player_name, player)
+      }
+    }
+    return lookup
+  }, [positions])
   const sourceCount = sourceDetails.used.length
 
   // Strategy tools need a chosen "My Team". Roster needs/byes are useful in any
@@ -106,27 +120,44 @@ export default function DraftBoard({
   const rosterActive = !!myTeamId &&
     (espnSync?.status === 'connected' || espnSync?.status === 'complete')
   const snakeLive = !!myTeamId && espnSync?.status === 'connected' && !auctionMode
+  const myTeamPicks = useMemo(() => {
+    if (!myTeamId) return []
+    return draftedList
+      .filter(p => p.teamId === myTeamId)
+      .sort((a, b) => (a.overall ?? Number.MAX_SAFE_INTEGER) - (b.overall ?? Number.MAX_SAFE_INTEGER))
+  }, [draftedList, myTeamId])
 
   const strategy = useMemo(() => {
     if (!rosterActive) return null
-    // id → bye_week across the whole sheet, so My Team picks can resolve byes.
-    const byeById = new Map()
-    for (const rows of Object.values(positions)) {
-      for (const p of rows) byeById.set(p.sleeper_id || p.player_name, p.bye_week)
-    }
-    const myPicks = draftedList.filter(p => p.teamId === myTeamId)
     return {
       currentPick: snakeLive ? currentOverall(draftedList) : null,
       nextPick: snakeLive ? nextUserPickOverall(draftedList, myTeamId, nTeams) : null,
       runs: snakeLive ? positionRunsSinceLastPick(draftedList, myTeamId, nTeams) : null,
-      needs: rosterNeeds(myPicks, config, id => byeById.get(id)),
+      needs: rosterNeeds(myTeamPicks, config, id => playersById.get(id)?.bye_week),
     }
-  }, [rosterActive, snakeLive, myTeamId, draftedList, nTeams, positions, config])
+  }, [rosterActive, snakeLive, draftedList, myTeamId, nTeams, myTeamPicks, playersById, config])
 
   // The per-row survival marker only needs the two pick numbers.
   const tableStrategy = strategy && strategy.nextPick != null
     ? { currentPick: strategy.currentPick, nextPick: strategy.nextPick }
     : null
+
+  const handleExportCsv = () => {
+    const headers = ['Overall', 'Pos', 'Player', 'Team', 'Bye', 'Value']
+    const rows = myTeamPicks.map((pick) => {
+      const player = playersById.get(pick.id)
+      return [
+        pick.overall ?? '',
+        pick.pos || player?.pos || '',
+        pick.name || player?.player_name || '',
+        player?.team || '',
+        player?.bye_week ?? '',
+        player?.val ?? '',
+      ]
+    })
+    const date = new Date().toISOString().slice(0, 10)
+    downloadCsv(`draft-roster-${date}.csv`, toCsv(headers, rows))
+  }
 
   return (
     <div className={styles.board}>
@@ -227,13 +258,36 @@ export default function DraftBoard({
           {count > 0 && (
             <span className={styles.draftCount}>
               {count} drafted —{' '}
-              <button className={styles.clearBtn} onClick={clear}>clear</button>
+              <button type="button" className={styles.clearBtn} onClick={clear}>clear</button>
             </span>
           )}
         </div>
         <div className={styles.actions}>
-          <button className={styles.printBtn} onClick={onPrint}>
-            🖨 Print Sheet
+          <div className={styles.filters}>
+            <input
+              type="search"
+              className={styles.searchInput}
+              aria-label="Search players"
+              placeholder="Search players"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <button
+              type="button"
+              className={`${styles.watchToggle} ${watchedOnly ? styles.watchToggleActive : ''}`}
+              aria-pressed={watchedOnly}
+              onClick={() => setWatchedOnly(active => !active)}
+            >
+              ★ only
+            </button>
+          </div>
+          {myTeamPicks.length > 0 && (
+            <button type="button" className={styles.printBtn} onClick={handleExportCsv}>
+              Export CSV
+            </button>
+          )}
+          <button type="button" className={styles.printBtn} onClick={onPrint}>
+            Print Sheet
           </button>
         </div>
       </div>
@@ -303,6 +357,10 @@ export default function DraftBoard({
               minVal={minVal}
               maxVal={maxVal}
               strategy={tableStrategy}
+              search={search}
+              watchedOnly={watchedOnly}
+              isWatched={isWatched}
+              toggleWatch={toggleWatch}
             />
           ) : (
             <PlayerTable
@@ -315,6 +373,10 @@ export default function DraftBoard({
               minVal={minVal}
               maxVal={maxVal}
               strategy={tableStrategy}
+              search={search}
+              watchedOnly={watchedOnly}
+              isWatched={isWatched}
+              toggleWatch={toggleWatch}
               wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
             />
           )}

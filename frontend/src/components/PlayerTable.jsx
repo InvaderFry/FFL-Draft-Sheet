@@ -40,13 +40,34 @@ const COLUMNS = [
   { key: 'ps_pct',      label: 'PS%',    align: 'right',  width: '44px'  },
 ]
 
-export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auctionMode, wrapStyle, minVal = 0, maxVal = 0, strategy = null }) {
+export default function PlayerTable({
+  players,
+  nTeams,
+  isDrafted,
+  onToggle,
+  auctionMode,
+  wrapStyle,
+  minVal = 0,
+  maxVal = 0,
+  strategy = null,
+  search = '',
+  watchedOnly = false,
+  isWatched = () => false,
+  toggleWatch = () => {},
+}) {
   const { theme } = useTheme()
   const cols = auctionMode
     ? [...COLUMNS, { key: 'auction_price', label: '$', align: 'right', width: '42px' }]
     : COLUMNS
 
-  const visible = players.filter(p => !isDrafted(p.sleeper_id || p.player_name))
+  const searchTerm = search.trim().toLowerCase()
+  const visible = players.filter(p => {
+    const id = p.sleeper_id || p.player_name
+    if (isDrafted(id)) return false
+    if (watchedOnly && !isWatched(id)) return false
+    if (searchTerm && !p.player_name.toLowerCase().includes(searchTerm)) return false
+    return true
+  })
 
   return (
     <div className={styles.tableWrap} style={wrapStyle}>
@@ -69,20 +90,34 @@ export default function PlayerTable({ players, nTeams, isDrafted, onToggle, auct
             const ecrStyle = { color: ecrColorStyle(ecr) }
             const valStyle = valBgStyle(player.val, minVal, maxVal, theme)
             const psStyle  = psPctBgStyle(player.ps_pct, theme)
+            const id = player.sleeper_id || player.player_name
+            const watched = isWatched(id)
             const surv = strategy
               ? survivalMarker(player.adp_rank, strategy.currentPick, strategy.nextPick)
               : null
 
             return (
               <tr
-                key={player.sleeper_id || `${player.player_name}-${idx}`}
+                key={id || `${player.player_name}-${idx}`}
                 className={`${tierClass} ${isTierStart ? styles.tierStart : ''}`}
-                onClick={() => onToggle(player.sleeper_id || player.player_name, player.player_name, player.pos)}
+                onClick={() => onToggle(id, player.player_name, player.pos)}
                 title="Click to mark as drafted"
               >
                 <td className={styles.nameCell}>
+                  <button
+                    type="button"
+                    className={`${styles.starBtn} ${watched ? styles.watched : ''}`}
+                    aria-label={`${watched ? 'Remove' : 'Add'} ${player.player_name} ${watched ? 'from' : 'to'} watchlist`}
+                    title={watched ? 'Remove from watchlist' : 'Add to watchlist'}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      toggleWatch(id)
+                    }}
+                  >
+                    {watched ? '★' : '☆'}
+                  </button>
                   {surv && <span className={`${styles.survDot} ${surv.cls}`} title={surv.title} />}
-                  {player.player_name}
+                  <span className={styles.playerName}>{player.player_name}</span>
                 </td>
                 <td className={styles.teamCell}>
                   <span className={styles.team}>{player.team}</span>

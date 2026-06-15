@@ -50,3 +50,27 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    overflow-y: auto;
+  }
+
+  .splitCol,
+  .fullCol {
+    min-height: 100%;
+    border-bottom: 1px solid var(--c-border);
+  }
+}
+
+@media (max-width: 480px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .splitCol,
+  .fullCol {
+    border-right: none;
+  }
+}

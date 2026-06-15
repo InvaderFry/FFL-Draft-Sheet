@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import DraftBoard from './DraftBoard'
 import { ThemeProvider } from '../context/ThemeContext'
 
@@ -23,7 +24,25 @@ function player(name, pos, val) {
   }
 }
 
-function renderBoard(positions) {
+function sync(overrides = {}) {
+  return {
+    status: 'complete',
+    teams: [],
+    myTeamId: null,
+    setMyTeamId: vi.fn(),
+    error: null,
+    authExpired: false,
+    lastSyncAtRef: { current: null },
+    pickCount: 0,
+    replayTotal: null,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    retry: vi.fn(),
+    ...overrides,
+  }
+}
+
+function renderBoard(positions, props = {}) {
   return render(
     <ThemeProvider>
       <DraftBoard
@@ -32,6 +51,7 @@ function renderBoard(positions) {
         onPrint={vi.fn()}
         isDrafted={() => false}
         onToggle={vi.fn()}
+        {...props}
       />
     </ThemeProvider>
   )
@@ -50,5 +70,83 @@ describe('DraftBoard', () => {
 
     expect(screen.getByText('5.0')).toHaveStyle({ backgroundColor: 'rgba(96, 165, 250, 0.3)' })
     expect(screen.getByText('40.0')).toHaveStyle({ backgroundColor: 'rgba(251, 146, 60, 0.3)' })
+  })
+
+  it('searches visible rows from the board header', async () => {
+    const user = userEvent.setup()
+    renderBoard({
+      QB: [player('Patrick Mahomes', 'QB', 40), player('Josh Allen', 'QB', 39)],
+      RB: [player('Bijan Robinson', 'RB', 35)],
+      WR: [],
+      TE: [],
+      DST: [],
+    })
+
+    expect(screen.getByText('Patrick Mahomes')).toBeInTheDocument()
+    expect(screen.getByText('Josh Allen')).toBeInTheDocument()
+
+    await user.type(screen.getByRole('searchbox', { name: /search players/i }), 'mahomes')
+
+    expect(screen.getByText('Patrick Mahomes')).toBeInTheDocument()
+    expect(screen.queryByText('Josh Allen')).not.toBeInTheDocument()
+    expect(screen.queryByText('Bijan Robinson')).not.toBeInTheDocument()
+  })
+
+  it('filters the board to watched players only', async () => {
+    const user = userEvent.setup()
+    renderBoard({
+      QB: [player('Patrick Mahomes', 'QB', 40), player('Josh Allen', 'QB', 39)],
+      RB: [],
+      WR: [],
+      TE: [],
+      DST: [],
+    }, {
+      isWatched: id => id === 'qb-patrick-mahomes',
+    })
+
+    await user.click(screen.getByRole('button', { name: /only/i }))
+
+    expect(screen.getByText('Patrick Mahomes')).toBeInTheDocument()
+    expect(screen.queryByText('Josh Allen')).not.toBeInTheDocument()
+  })
+
+  it('only shows Export CSV when My Team has picks', () => {
+    const positions = {
+      QB: [player('Patrick Mahomes', 'QB', 40)],
+      RB: [],
+      WR: [],
+      TE: [],
+      DST: [],
+    }
+    const draftedList = [{
+      id: 'qb-patrick-mahomes',
+      name: 'Patrick Mahomes',
+      pos: 'QB',
+      source: 'espn',
+      teamId: 'team-1',
+      teamName: 'My Team',
+      overall: 4,
+    }]
+
+    const { rerender } = renderBoard(positions, {
+      espnSync: sync({ myTeamId: 'team-1', pickCount: 1 }),
+      draftedList,
+    })
+    expect(screen.getByRole('button', { name: /export csv/i })).toBeInTheDocument()
+
+    rerender(
+      <ThemeProvider>
+        <DraftBoard
+          sheetData={{ positions, metadata: { ppr: 0.5 } }}
+          config={{ n_teams: 12, auction_mode: false }}
+          onPrint={vi.fn()}
+          isDrafted={() => false}
+          onToggle={vi.fn()}
+          espnSync={sync({ myTeamId: 'team-2', pickCount: 1 })}
+          draftedList={draftedList}
+        />
+      </ThemeProvider>
+    )
+    expect(screen.queryByRole('button', { name: /export csv/i })).not.toBeInTheDocument()
   })
 })

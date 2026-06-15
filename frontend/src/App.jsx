@@ -16,6 +16,7 @@ import LeagueForm from './components/LeagueForm'
 import DraftBoard from './components/DraftBoard'
 import PrintView from './components/PrintView'
 import { useDraftState } from './hooks/useDraftState'
+import { useWatchlist } from './hooks/useWatchlist'
 import { useEspnDraftSync } from './hooks/useEspnDraftSync'
 import { useTheme } from './context/ThemeContext'
 import styles from './App.module.css'
@@ -33,6 +34,7 @@ export default function App() {
   const [config, setConfig] = useState(null)
   const [error, setError] = useState(null)
   const { isDrafted, toggle, applySyncedPicks, count: draftedCount, clear: clearDrafted, remove: removeDrafted, draftedList } = useDraftState()
+  const { isWatched, toggle: toggleWatch } = useWatchlist()
   const espnSync = useEspnDraftSync({ sheetData, applySyncedPicks })
   // Destructured so hooks below can depend on the stable callback instead of
   // the espnSync object, which is recreated every render.
@@ -148,6 +150,8 @@ export default function App() {
               onRemoveDrafted={removeDrafted}
               draftedList={draftedList}
               espnSync={espnSync}
+              isWatched={isWatched}
+              toggleWatch={toggleWatch}
             />
           </div>
         )}
