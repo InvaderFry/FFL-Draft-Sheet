@@ -98,7 +98,7 @@ export default function PlayerTable({
 
             return (
               <tr
-                key={id || `${player.player_name}-${idx}`}
+                key={player.sleeper_id || `${player.player_name}-${idx}`}
                 className={`${tierClass} ${isTierStart ? styles.tierStart : ''}`}
                 onClick={() => onToggle(id, player.player_name, player.pos)}
                 title="Click to mark as drafted"
