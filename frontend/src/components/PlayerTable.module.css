@@ -80,6 +80,39 @@
   font-weight: 500;
 }
 
+.starBtn {
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  margin-right: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--c-text-dim);
+  font-size: 15px;
+  line-height: 1;
+  vertical-align: middle;
+  transition: color 0.15s;
+}
+
+.starBtn:hover,
+.starBtn:focus-visible {
+  color: var(--c-amber);
+}
+
+.starBtn:focus-visible {
+  outline: 1px solid var(--c-amber);
+  outline-offset: 1px;
+}
+
+.starBtn.watched {
+  color: var(--c-amber);
+}
+
+.playerName {
+  vertical-align: middle;
+}
+
 /* "Survives to your next pick?" marker, shown only when a live draft with a
    selected My Team gives us a next-pick number. */
 .survDot {
@@ -146,4 +179,29 @@
 .tierOdd + .tierEven td,
 .tierEven + .tierOdd td {
   border-top: 1px solid var(--c-border2);
+}
+
+@media (max-width: 768px) {
+  .table {
+    min-width: 460px;
+  }
+
+  .table thead th {
+    padding: 7px 6px;
+  }
+
+  .nameCell,
+  .numCell,
+  .ecrCell,
+  .teamCell {
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+
+  .starBtn {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    margin-left: -4px;
+  }
 }

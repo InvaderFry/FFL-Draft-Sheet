@@ -159,6 +159,25 @@ input:focus, select:focus {
   border-color: var(--c-amber);
 }
 
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--c-amber);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  html, body {
+    font-size: 14px;
+  }
+
+  button,
+  input,
+  select {
+    min-height: 36px;
+  }
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--c-bg); }
