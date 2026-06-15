@@ -11,7 +11,7 @@ module.exports = {
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
   settings: { react: { version: 'detect' } },
   plugins: ['react-refresh'],
-  ignorePatterns: ['dist', 'node_modules'],
+  ignorePatterns: ['dist', 'node_modules', 'test-results', 'playwright-report'],
   rules: {
     'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     // Allow intentionally-empty catch blocks (e.g. localStorage guards).
