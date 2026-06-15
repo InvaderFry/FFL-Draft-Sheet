@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { stubSheet, stubDraft } from './helpers'
+import { stubSheet, stubDraft, fixture } from './helpers'
 
 test.describe('live ESPN draft sync', () => {
   test('synced picks cross players off the board', async ({ page }) => {
@@ -25,13 +25,15 @@ test.describe('live ESPN draft sync', () => {
 
   test('strategy tools appear once a My Team is selected', async ({ page }) => {
     await stubSheet(page)
-    await stubDraft(page)
+    // Snake-only strategy (next pick, runs, survival markers) shows for a LIVE
+    // draft, not a completed one — stub an in-progress snapshot.
+    await stubDraft(page, fixture('draft_in_progress.json'))
     await page.goto('/')
     await page.getByRole('button', { name: /generate draft sheet/i }).click()
     await page.getByRole('button', { name: /sync espn draft/i }).click()
     await page.getByPlaceholder(/12345678/).fill('99887766')
     await page.getByRole('button', { name: /^Connect$/ }).click()
-    await expect(page.getByText(/Draft complete · 2 picks/)).toBeVisible()
+    await expect(page.locator('main').getByText(/2 drafted/)).toBeVisible()
 
     // Pick the user's team (owns the McCaffrey pick at overall 1).
     await page.locator('select').filter({ hasText: 'Team Derrick' }).selectOption({ label: 'Team Derrick' })

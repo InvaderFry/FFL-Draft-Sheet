@@ -13,9 +13,14 @@ import { survivalStatus } from '../utils/draftStrategy'
 import { useTheme } from '../context/ThemeContext'
 import styles from './PlayerTable.module.css'
 
-// Tooltip + dot class for the "survives to your next pick?" marker.
+// Tooltip + dot class for the "survives to your next pick?" marker. Both
+// 'gone' (already past ADP — a falling player still on the board) and 'risky'
+// (likely drafted before your next pick) share the urgent amber dot.
 function survivalMarker(adpRank, currentPick, nextPick) {
   const status = survivalStatus(adpRank, currentPick, nextPick)
+  if (status === 'gone') {
+    return { cls: styles.survRisky, title: `ADP ${adpRank} · already past ADP — likely gone any pick now` }
+  }
   if (status === 'risky') {
     return { cls: styles.survRisky, title: `ADP ${adpRank} · likely gone before your pick ${nextPick}` }
   }

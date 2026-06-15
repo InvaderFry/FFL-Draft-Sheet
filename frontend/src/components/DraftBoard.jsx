@@ -98,14 +98,17 @@ export default function DraftBoard({
   )
   const sourceCount = sourceDetails.used.length
 
-  // Strategy tools light up only with a live draft + a chosen "My Team": they
-  // need the user's slot and the picks made so far.
+  // Strategy tools need a chosen "My Team". Roster needs/byes are useful in any
+  // format and after the draft ends; next-pick, runs, and the per-row survival
+  // markers are snake-only, so they're gated to a *live snake* draft (no auction,
+  // not yet complete) to avoid showing confidently-wrong advice.
   const myTeamId = espnSync?.myTeamId || null
-  const strategyActive = !!myTeamId &&
+  const rosterActive = !!myTeamId &&
     (espnSync?.status === 'connected' || espnSync?.status === 'complete')
+  const snakeLive = !!myTeamId && espnSync?.status === 'connected' && !auctionMode
 
   const strategy = useMemo(() => {
-    if (!strategyActive) return null
+    if (!rosterActive) return null
     // id → bye_week across the whole sheet, so My Team picks can resolve byes.
     const byeById = new Map()
     for (const rows of Object.values(positions)) {
@@ -113,12 +116,12 @@ export default function DraftBoard({
     }
     const myPicks = draftedList.filter(p => p.teamId === myTeamId)
     return {
-      currentPick: currentOverall(draftedList),
-      nextPick: nextUserPickOverall(draftedList, myTeamId, nTeams),
-      runs: positionRunsSinceLastPick(draftedList, myTeamId, nTeams),
+      currentPick: snakeLive ? currentOverall(draftedList) : null,
+      nextPick: snakeLive ? nextUserPickOverall(draftedList, myTeamId, nTeams) : null,
+      runs: snakeLive ? positionRunsSinceLastPick(draftedList, myTeamId, nTeams) : null,
       needs: rosterNeeds(myPicks, config, id => byeById.get(id)),
     }
-  }, [strategyActive, myTeamId, draftedList, nTeams, positions, config])
+  }, [rosterActive, snakeLive, myTeamId, draftedList, nTeams, positions, config])
 
   // The per-row survival marker only needs the two pick numbers.
   const tableStrategy = strategy && strategy.nextPick != null

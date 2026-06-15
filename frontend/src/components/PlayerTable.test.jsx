@@ -24,7 +24,7 @@ function player(name, tier, tierIsEven, val = tier === 8 ? 0 : 40 - tier) {
   }
 }
 
-function renderTable(players, { minVal = 0, maxVal = 40 } = {}) {
+function renderTable(players, { minVal = 0, maxVal = 40, strategy = null } = {}) {
   return render(
     <ThemeProvider>
       <PlayerTable
@@ -35,6 +35,7 @@ function renderTable(players, { minVal = 0, maxVal = 40 } = {}) {
         auctionMode={false}
         minVal={minVal}
         maxVal={maxVal}
+        strategy={strategy}
       />
     </ThemeProvider>
   )
@@ -77,5 +78,29 @@ describe('PlayerTable', () => {
     expect(valCells[0]).not.toHaveStyle({ backgroundColor: 'rgba(96, 165, 250, 0.3)' })
     expect(valCells[0].style.backgroundColor).toBe('')
     expect(valCells[1].style.backgroundColor).toBe('')
+  })
+
+  describe('survival markers', () => {
+    const withAdp = (name, adp) => ({ ...player(name, 1, false), adp_rank: adp })
+
+    it('flags fallen (past-ADP), risky, and safe players; none without ADP', () => {
+      const { container } = renderTable([
+        withAdp('Fallen', 5),    // adp <= currentPick → already past ADP
+        withAdp('Risky', 15),    // currentPick < adp <= nextPick
+        withAdp('Safe', 30),     // adp > nextPick
+        withAdp('NoAdp', null),  // no ADP → no marker
+      ], { strategy: { currentPick: 10, nextPick: 22 } })
+
+      expect(screen.getByTitle(/already past ADP/)).toBeInTheDocument()
+      expect(screen.getByTitle(/likely gone before your pick 22/)).toBeInTheDocument()
+      expect(screen.getByTitle(/should reach your pick 22/)).toBeInTheDocument()
+      // Exactly three rows carry a marker (the no-ADP row has none).
+      expect(container.querySelectorAll(`.${styles.survDot}`)).toHaveLength(3)
+    })
+
+    it('renders no markers without a strategy context', () => {
+      const { container } = renderTable([withAdp('Anyone', 5)])
+      expect(container.querySelectorAll(`.${styles.survDot}`)).toHaveLength(0)
+    })
   })
 })
