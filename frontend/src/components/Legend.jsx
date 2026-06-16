@@ -13,13 +13,19 @@ const BASE_ENTRIES = [
 
 const AUCTION_ENTRY = { abbrev: '$', full: 'Auction Price', desc: 'Estimated dollar value in auction mode, derived from each player\'s share of total VBD value' }
 
-export default function Legend({ auctionMode }) {
+// Abbreviations hidden from the table (and thus the guide) in thin mode.
+const THIN_HIDDEN = new Set(['TM/BW', 'F'])
+
+export default function Legend({ auctionMode, thinMode = false }) {
   const [open, setOpen] = useState(false)
 
   const tiersEntry = BASE_ENTRIES.find(e => e.abbrev === 'Tiers')
-  const entries = auctionMode
-    ? [...BASE_ENTRIES.filter(e => e.abbrev !== 'Tiers'), AUCTION_ENTRY, tiersEntry]
+  const baseEntries = thinMode
+    ? BASE_ENTRIES.filter(e => !THIN_HIDDEN.has(e.abbrev))
     : BASE_ENTRIES
+  const entries = auctionMode
+    ? [...baseEntries.filter(e => e.abbrev !== 'Tiers'), AUCTION_ENTRY, tiersEntry]
+    : baseEntries
 
   return (
     <div className={styles.legend}>
