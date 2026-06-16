@@ -178,6 +178,11 @@
     border-top: 1pt solid #999 !important;
   }
 
+  /* Dual-encoding: second method's boundary, distinct from the tier-start rule. */
+  .tier-line-start td {
+    border-top: 1.5pt solid #444 !important;
+  }
+
   .drafted {
     opacity: 0.40 !important;
   }

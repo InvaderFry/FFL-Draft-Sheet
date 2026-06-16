@@ -95,6 +95,30 @@
   transition: color 0.15s;
 }
 
+/* Manual-tier nudge handle: toggles a tier break at this row. */
+.tierBreakBtn {
+  width: 16px;
+  min-width: 16px;
+  height: 20px;
+  margin-right: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--c-text-dim);
+  font-size: 13px;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.tierBreakBtn:hover,
+.tierBreakBtn:focus-visible {
+  color: var(--c-tier-line);
+}
+.tierBreakActive {
+  color: var(--c-tier-line);
+}
+
 .starBtn:hover,
 .starBtn:focus-visible {
   color: var(--c-amber);

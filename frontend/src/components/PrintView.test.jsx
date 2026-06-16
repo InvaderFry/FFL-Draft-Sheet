@@ -105,6 +105,30 @@ describe('PrintView', () => {
     expect(screen.getByText(/ZSheet/)).toBeInTheDocument()
   })
 
+  it('shades by shadeBy and draws line boundaries by linesBy', () => {
+    // jenks groups [1,1,2]; gmm groups [1,2,2] — the two methods disagree.
+    const mk = (name, jenks, gmm) => ({
+      ...player, sleeper_id: name, player_name: name, pos: 'RB',
+      tiers: { jenks, gmm },
+    })
+    const rbs = [mk('Alpha', 1, 1), mk('Bravo', 1, 2), mk('Charlie', 2, 2)]
+
+    render(
+      <PrintView
+        sheetData={{ positions: { QB: [], RB: rbs, WR: [], TE: [], DST: [] }, metadata: {} }}
+        config={{ n_teams: 12, RB: 2, scoring: { rec: 0.5 } }}
+        isDrafted={() => false}
+        shadeBy="jenks"
+        linesBy="gmm"
+      />
+    )
+
+    // Jenks shading boundary lands on Charlie; GMM line boundary lands on Bravo.
+    expect(screen.getByText('Charlie').closest('tr').className).toContain('tier-start')
+    expect(screen.getByText('Bravo').closest('tr').className).toContain('tier-line-start')
+    expect(screen.getByText('Bravo').closest('tr').className).not.toContain('tier-start')
+  })
+
   it('shades the full Val range continuously, including mid-range values', () => {
     const lowValPlayer = { ...player, sleeper_id: 'low', player_name: 'Low Value', val: -20, floor: null, ceil: null }
     const midValPlayer = { ...player, sleeper_id: 'mid', player_name: 'Mid Value', pos: 'QB', val: 10, floor: null, ceil: null }

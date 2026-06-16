@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { tierFor, methodAvailable } from './tierAccess'
+import { tierFor, methodAvailable, computeBoundaries, deriveManualTiers } from './tierAccess'
 
 const player = (overrides = {}) => ({
   player_name: 'Test Player',
@@ -57,5 +57,54 @@ describe('methodAvailable', () => {
   it('treats manual as available only once seeded', () => {
     expect(methodAvailable(positions, 'manual', null)).toBe(false)
     expect(methodAvailable(positions, 'manual', { x: 1 })).toBe(true)
+  })
+})
+
+describe('computeBoundaries', () => {
+  const positions = {
+    QB: [
+      { sleeper_id: 'a', tiers: { jenks: 1 } },
+      { sleeper_id: 'b', tiers: { jenks: 1 } },
+      { sleeper_id: 'c', tiers: { jenks: 2 } },
+      { sleeper_id: 'd', tiers: { jenks: 3 } },
+    ],
+  }
+
+  it('marks the first player and every tier change as a boundary', () => {
+    expect(computeBoundaries(positions, 'jenks').QB).toEqual(['a', 'c', 'd'])
+  })
+})
+
+describe('deriveManualTiers', () => {
+  const positions = {
+    QB: [
+      { sleeper_id: 'a' },
+      { sleeper_id: 'b' },
+      { sleeper_id: 'c' },
+      { sleeper_id: 'd' },
+    ],
+  }
+
+  it('renumbers contiguously from the boundary id set', () => {
+    const map = deriveManualTiers(positions, { QB: ['a', 'c'] })
+    expect(map).toEqual({ a: 1, b: 1, c: 2, d: 2 })
+  })
+
+  it('always starts the first player at tier 1 even without an explicit boundary', () => {
+    const map = deriveManualTiers(positions, { QB: ['c'] })
+    expect(map).toEqual({ a: 1, b: 1, c: 2, d: 2 })
+  })
+
+  it('round-trips with computeBoundaries to reproduce a method', () => {
+    const withTiers = {
+      QB: [
+        { sleeper_id: 'a', tiers: { gmm: 1 } },
+        { sleeper_id: 'b', tiers: { gmm: 2 } },
+        { sleeper_id: 'c', tiers: { gmm: 2 } },
+      ],
+    }
+    const boundaries = computeBoundaries(withTiers, 'gmm')
+    const map = deriveManualTiers(withTiers, boundaries)
+    expect(map).toEqual({ a: 1, b: 2, c: 2 })
   })
 })

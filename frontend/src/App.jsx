@@ -10,7 +10,7 @@
  * both the on-screen board and the printed sheet.
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import LeagueForm from './components/LeagueForm'
 import DraftBoard from './components/DraftBoard'
@@ -18,6 +18,9 @@ import PrintView from './components/PrintView'
 import { useDraftState } from './hooks/useDraftState'
 import { useWatchlist } from './hooks/useWatchlist'
 import { useEspnDraftSync } from './hooks/useEspnDraftSync'
+import { useTierDisplay } from './hooks/useTierDisplay'
+import { useManualTiers } from './hooks/useManualTiers'
+import { deriveManualTiers } from './utils/tierAccess'
 import { useTheme } from './context/ThemeContext'
 import styles from './App.module.css'
 
@@ -34,6 +37,13 @@ export default function App() {
   const [error, setError] = useState(null)
   const { isDrafted, toggle, applySyncedPicks, count: draftedCount, clear: clearDrafted, remove: removeDrafted, draftedList } = useDraftState()
   const { isWatched, toggle: toggleWatch } = useWatchlist()
+  const { shadeBy, setShadeBy, linesBy, setLinesBy } = useTierDisplay()
+  const { boundaries, seedFromMethod, toggleBoundary, clear: clearManual, hasManual } = useManualTiers(config)
+  // Derived id→tier map from the full position lists, shared by board + print.
+  const manualTiers = useMemo(
+    () => deriveManualTiers(sheetData?.positions || {}, boundaries),
+    [sheetData, boundaries]
+  )
   const espnSync = useEspnDraftSync({ sheetData, applySyncedPicks })
   // Destructured so hooks below can depend on the stable callback instead of
   // the espnSync object, which is recreated every render.
@@ -151,6 +161,15 @@ export default function App() {
               espnSync={espnSync}
               isWatched={isWatched}
               toggleWatch={toggleWatch}
+              shadeBy={shadeBy}
+              setShadeBy={setShadeBy}
+              linesBy={linesBy}
+              setLinesBy={setLinesBy}
+              manualTiers={manualTiers}
+              hasManual={hasManual}
+              onSeedManual={seedFromMethod}
+              onToggleBoundary={toggleBoundary}
+              onClearManual={clearManual}
             />
           </div>
         )}
@@ -162,6 +181,9 @@ export default function App() {
           sheetData={sheetData}
           config={config}
           isDrafted={isDrafted}
+          shadeBy={shadeBy}
+          linesBy={linesBy}
+          manualTiers={manualTiers}
         />,
         document.body
       )}

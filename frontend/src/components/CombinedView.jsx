@@ -32,6 +32,8 @@ export default function CombinedView({
   shadeBy = 'jenks',
   linesBy = 'none',
   manualTiers = null,
+  manualEdit = false,
+  onToggleBoundary = () => {},
 }) {
   const { posColors } = useTheme()
   return (
@@ -60,6 +62,8 @@ export default function CombinedView({
                 shadeBy={shadeBy}
                 linesBy={linesBy}
                 manualTiers={manualTiers}
+                manualEdit={manualEdit}
+                onToggleBoundary={onToggleBoundary}
                 wrapStyle={tableStyle}
               />
             </div>

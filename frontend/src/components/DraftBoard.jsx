@@ -26,17 +26,6 @@ import styles from './DraftBoard.module.css'
 
 const TAB_ORDER = ['ALL', 'QB', 'RB', 'WR', 'TE', 'DST']
 
-const SHADE_STORAGE_KEY = 'ffl_tier_shade'
-const LINES_STORAGE_KEY = 'ffl_tier_lines'
-
-function readStored(key, fallback) {
-  try {
-    return localStorage.getItem(key) || fallback
-  } catch {
-    return fallback
-  }
-}
-
 function buildSourceDetails(metadata) {
   const richStatuses = Array.isArray(metadata?.source_statuses) ? metadata.source_statuses : []
   if (richStatuses.length > 0) {
@@ -122,41 +111,55 @@ export default function DraftBoard({
   espnSync = null,
   isWatched = () => false,
   toggleWatch = () => {},
+  shadeBy = 'jenks',
+  setShadeBy = () => {},
+  linesBy = 'none',
+  setLinesBy = () => {},
+  manualTiers = null,
+  hasManual = false,
+  onSeedManual = () => {},
+  onToggleBoundary = () => {},
 }) {
   const { posColors } = useTheme()
   const [activePos, setActivePos] = useState('ALL')
   const [sourceDetailsOpen, setSourceDetailsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [watchedOnly, setWatchedOnly] = useState(false)
-  // Tier display: shade rows by one method, draw colored boundary lines by
-  // another. Persisted like the theme toggle. Manual tiers are a later phase.
-  const [shadeBy, setShadeBy] = useState(() => readStored(SHADE_STORAGE_KEY, 'jenks'))
-  const [linesBy, setLinesBy] = useState(() => readStored(LINES_STORAGE_KEY, 'none'))
-  const manualTiers = null
 
   const { positions, metadata } = sheetData
 
-  useEffect(() => {
-    try { localStorage.setItem(SHADE_STORAGE_KEY, shadeBy) } catch { /* ignore */ }
-  }, [shadeBy])
-  useEffect(() => {
-    try { localStorage.setItem(LINES_STORAGE_KEY, linesBy) } catch { /* ignore */ }
-  }, [linesBy])
-
-  // Which methods actually have data in this sheet (Jenks/None always do).
+  // Which methods can be selected. Manual is always selectable (selecting it
+  // seeds from the active method); Jenks/None are always available; computed
+  // methods (GMM, Boris Chen) only when the sheet carries their data.
   const availableMethods = useMemo(() => {
     const map = {}
-    for (const m of TIER_METHODS) map[m.id] = methodAvailable(positions, m.id, manualTiers)
+    for (const m of TIER_METHODS) {
+      map[m.id] = m.id === 'manual' ? true : methodAvailable(positions, m.id, manualTiers)
+    }
     return map
-  }, [positions])
+  }, [positions, manualTiers])
 
-  // Fall back to Jenks/None if a persisted selection isn't available this sheet.
+  // Fall back to Jenks/None if a persisted selection isn't available this sheet
+  // (manual is exempt — it is always selectable and self-seeds).
   useEffect(() => {
-    if (shadeBy !== 'jenks' && !availableMethods[shadeBy]) setShadeBy('jenks')
-  }, [availableMethods, shadeBy])
+    if (shadeBy !== 'jenks' && shadeBy !== 'manual' && !availableMethods[shadeBy]) setShadeBy('jenks')
+  }, [availableMethods, shadeBy, setShadeBy])
   useEffect(() => {
-    if (linesBy !== 'none' && !availableMethods[linesBy]) setLinesBy('none')
-  }, [availableMethods, linesBy])
+    if (linesBy !== 'none' && linesBy !== 'manual' && !availableMethods[linesBy]) setLinesBy('none')
+  }, [availableMethods, linesBy, setLinesBy])
+
+  const manualEdit = shadeBy === 'manual' || linesBy === 'manual'
+
+  // Selecting Manual seeds boundaries from the other channel's method (or Jenks)
+  // when none exist yet, so the user starts from a sensible tiering.
+  const selectMethod = (setter, value) => {
+    if (value === 'manual' && !hasManual) {
+      const seed = [shadeBy, linesBy].find(m => m && m !== 'manual' && m !== 'none') || 'jenks'
+      onSeedManual(positions, seed)
+    }
+    setter(value)
+  }
+
   const players = positions[activePos] || []
   const nTeams = config?.n_teams || 12
   const auctionMode = config?.auction_mode || false
@@ -372,7 +375,7 @@ export default function DraftBoard({
                 className={styles.tierSelect}
                 aria-label="Shade tiers by method"
                 value={shadeBy}
-                onChange={(event) => setShadeBy(event.target.value)}
+                onChange={(event) => selectMethod(setShadeBy, event.target.value)}
               >
                 {TIER_METHODS.map(m => (
                   <option key={m.id} value={m.id} disabled={!availableMethods[m.id]}>
@@ -387,7 +390,7 @@ export default function DraftBoard({
                 className={styles.tierSelect}
                 aria-label="Tier boundary lines by method"
                 value={linesBy}
-                onChange={(event) => setLinesBy(event.target.value)}
+                onChange={(event) => selectMethod(setLinesBy, event.target.value)}
               >
                 <option value="none">None</option>
                 {TIER_METHODS.map(m => (
@@ -397,6 +400,19 @@ export default function DraftBoard({
                 ))}
               </select>
             </label>
+            {manualEdit && (
+              <button
+                type="button"
+                className={styles.watchToggle}
+                title="Re-seed manual tiers from the other selected method"
+                onClick={() => {
+                  const seed = [shadeBy, linesBy].find(m => m && m !== 'manual' && m !== 'none') || 'jenks'
+                  onSeedManual(positions, seed)
+                }}
+              >
+                ⟳ reset tiers
+              </button>
+            )}
           </div>
           {myTeamPicks.length > 0 && (
             <button type="button" className={styles.printBtn} onClick={handleExportCsv}>
@@ -481,6 +497,8 @@ export default function DraftBoard({
               shadeBy={shadeBy}
               linesBy={linesBy}
               manualTiers={manualTiers}
+              manualEdit={manualEdit}
+              onToggleBoundary={onToggleBoundary}
             />
           ) : (
             <PlayerTable
@@ -500,6 +518,8 @@ export default function DraftBoard({
               shadeBy={shadeBy}
               linesBy={linesBy}
               manualTiers={manualTiers}
+              manualEdit={manualEdit}
+              onToggleBoundary={onToggleBoundary}
               wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
             />
           )}

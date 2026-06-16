@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react'
 import { ecrColor } from '../utils/ecrColor'
 import { fmtVal, fmtInt, fmtPct } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle, valGradientPosition, valRangeFromPositions } from '../utils/valGradient'
+import { tierFor } from '../utils/tierAccess'
 import '../styles/print.css'
 
 const POSITION_LABELS = {
@@ -108,7 +109,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, auctionMode }) {
+function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, auctionMode, shadeBy, linesBy, manualTiers }) {
   const visible = players.slice(0, POSITION_LIMITS[pos] ?? players.length)
 
   return (
@@ -130,15 +131,18 @@ function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, au
         <tbody>
           {visible.map((player, idx) => {
             const drafted = isDrafted(player.sleeper_id || player.player_name)
-            const tierClass = player.tier_is_even ? 'tier-even' : 'tier-odd'
             const previous = visible[idx - 1]
-            const isTierStart = idx > 0 && player.tier != null && previous?.tier !== player.tier
+            const shadeTier = tierFor(player, shadeBy, manualTiers)
+            const tierClass = shadeTier != null && shadeTier % 2 === 0 ? 'tier-even' : 'tier-odd'
+            const isTierStart = idx > 0 && shadeTier != null && tierFor(previous, shadeBy, manualTiers) !== shadeTier
+            const lineTier = tierFor(player, linesBy, manualTiers)
+            const isLineStart = idx > 0 && lineTier != null && tierFor(previous, linesBy, manualTiers) !== lineTier
             const ecr = ecrColor(player.adp_rank, player.ecr_rank, nTeams)
 
             return (
               <tr
                 key={playerKey(player, idx)}
-                className={classNames(tierClass, isTierStart && 'tier-start', drafted && 'drafted')}
+                className={classNames(tierClass, isTierStart && 'tier-start', isLineStart && 'tier-line-start', drafted && 'drafted')}
               >
                 <td className={`col-name ${drafted ? 'name-drafted' : ''}`}>
                   {player.player_name}
@@ -165,7 +169,7 @@ function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, au
 
 const PositionTable = memo(PositionTableBase)
 
-export default function PrintView({ sheetData, config, isDrafted }) {
+export default function PrintView({ sheetData, config, isDrafted, shadeBy = 'jenks', linesBy = 'none', manualTiers = null }) {
   const positions = sheetData?.positions ?? EMPTY_POSITIONS
   const metadata = sheetData?.metadata
   const { minVal, maxVal } = useMemo(() => {
@@ -215,6 +219,9 @@ export default function PrintView({ sheetData, config, isDrafted }) {
             minVal={minVal}
             maxVal={maxVal}
             auctionMode={auctionMode}
+            shadeBy={shadeBy}
+            linesBy={linesBy}
+            manualTiers={manualTiers}
           />
           <PositionTable
             pos="TE"
@@ -224,6 +231,9 @@ export default function PrintView({ sheetData, config, isDrafted }) {
             minVal={minVal}
             maxVal={maxVal}
             auctionMode={auctionMode}
+            shadeBy={shadeBy}
+            linesBy={linesBy}
+            manualTiers={manualTiers}
           />
         </div>
         <PositionTable
@@ -234,6 +244,9 @@ export default function PrintView({ sheetData, config, isDrafted }) {
           minVal={minVal}
           maxVal={maxVal}
           auctionMode={auctionMode}
+          shadeBy={shadeBy}
+          linesBy={linesBy}
+          manualTiers={manualTiers}
         />
         <PositionTable
           pos="WR"
@@ -243,6 +256,9 @@ export default function PrintView({ sheetData, config, isDrafted }) {
           minVal={minVal}
           maxVal={maxVal}
           auctionMode={auctionMode}
+          shadeBy={shadeBy}
+          linesBy={linesBy}
+          manualTiers={manualTiers}
         />
       </div>
 

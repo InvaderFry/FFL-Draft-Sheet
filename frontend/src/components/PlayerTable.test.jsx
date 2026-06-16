@@ -37,6 +37,9 @@ function renderTable(players, {
   onToggle = vi.fn(),
   shadeBy = 'jenks',
   linesBy = 'none',
+  manualEdit = false,
+  manualTiers = null,
+  onToggleBoundary = vi.fn(),
 } = {}) {
   return render(
     <ThemeProvider>
@@ -55,6 +58,9 @@ function renderTable(players, {
         toggleWatch={toggleWatch}
         shadeBy={shadeBy}
         linesBy={linesBy}
+        manualEdit={manualEdit}
+        manualTiers={manualTiers}
+        onToggleBoundary={onToggleBoundary}
       />
     </ThemeProvider>
   )
@@ -96,6 +102,40 @@ describe('PlayerTable', () => {
     // GMM line boundary falls between Alpha and Bravo, not Bravo/Charlie.
     expect(bravo.className).toContain(styles.tierLineStart)
     expect(charlie.className).not.toContain(styles.tierLineStart)
+  })
+
+  it('shows the tier-break handle only in manual-edit mode', () => {
+    const { rerender } = renderTable([player('Mahomes', 1, false)])
+    expect(screen.queryByRole('button', { name: /tier break/i })).not.toBeInTheDocument()
+
+    rerender(
+      <ThemeProvider>
+        <PlayerTable
+          players={[player('Mahomes', 1, false)]}
+          nTeams={12}
+          isDrafted={() => false}
+          onToggle={vi.fn()}
+          auctionMode={false}
+          minVal={0}
+          maxVal={40}
+          manualEdit
+          onToggleBoundary={vi.fn()}
+        />
+      </ThemeProvider>
+    )
+    expect(screen.getByRole('button', { name: /tier break/i })).toBeInTheDocument()
+  })
+
+  it('toggles a tier boundary without drafting the player', async () => {
+    const user = userEvent.setup()
+    const onToggleBoundary = vi.fn()
+    const onToggle = vi.fn()
+    renderTable([player('Josh Allen', 2, true)], { manualEdit: true, onToggleBoundary, onToggle })
+
+    await user.click(screen.getByRole('button', { name: /tier break at Josh Allen/i }))
+
+    expect(onToggleBoundary).toHaveBeenCalledWith('QB', 'josh-allen')
+    expect(onToggle).not.toHaveBeenCalled()
   })
 
   it('uses the full positive and negative Val range for cell gradients', () => {

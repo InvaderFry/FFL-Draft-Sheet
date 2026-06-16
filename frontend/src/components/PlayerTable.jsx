@@ -58,6 +58,8 @@ export default function PlayerTable({
   shadeBy = 'jenks',
   linesBy = 'none',
   manualTiers = null,
+  manualEdit = false,
+  onToggleBoundary = () => {},
 }) {
   const { theme } = useTheme()
   const cols = auctionMode
@@ -95,6 +97,9 @@ export default function PlayerTable({
             // Lines channel: a bold colored rule at a second method's boundaries.
             const lineTier = tierFor(player, linesBy, manualTiers)
             const isLineStart = idx > 0 && lineTier != null && tierFor(previous, linesBy, manualTiers) !== lineTier
+            // Manual-edit handle reflects the manual boundary, independent of channels.
+            const manualTier = tierFor(player, 'manual', manualTiers)
+            const isManualStart = idx === 0 || (manualTier != null && tierFor(previous, 'manual', manualTiers) !== manualTier)
             const ecr = ecrColor(player.adp_rank, player.ecr_rank, nTeams)
             const ecrStyle = { color: ecrColorStyle(ecr) }
             const valStyle = valBgStyle(player.val, minVal, maxVal, theme)
@@ -113,6 +118,20 @@ export default function PlayerTable({
                 title="Click to mark as drafted"
               >
                 <td className={styles.nameCell}>
+                  {manualEdit && (
+                    <button
+                      type="button"
+                      className={`${styles.tierBreakBtn} ${isManualStart ? styles.tierBreakActive : ''}`}
+                      aria-label={`${isManualStart ? 'Remove' : 'Add'} tier break at ${player.player_name}`}
+                      title={isManualStart ? 'Remove tier break here' : 'Start a new tier here'}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onToggleBoundary(player.pos, id)
+                      }}
+                    >
+                      {isManualStart ? '┃' : '╌'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`${styles.starBtn} ${watched ? styles.watched : ''}`}

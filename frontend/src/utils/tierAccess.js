@@ -45,3 +45,46 @@ export function methodAvailable(positions, method, manualTiers = null) {
   }
   return false
 }
+
+const playerId = (p) => p.sleeper_id || p.player_name
+
+/**
+ * Boundary id sets per position for a given method: the ids of players that
+ * *start* a tier (tier number differs from the previous player). Used to seed
+ * Manual tiers from another method. Returns `{ [pos]: string[] }`.
+ */
+export function computeBoundaries(positions, method, manualTiers = null) {
+  const result = {}
+  for (const pos of Object.keys(positions || {})) {
+    const players = positions[pos] || []
+    const ids = []
+    let prevTier = null
+    players.forEach((p, idx) => {
+      const tier = tierFor(p, method, manualTiers)
+      if (idx === 0 || (tier != null && tier !== prevTier)) ids.push(playerId(p))
+      prevTier = tier
+    })
+    result[pos] = ids
+  }
+  return result
+}
+
+/**
+ * Map of `{ [playerId]: tier }` derived from per-position boundary id sets:
+ * walk each position's full list, incrementing the tier at the first player and
+ * at every boundary id. Tier numbers are contiguous within a position.
+ */
+export function deriveManualTiers(positions, boundaries) {
+  const map = {}
+  if (!boundaries) return map
+  for (const pos of Object.keys(positions || {})) {
+    const starts = new Set(boundaries[pos] || [])
+    let tier = 0
+    ;(positions[pos] || []).forEach((p, idx) => {
+      const id = playerId(p)
+      if (idx === 0 || starts.has(id)) tier += 1
+      map[id] = tier
+    })
+  }
+  return map
+}
