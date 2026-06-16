@@ -2,7 +2,11 @@ import { memo, useMemo } from 'react'
 import { ecrColor } from '../utils/ecrColor'
 import { fmtVal, fmtInt, fmtPct } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle, valGradientPosition, valRangeFromPositions } from '../utils/valGradient'
+import { tierFor, TIER_METHODS } from '../utils/tierAccess'
 import '../styles/print.css'
+
+const METHOD_LABEL = Object.fromEntries(TIER_METHODS.map(m => [m.id, m.label]))
+const methodLabel = (id) => METHOD_LABEL[id] || id
 
 const POSITION_LABELS = {
   QB: 'QUARTERBACK',
@@ -108,7 +112,7 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, auctionMode }) {
+function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, auctionMode, shadeBy, linesBy, manualTiers }) {
   const visible = players.slice(0, POSITION_LIMITS[pos] ?? players.length)
 
   return (
@@ -130,15 +134,18 @@ function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, au
         <tbody>
           {visible.map((player, idx) => {
             const drafted = isDrafted(player.sleeper_id || player.player_name)
-            const tierClass = player.tier_is_even ? 'tier-even' : 'tier-odd'
             const previous = visible[idx - 1]
-            const isTierStart = idx > 0 && player.tier != null && previous?.tier !== player.tier
+            const shadeTier = tierFor(player, shadeBy, manualTiers)
+            const tierClass = shadeTier != null && shadeTier % 2 === 0 ? 'tier-even' : 'tier-odd'
+            const isTierStart = idx > 0 && shadeTier != null && tierFor(previous, shadeBy, manualTiers) !== shadeTier
+            const lineTier = tierFor(player, linesBy, manualTiers)
+            const isLineStart = idx > 0 && lineTier != null && tierFor(previous, linesBy, manualTiers) !== lineTier
             const ecr = ecrColor(player.adp_rank, player.ecr_rank, nTeams)
 
             return (
               <tr
                 key={playerKey(player, idx)}
-                className={classNames(tierClass, isTierStart && 'tier-start', drafted && 'drafted')}
+                className={classNames(tierClass, isTierStart && 'tier-start', isLineStart && 'tier-line-start', drafted && 'drafted')}
               >
                 <td className={`col-name ${drafted ? 'name-drafted' : ''}`}>
                   {player.player_name}
@@ -165,7 +172,7 @@ function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, au
 
 const PositionTable = memo(PositionTableBase)
 
-export default function PrintView({ sheetData, config, isDrafted }) {
+export default function PrintView({ sheetData, config, isDrafted, shadeBy = 'jenks', linesBy = 'none', manualTiers = null }) {
   const positions = sheetData?.positions ?? EMPTY_POSITIONS
   const metadata = sheetData?.metadata
   const { minVal, maxVal } = useMemo(() => {
@@ -215,6 +222,9 @@ export default function PrintView({ sheetData, config, isDrafted }) {
             minVal={minVal}
             maxVal={maxVal}
             auctionMode={auctionMode}
+            shadeBy={shadeBy}
+            linesBy={linesBy}
+            manualTiers={manualTiers}
           />
           <PositionTable
             pos="TE"
@@ -224,6 +234,9 @@ export default function PrintView({ sheetData, config, isDrafted }) {
             minVal={minVal}
             maxVal={maxVal}
             auctionMode={auctionMode}
+            shadeBy={shadeBy}
+            linesBy={linesBy}
+            manualTiers={manualTiers}
           />
         </div>
         <PositionTable
@@ -234,6 +247,9 @@ export default function PrintView({ sheetData, config, isDrafted }) {
           minVal={minVal}
           maxVal={maxVal}
           auctionMode={auctionMode}
+          shadeBy={shadeBy}
+          linesBy={linesBy}
+          manualTiers={manualTiers}
         />
         <PositionTable
           pos="WR"
@@ -243,6 +259,9 @@ export default function PrintView({ sheetData, config, isDrafted }) {
           minVal={minVal}
           maxVal={maxVal}
           auctionMode={auctionMode}
+          shadeBy={shadeBy}
+          linesBy={linesBy}
+          manualTiers={manualTiers}
         />
       </div>
 
@@ -269,7 +288,7 @@ export default function PrintView({ sheetData, config, isDrafted }) {
         <section className="print-notes">
           <p className="print-scoring"><strong>Scoring:</strong> {buildScoringLine(scoring)}</p>
           <p><strong>ECR:</strong> Player rank from FantasyPros Expert Consensus Ranking formatted as Rnd|Pick, so 1|3 means the 3rd pick of the 1st round. Orange means ADP is a round or more behind consensus: value, likely available later than expected. Blue means ADP is a round or more ahead: tends to go earlier than experts suggest.</p>
-          <p><strong>F, VAL, C:</strong> Player projected weekly value above a positional baseline replacement player. Rows are shaded by value tiers. A thicker top border marks a new tier. F and C are floor and ceiling based on projection variance.</p>
+          <p><strong>F, VAL, C:</strong> Player projected weekly value above a positional baseline replacement player. Rows are shaded into tiers by the {methodLabel(shadeBy)} method; a thicker top border marks each new tier.{linesBy !== 'none' && ` A second, darker border marks ${methodLabel(linesBy)} tier boundaries, so two tiering methods can be compared at a glance.`} F and C are floor and ceiling based on projection variance.</p>
           <p><strong>PS:</strong> Positional scarcity, the percentage of total positive value remaining in the position after this player is selected.</p>
           {auctionMode && <p><strong>$:</strong> Estimated auction price derived from each player&apos;s share of total positive draft value.</p>}
           {metadata?.baselines && (

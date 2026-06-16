@@ -224,6 +224,62 @@ def test_few_distinct_values_with_sub_baseline():
     assert pos_tier_set == list(range(1, max(pos_tier_set) + 1))
 
 
+# ---- multi-method tiers (GMM) ------------------------------------------------
+
+def test_all_methods_populate_tiers_dict():
+    players = _make_rbs([80 - i for i in range(120)])
+    result = assign_tiers(players)
+    for p in result:
+        assert "jenks" in p.tiers
+        assert "gmm" in p.tiers
+        # The flat field mirrors the default (jenks) method for back-compat.
+        assert p.tier == p.tiers["jenks"]
+        assert p.tier_is_even == (p.tier % 2 == 0)
+
+
+def test_gmm_tiers_monotonic_in_val():
+    players = _make_qbs([55 - i * 2.5 for i in range(50)])
+    result = assign_tiers(players)
+    for a, b in zip(result, result[1:]):
+        assert a.tiers["gmm"] <= b.tiers["gmm"]
+
+
+def test_gmm_tier1_contains_highest_val():
+    players = _make_rbs([100 - i * 2 for i in range(40)])
+    result = assign_tiers(players)
+    t1 = [p.val for p in result if p.tiers["gmm"] == 1]
+    rest = [p.val for p in result if p.tiers["gmm"] > 1]
+    assert t1 and rest
+    assert min(t1) >= max(rest)
+
+
+def test_gmm_produces_multiple_tiers_on_clustered_data():
+    vals = [100, 99, 98, 60, 59, 58, 20, 19, 18] + [40 - i for i in range(30)]
+    players = _make_rbs(vals)
+    result = assign_tiers(players)
+    assert len({p.tiers["gmm"] for p in result if p.val > 0}) >= 2
+
+
+def test_gmm_degenerate_all_same_val():
+    players = _make_qbs([30.0] * 20)
+    result = assign_tiers(players)
+    assert len({p.tiers["gmm"] for p in result}) == 1
+
+
+def test_gmm_falls_back_to_jenks_on_failure(monkeypatch, caplog):
+    def boom(_values, _n):
+        raise RuntimeError("singular covariance")
+
+    monkeypatch.setattr(tiers_mod, "_gmm_breaks_impl", boom)
+    players = _make_rbs([80 - i for i in range(60)])
+    with caplog.at_level("WARNING"):
+        result = assign_tiers(players)
+    # GMM still assigned (via Jenks fallback), monotonic, no crash.
+    for a, b in zip(result, result[1:]):
+        assert a.tiers["gmm"] <= b.tiers["gmm"]
+    assert any("falling back to Jenks" in r.message for r in caplog.records)
+
+
 def test_jenks_runtime_failure_falls_back_loudly(monkeypatch, caplog):
     def fail_jenks_breaks(_values, n_classes):
         raise RuntimeError("bad input")

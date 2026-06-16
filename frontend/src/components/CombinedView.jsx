@@ -29,6 +29,11 @@ export default function CombinedView({
   watchedOnly = false,
   isWatched = () => false,
   toggleWatch = () => {},
+  shadeBy = 'jenks',
+  linesBy = 'none',
+  manualTiers = null,
+  manualEdit = false,
+  onToggleBoundary = () => {},
   thinMode = false,
 }) {
   const { posColors } = useTheme()
@@ -55,6 +60,11 @@ export default function CombinedView({
                 watchedOnly={watchedOnly}
                 isWatched={isWatched}
                 toggleWatch={toggleWatch}
+                shadeBy={shadeBy}
+                linesBy={linesBy}
+                manualTiers={manualTiers}
+                manualEdit={manualEdit}
+                onToggleBoundary={onToggleBoundary}
                 thinMode={thinMode}
                 wrapStyle={tableStyle}
               />

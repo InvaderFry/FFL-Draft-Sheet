@@ -12,6 +12,7 @@ import CombinedView from './CombinedView'
 import DraftedPanel from './DraftedPanel'
 import DraftSync from './DraftSync'
 import Legend from './Legend'
+import { TIER_METHODS, methodAvailable } from '../utils/tierAccess'
 import { useTheme } from '../context/ThemeContext'
 import { downloadCsv, toCsv } from '../utils/exportCsv'
 import { valRangeFromPositions } from '../utils/valGradient'
@@ -110,6 +111,14 @@ export default function DraftBoard({
   espnSync = null,
   isWatched = () => false,
   toggleWatch = () => {},
+  shadeBy = 'jenks',
+  setShadeBy = () => {},
+  linesBy = 'none',
+  setLinesBy = () => {},
+  manualTiers = null,
+  hasManual = false,
+  onSeedManual = () => {},
+  onToggleBoundary = () => {},
 }) {
   const { posColors } = useTheme()
   const [activePos, setActivePos] = useState('ALL')
@@ -125,6 +134,39 @@ export default function DraftBoard({
   }, [thinMode])
 
   const { positions, metadata } = sheetData
+
+  // Which methods can be selected. Manual is always selectable (selecting it
+  // seeds from the active method); Jenks/None are always available; computed
+  // methods (GMM, Boris Chen) only when the sheet carries their data.
+  const availableMethods = useMemo(() => {
+    const map = {}
+    for (const m of TIER_METHODS) {
+      map[m.id] = m.id === 'manual' ? true : methodAvailable(positions, m.id, manualTiers)
+    }
+    return map
+  }, [positions, manualTiers])
+
+  // Fall back to Jenks/None if a persisted selection isn't available this sheet
+  // (manual is exempt — it is always selectable and self-seeds).
+  useEffect(() => {
+    if (shadeBy !== 'jenks' && shadeBy !== 'manual' && !availableMethods[shadeBy]) setShadeBy('jenks')
+  }, [availableMethods, shadeBy, setShadeBy])
+  useEffect(() => {
+    if (linesBy !== 'none' && linesBy !== 'manual' && !availableMethods[linesBy]) setLinesBy('none')
+  }, [availableMethods, linesBy, setLinesBy])
+
+  const manualEdit = shadeBy === 'manual' || linesBy === 'manual'
+
+  // Selecting Manual seeds boundaries from the other channel's method (or Jenks)
+  // when none exist yet, so the user starts from a sensible tiering.
+  const selectMethod = (setter, value) => {
+    if (value === 'manual' && !hasManual) {
+      const seed = [shadeBy, linesBy].find(m => m && m !== 'manual' && m !== 'none') || 'jenks'
+      onSeedManual(positions, seed)
+    }
+    setter(value)
+  }
+
   const players = positions[activePos] || []
   const nTeams = config?.n_teams || 12
   const auctionMode = config?.auction_mode || false
@@ -343,6 +385,50 @@ export default function DraftBoard({
             >
               Thin
             </button>
+            <label className={styles.tierControl}>
+              <span className={styles.tierControlLabel}>Shade</span>
+              <select
+                className={styles.tierSelect}
+                aria-label="Shade tiers by method"
+                value={shadeBy}
+                onChange={(event) => selectMethod(setShadeBy, event.target.value)}
+              >
+                {TIER_METHODS.map(m => (
+                  <option key={m.id} value={m.id} disabled={!availableMethods[m.id]}>
+                    {m.label}{availableMethods[m.id] ? '' : ' (n/a)'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.tierControl}>
+              <span className={styles.tierControlLabel}>Lines</span>
+              <select
+                className={styles.tierSelect}
+                aria-label="Tier boundary lines by method"
+                value={linesBy}
+                onChange={(event) => selectMethod(setLinesBy, event.target.value)}
+              >
+                <option value="none">None</option>
+                {TIER_METHODS.map(m => (
+                  <option key={m.id} value={m.id} disabled={!availableMethods[m.id]}>
+                    {m.label}{availableMethods[m.id] ? '' : ' (n/a)'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {manualEdit && (
+              <button
+                type="button"
+                className={styles.watchToggle}
+                title="Re-seed manual tiers from the other selected method"
+                onClick={() => {
+                  const seed = [shadeBy, linesBy].find(m => m && m !== 'manual' && m !== 'none') || 'jenks'
+                  onSeedManual(positions, seed)
+                }}
+              >
+                ⟳ reset tiers
+              </button>
+            )}
           </div>
           {myTeamPicks.length > 0 && (
             <button type="button" className={styles.printBtn} onClick={handleExportCsv}>
@@ -405,7 +491,7 @@ export default function DraftBoard({
       </div>
 
       {/* Column legend */}
-      <Legend auctionMode={auctionMode} thinMode={thinMode} />
+      <Legend auctionMode={auctionMode} thinMode={thinMode} shadeBy={shadeBy} linesBy={linesBy} manualEdit={manualEdit} />
 
       {/* Player table + drafted panel */}
       <div className={styles.contentRow}>
@@ -424,6 +510,11 @@ export default function DraftBoard({
               watchedOnly={watchedOnly}
               isWatched={isWatched}
               toggleWatch={toggleWatch}
+              shadeBy={shadeBy}
+              linesBy={linesBy}
+              manualTiers={manualTiers}
+              manualEdit={manualEdit}
+              onToggleBoundary={onToggleBoundary}
               thinMode={thinMode}
             />
           ) : (
@@ -441,6 +532,11 @@ export default function DraftBoard({
               watchedOnly={watchedOnly}
               isWatched={isWatched}
               toggleWatch={toggleWatch}
+              shadeBy={shadeBy}
+              linesBy={linesBy}
+              manualTiers={manualTiers}
+              manualEdit={manualEdit}
+              onToggleBoundary={onToggleBoundary}
               thinMode={thinMode}
               wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
             />
