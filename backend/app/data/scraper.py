@@ -255,6 +255,7 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
             if pos == "DST":
                 name = cells[0].split(" ")[0] + " D/ST"
                 team = cells[0].split(" ")[0]
+                bye_week_from_html = _extract_bye(cells[0])
                 stats = {
                     "dst_sack":       _f(cells[1]),
                     "dst_int":        _f(cells[2]),
@@ -270,6 +271,7 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
                 # the NumberFire adapter does instead of splitting concatenated text.
                 first_td = td_nodes[0]
                 name_el = first_td.css_first("a")
+                bye_week_from_html: int | None = None
                 if name_el:
                     name = name_el.text(strip=True)
                     full = cells[0]
@@ -286,8 +288,10 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
                         corrected_name, team = _split_fp_name_team(full)
                         if team:
                             name = corrected_name
+                    bye_week_from_html = _extract_bye(rest)
                 else:
                     name, team = _split_fp_name_team(cells[0])
+                    bye_week_from_html = _extract_bye(cells[0])
 
                 if pos == "QB":
                     # Name, Team, Cmp, Att, Yds, TDs, Ints, Rush Att, Rush Yds, Rush TDs, FL, Pts
@@ -330,6 +334,7 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
                 "player_name": name,
                 "pos": pos,
                 "team": team,
+                "bye_week": bye_week_from_html,
                 "sleeper_id": None,
                 "points": pts,
                 **stats,
@@ -340,6 +345,12 @@ def _parse_fantasypros_html(html: str, pos: str, cfg: ScoringConfig) -> list[dic
 
 
 _TEAM_RE = re.compile(r'([A-Z]{2,3})$')
+_BYE_RE = re.compile(r'(?i)bye\s*[-:.]?\s*(\d+)')
+
+
+def _extract_bye(text: str) -> int | None:
+    m = _BYE_RE.search(text)
+    return int(m.group(1)) if m else None
 
 _NFL_TEAMS = frozenset({
     "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE",
