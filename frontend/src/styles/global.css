@@ -23,6 +23,12 @@
   --c-tier-odd:  #181825;
   --c-tier-even: #313244;
   --c-tier-line: #94e2d5;
+  /* Cycling tier-line colors: consecutive tiers rotate through these so
+     neighboring boundaries are easy to tell apart. */
+  --c-tier-line-1: #94e2d5; /* teal  */
+  --c-tier-line-2: #cba6f7; /* mauve */
+  --c-tier-line-3: #f5c2e7; /* pink  */
+  --c-tier-line-4: #89dceb; /* sky   */
   --c-drafted-bg:   #11111b;
   --c-drafted-text: #6c7086;
 
@@ -64,6 +70,10 @@
   --c-tier-odd:  #181825;
   --c-tier-even: #313244;
   --c-tier-line: #94e2d5;
+  --c-tier-line-1: #94e2d5; /* teal  */
+  --c-tier-line-2: #cba6f7; /* mauve */
+  --c-tier-line-3: #f5c2e7; /* pink  */
+  --c-tier-line-4: #89dceb; /* sky   */
   --c-drafted-bg:   #11111b;
   --c-drafted-text: #6c7086;
 }
@@ -87,6 +97,10 @@
   --c-tier-odd:  #e6e9ef;
   --c-tier-even: #ccd0da;
   --c-tier-line: #179299;
+  --c-tier-line-1: #179299; /* teal  */
+  --c-tier-line-2: #8839ef; /* mauve */
+  --c-tier-line-3: #ea76cb; /* pink  */
+  --c-tier-line-4: #04a5e5; /* sky   */
   --c-drafted-bg:   #dce0e8;
   --c-drafted-text: #9ca0b0;
 }

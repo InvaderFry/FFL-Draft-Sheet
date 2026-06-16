@@ -102,6 +102,8 @@ describe('PlayerTable', () => {
     // GMM line boundary falls between Alpha and Bravo, not Bravo/Charlie.
     expect(bravo.className).toContain(styles.tierLineStart)
     expect(charlie.className).not.toContain(styles.tierLineStart)
+    // Line color cycles per tier: Bravo starts gmm tier 2 → tierLine2.
+    expect(bravo.className).toContain(styles.tierLine2)
   })
 
   it('shows the tier-break handle only in manual-edit mode', () => {

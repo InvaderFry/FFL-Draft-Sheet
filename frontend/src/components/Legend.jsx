@@ -29,10 +29,15 @@ function tierEntries({ shadeBy, linesBy, manualEdit }) {
   }]
   if (linesBy && linesBy !== 'none') {
     entries.push({
-      abbrev: '▬',
-      color: 'var(--c-tier-line)',
+      abbrev: (
+        <span aria-hidden="true">
+          {[1, 2, 3, 4].map(n => (
+            <span key={n} style={{ color: `var(--c-tier-line-${n})` }}>▬</span>
+          ))}
+        </span>
+      ),
       full: 'Tier Line',
-      desc: `Colored rule marking ${methodLabel(linesBy)} tier boundaries — set with the "Lines" selector — so you can compare two tiering methods at once: shading is one method, the line is another.`,
+      desc: `Colored rule marking ${methodLabel(linesBy)} tier boundaries — set with the "Lines" selector — so you can compare two tiering methods at once: shading is one method, the line is another. The line color cycles through 4 colors per tier so neighboring tiers are easy to tell apart.`,
     })
   }
   if (manualEdit) {
