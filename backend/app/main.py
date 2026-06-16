@@ -27,6 +27,7 @@ from app.data.scraper import scrape_all
 from app.data.historical import load_attrition_curves
 from app.data.variance import load_variance
 from app.data.adp import enrich_with_adp
+from app.data.schedule import load_team_byes
 from app.engine.baseline import compute_baselines
 from app.engine.vbd import aggregate_projections, PlayerVBD
 from app.engine.tiers import assign_tiers
@@ -91,6 +92,7 @@ class SourceStatus(BaseModel):
     status: str
     used: bool
     positions: list[str]
+    position_counts: dict[str, int] = Field(default_factory=dict)
     reason: str | None = None
     failures: list[SourceFailure] = Field(default_factory=list)
 
@@ -105,6 +107,8 @@ class SheetMetadata(BaseModel):
     baselines: dict[str, float]
     data_quality_warnings: list[str] = Field(default_factory=list)
     adp_available: bool
+    ecr_available: bool = False
+    adp_season: int | None = None
     cache_hit: bool
     generation_time_s: float
 
@@ -150,6 +154,7 @@ def _outcome_value(outcome: Any, key: str, default: Any = None) -> Any:
 def _aggregate_source_metadata(raw_by_pos: dict[str, list[dict]]) -> tuple[list[str], list[str], list[dict]]:
     all_sources: set[str] = set()
     positions_by_source: dict[str, set[str]] = {}
+    counts_by_source: dict[str, dict[str, int]] = {}
     failures_by_source: dict[str, list[dict]] = {}
 
     if not hasattr(raw_by_pos, "outcomes"):
@@ -158,6 +163,8 @@ def _aggregate_source_metadata(raw_by_pos: dict[str, list[dict]]) -> tuple[list[
                 source = row.get("source", "unknown")
                 all_sources.add(source)
                 positions_by_source.setdefault(source, set()).add(pos)
+                counts = counts_by_source.setdefault(source, {})
+                counts[pos] = counts.get(pos, 0) + 1
 
     for outcome in getattr(raw_by_pos, "outcomes", []):
         source = _outcome_value(outcome, "source")
@@ -169,6 +176,7 @@ def _aggregate_source_metadata(raw_by_pos: dict[str, list[dict]]) -> tuple[list[
         all_sources.add(source)
         if rows > 0 and position:
             positions_by_source.setdefault(source, set()).add(position)
+            counts_by_source.setdefault(source, {})[position] = rows
         elif reason and position:
             failures_by_source.setdefault(source, []).append({
                 "position": position,
@@ -178,6 +186,7 @@ def _aggregate_source_metadata(raw_by_pos: dict[str, list[dict]]) -> tuple[list[
     source_statuses: list[dict] = []
     for source in sorted(all_sources):
         positions = sorted(positions_by_source.get(source, set()))
+        position_counts = counts_by_source.get(source, {})
         failures = failures_by_source.get(source, [])
         used = bool(positions)
         if used and failures:
@@ -196,6 +205,7 @@ def _aggregate_source_metadata(raw_by_pos: dict[str, list[dict]]) -> tuple[list[
             "status": status,
             "used": used,
             "positions": positions,
+            "position_counts": position_counts,
             "reason": reason,
             "failures": failures,
         })
@@ -272,8 +282,11 @@ def _backfill_cached_diagnostic_fields(sheet: dict[str, Any]) -> None:
 async def _generate_sheet(cfg: LeagueConfig, fantasypros_api_key: str | None = None) -> dict[str, Any]:
     t0 = time.perf_counter()
 
-    # 1. Load player map (for bye weeks + ID bridging)
+    # 1. Load player map (for ID bridging) and per-team bye weeks. Bye weeks are
+    # a per-team property; Sleeper leaves them null off-season, so we source them
+    # from ESPN's pro-team schedule and apply them by team below.
     player_map = await load_player_map_async()
+    team_byes = await asyncio.to_thread(load_team_byes, cfg.season)
 
     # 2. Scrape projections for all positions
     raw_by_pos = await scrape_all(cfg)
@@ -310,6 +323,11 @@ async def _generate_sheet(cfg: LeagueConfig, fantasypros_api_key: str | None = N
         players = aggregate_projections(rows, pos, baselines.get(pos, 0.0), player_map, variance=variance)
         players = assign_tiers(players)
         players = assign_positional_scarcity(players)
+        # Fill bye week from the per-team map when the player map didn't supply it.
+        if team_byes:
+            for p in players:
+                if not p.bye_week:
+                    p.bye_week = team_byes.get(p.team)
         position_players[pos] = players
         all_players.extend(players)
 
@@ -321,7 +339,7 @@ async def _generate_sheet(cfg: LeagueConfig, fantasypros_api_key: str | None = N
     # (and its cache-file read) happens once per request instead of once per
     # position. Still off the event loop for the cold-cache HTTP case.
     all_rows = [p.__dict__ for p in all_players]
-    enriched, adp_available, ecr_available = await asyncio.to_thread(
+    enriched, adp_available, ecr_available, adp_season = await asyncio.to_thread(
         enrich_with_adp, all_rows, cfg.n_teams, ppr, cfg.season, fantasypros_api_key
     )
     for p, row in zip(all_players, enriched):
@@ -348,6 +366,7 @@ async def _generate_sheet(cfg: LeagueConfig, fantasypros_api_key: str | None = N
             "data_quality_warnings": data_quality_warnings,
             "adp_available": adp_available,
             "ecr_available": ecr_available,
+            "adp_season": adp_season,
             "cache_hit": False,
             "generation_time_s": round(elapsed, 2),
         },

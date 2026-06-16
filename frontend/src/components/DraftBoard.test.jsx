@@ -82,6 +82,51 @@ describe('DraftBoard', () => {
     expect(screen.queryByText('ECR: ADP proxy')).not.toBeInTheDocument()
   })
 
+  it('surfaces per-position counts, ADP fallback, and data-quality warnings in source details', async () => {
+    const user = userEvent.setup()
+    renderWithMetadata({
+      ppr: 0.5,
+      season: 2026,
+      adp_available: true,
+      adp_season: 2025,
+      data_quality_warnings: ['WR projections appear inflated (early-season data).'],
+      source_statuses: [
+        {
+          source: 'FantasyPros',
+          status: 'used',
+          used: true,
+          positions: ['QB', 'RB', 'WR'],
+          position_counts: { QB: 60, RB: 120, WR: 140 },
+          failures: [],
+        },
+      ],
+    })
+
+    await user.click(screen.getByRole('button', { name: /1 source/i }))
+
+    expect(screen.getByText('QB 60 · RB 120 · WR 140')).toBeInTheDocument()
+    expect(screen.getByText('ADP from 2025 — 2026 not yet published')).toBeInTheDocument()
+    expect(
+      screen.getByText('WR projections appear inflated (early-season data).')
+    ).toBeInTheDocument()
+  })
+
+  it('reports ADP unavailable in source details when no ADP loaded', async () => {
+    const user = userEvent.setup()
+    renderWithMetadata({
+      ppr: 0.5,
+      season: 2026,
+      adp_available: false,
+      source_statuses: [
+        { source: 'FantasyPros', status: 'used', used: true, positions: ['QB'], position_counts: { QB: 60 }, failures: [] },
+      ],
+    })
+
+    await user.click(screen.getByRole('button', { name: /1 source/i }))
+
+    expect(screen.getByText('ADP unavailable')).toBeInTheDocument()
+  })
+
   it('derives Val gradients from finite skill-position values only', () => {
     renderBoard({
       QB: [player('Top Skill', 'QB', 40)],

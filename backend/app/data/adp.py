@@ -141,7 +141,7 @@ def enrich_with_adp(
     ppr: float = 0.5,
     season: int | None = None,
     fantasypros_api_key: str | None = None,
-) -> tuple[list[dict], bool, bool]:
+) -> tuple[list[dict], bool, bool, int | None]:
     """
     Join ADP (FFC, by espn_id) and ECR (FantasyPros, by sleeper_id) onto rows.
 
@@ -151,12 +151,17 @@ def enrich_with_adp(
     (no API key / upstream down), ECR falls back to the FFC ADP rank — the
     behavior before real ECR existed.
 
-    Returns (enriched_rows, adp_available, ecr_available).
+    Returns (enriched_rows, adp_available, ecr_available, adp_season), where
+    adp_season is the season the ADP data actually came from (may be the prior
+    year when the requested season isn't published yet), or None when no ADP
+    was available.
     """
     adp_map = fetch_adp(n_teams, ppr, season)
     ecr_map = ecr.fetch_ecr(season, ppr, api_key=fantasypros_api_key) if season is not None else {}
     adp_available = bool(adp_map)
     ecr_available = bool(ecr_map)
+    # Every row in adp_map shares the same adp_season (set by fetch_adp).
+    adp_season = next(iter(adp_map.values())).get("adp_season") if adp_map else None
 
     for row in player_rows:
         eid = str(row.get("espn_id") or "")
@@ -172,7 +177,7 @@ def enrich_with_adp(
         row["ecr_rank"] = ecr_rank
         row["ecr_fmt"] = _fmt_ecr(ecr_rank, n_teams) if ecr_rank is not None else "—"
 
-    return player_rows, adp_available, ecr_available
+    return player_rows, adp_available, ecr_available, adp_season
 
 
 def _fmt_ecr(rank: int, n_teams: int) -> str:

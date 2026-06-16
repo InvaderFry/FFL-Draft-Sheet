@@ -70,7 +70,7 @@ def test_enrich_prefers_ecr_over_adp(monkeypatch):
     monkeypatch.setattr(adp.ecr, "fetch_ecr", lambda season, ppr, api_key=None: {"sid_a": 3})
 
     rows = [{"espn_id": "5001", "sleeper_id": "sid_a"}]
-    enriched, adp_avail, ecr_avail = adp.enrich_with_adp(rows, n_teams=12, ppr=0.5, season=SEASON)
+    enriched, adp_avail, ecr_avail, adp_season = adp.enrich_with_adp(rows, n_teams=12, ppr=0.5, season=SEASON)
 
     assert adp_avail is True and ecr_avail is True
     assert enriched[0]["adp_rank"] == 7
@@ -85,11 +85,38 @@ def test_enrich_falls_back_to_adp_as_ecr_proxy(monkeypatch):
     monkeypatch.setattr(adp.ecr, "fetch_ecr", lambda season, ppr, api_key=None: {})  # no ECR
 
     rows = [{"espn_id": "5001", "sleeper_id": "sid_a"}]
-    enriched, adp_avail, ecr_avail = adp.enrich_with_adp(rows, n_teams=12, ppr=0.5, season=SEASON)
+    enriched, adp_avail, ecr_avail, adp_season = adp.enrich_with_adp(rows, n_teams=12, ppr=0.5, season=SEASON)
 
     assert adp_avail is True and ecr_avail is False
     assert enriched[0]["ecr_rank"] == 7            # proxied from ADP
     assert enriched[0]["ecr_fmt"] == "1|07"
+
+
+def test_enrich_reports_prior_season_fallback(monkeypatch):
+    # Current season sparse → fetch_adp falls back to prior year; enrich_with_adp
+    # should surface that prior season as adp_season.
+    def fake_get(url, params=None, **kwargs):
+        if params.get("year") == SEASON:
+            return _resp(_players(3))            # sparse → triggers fallback
+        return _resp(_players(50, start=100))    # prior season healthy
+    monkeypatch.setattr(adp.httpx, "get", MagicMock(side_effect=fake_get))
+    monkeypatch.setattr(adp.ecr, "fetch_ecr", lambda season, ppr, api_key=None: {})
+
+    rows = [{"espn_id": "1100", "sleeper_id": "sid_x"}]
+    _, adp_avail, _, adp_season = adp.enrich_with_adp(rows, n_teams=12, ppr=1.0, season=SEASON)
+
+    assert adp_avail is True
+    assert adp_season == SEASON - 1
+
+
+def test_enrich_adp_season_none_when_no_adp(monkeypatch):
+    monkeypatch.setattr(adp, "fetch_adp", lambda n, ppr, season: {})
+    monkeypatch.setattr(adp.ecr, "fetch_ecr", lambda season, ppr, api_key=None: {})
+
+    _, _, _, adp_season = adp.enrich_with_adp(
+        [{"espn_id": "1", "sleeper_id": "s"}], n_teams=12, ppr=0.5, season=SEASON
+    )
+    assert adp_season is None
 
 
 def test_enrich_unmatched_player_is_blank(monkeypatch):
@@ -97,7 +124,7 @@ def test_enrich_unmatched_player_is_blank(monkeypatch):
     monkeypatch.setattr(adp.ecr, "fetch_ecr", lambda season, ppr, api_key=None: {})
 
     rows = [{"espn_id": "9999", "sleeper_id": "nope"}]
-    enriched, adp_avail, ecr_avail = adp.enrich_with_adp(rows, n_teams=12, ppr=0.5, season=SEASON)
+    enriched, adp_avail, ecr_avail, adp_season = adp.enrich_with_adp(rows, n_teams=12, ppr=0.5, season=SEASON)
 
     assert adp_avail is False and ecr_avail is False
     assert enriched[0]["adp_rank"] is None
