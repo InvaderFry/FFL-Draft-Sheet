@@ -105,19 +105,23 @@ describe('PrintView', () => {
     expect(screen.getByText(/ZSheet/)).toBeInTheDocument()
   })
 
-  it('uses the actual Val range for print high and low tint thresholds', () => {
+  it('shades the full Val range continuously, including mid-range values', () => {
     const lowValPlayer = { ...player, sleeper_id: 'low', player_name: 'Low Value', val: -20, floor: null, ceil: null }
+    const midValPlayer = { ...player, sleeper_id: 'mid', player_name: 'Mid Value', pos: 'QB', val: 10, floor: null, ceil: null }
     const highValPlayer = { ...player, sleeper_id: 'high', player_name: 'High Value', pos: 'WR', val: 40, floor: null, ceil: null }
 
     render(
       <PrintView
-        sheetData={{ positions: { QB: [], RB: [lowValPlayer], WR: [highValPlayer], TE: [], DST: [] }, metadata: {} }}
+        sheetData={{ positions: { QB: [midValPlayer], RB: [lowValPlayer], WR: [highValPlayer], TE: [], DST: [] }, metadata: {} }}
         config={{ n_teams: 12, RB: 2, WR: 3, auction_mode: false, scoring: { rec: 0.5 } }}
         isDrafted={() => false}
       />
     )
 
-    expect(screen.getByText('(20.0)')).toHaveStyle({ backgroundColor: 'rgba(37, 99, 235, 0.25)' })
-    expect(screen.getByText('40.0')).toHaveStyle({ backgroundColor: 'rgba(234, 88, 12, 0.4)' })
+    // Endpoints keep their blue/orange colors; alpha is now a uniform 0.30.
+    expect(screen.getByText('(20.0)')).toHaveStyle({ backgroundColor: 'rgba(37, 99, 235, 0.3)' })
+    expect(screen.getByText('40.0')).toHaveStyle({ backgroundColor: 'rgba(234, 88, 12, 0.3)' })
+    // Mid-range value (t=0.5) is now colored too, where it used to be blank.
+    expect(screen.getByText('10.0')).toHaveStyle({ backgroundColor: 'rgba(112, 151, 39, 0.3)' })
   })
 })
