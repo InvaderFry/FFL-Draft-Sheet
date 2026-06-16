@@ -57,7 +57,31 @@ function renderBoard(positions, props = {}) {
   )
 }
 
+function renderWithMetadata(metadata) {
+  return render(
+    <ThemeProvider>
+      <DraftBoard
+        sheetData={{ positions: { QB: [], RB: [], WR: [], TE: [], DST: [] }, metadata }}
+        config={{ n_teams: 12, auction_mode: false }}
+        onPrint={vi.fn()}
+        isDrafted={() => false}
+        onToggle={vi.fn()}
+      />
+    </ThemeProvider>
+  )
+}
+
 describe('DraftBoard', () => {
+  it('flags ECR as an ADP proxy when FantasyPros ECR is unavailable', () => {
+    renderWithMetadata({ ppr: 0.5, ecr_available: false })
+    expect(screen.getByText('ECR: ADP proxy')).toBeInTheDocument()
+  })
+
+  it('omits the ECR proxy flag when real ECR is available', () => {
+    renderWithMetadata({ ppr: 0.5, ecr_available: true })
+    expect(screen.queryByText('ECR: ADP proxy')).not.toBeInTheDocument()
+  })
+
   it('derives Val gradients from finite skill-position values only', () => {
     renderBoard({
       QB: [player('Top Skill', 'QB', 40)],

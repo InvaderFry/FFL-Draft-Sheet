@@ -167,6 +167,14 @@ export default function DraftBoard({
           <span className={styles.metaTag}>
             {nTeams}-team · {metadata?.ppr === 1 ? 'Full PPR' : metadata?.ppr === 0.5 ? 'Half PPR' : 'Standard'}
           </span>
+          {metadata?.ecr_available === false && (
+            <span
+              className={styles.metaTag}
+              title="FantasyPros ECR is unavailable (no API key or not yet published), so the ECR column is approximated from ADP."
+            >
+              ECR: ADP proxy
+            </span>
+          )}
           {sourceDetails.hasDetails && (
             <div className={styles.sourceWrap}>
               <button

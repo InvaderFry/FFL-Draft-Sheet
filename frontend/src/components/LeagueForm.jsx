@@ -10,6 +10,11 @@ import styles from './LeagueForm.module.css'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
+// The FantasyPros API key is a credential, so it lives in sessionStorage
+// (tab-scoped, cleared when the tab closes) rather than the localStorage
+// settings blob — mirroring how DraftSync handles espn_s2/SWID.
+const FP_KEY_STORAGE = 'beersheet_fp_key'
+
 const DEFAULT_SETTINGS = {
   n_teams: 12,
   fantasy_weeks: 14,
@@ -44,12 +49,23 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
   const [loading, setLoading] = useState(false)
   const [validationError, setValidationError] = useState({})
   const [clearStatus, setClearStatus] = useState(null) // null | 'clearing' | 'cleared' | 'error'
+  const [fpKey, setFpKey] = useState(() => {
+    try { return sessionStorage.getItem(FP_KEY_STORAGE) || '' } catch (_) { return '' }
+  })
   const clearTimerRef = useRef(null)
 
   // Persist settings
   useEffect(() => {
     try { localStorage.setItem('beersheet_settings', JSON.stringify(settings)) } catch (_) {}
   }, [settings])
+
+  // Persist the FantasyPros key to sessionStorage only (never localStorage).
+  useEffect(() => {
+    try {
+      if (fpKey) sessionStorage.setItem(FP_KEY_STORAGE, fpKey)
+      else sessionStorage.removeItem(FP_KEY_STORAGE)
+    } catch (_) {}
+  }, [fpKey])
 
   // Cancel any pending clear-status reset on unmount to avoid setState on detached instance
   useEffect(() => {
@@ -139,13 +155,18 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
       },
     }
 
+    // Send the key only when present, and only in the request body — never in
+    // the `payload` handed to onSheet (which becomes App-level config state).
+    const trimmedKey = fpKey.trim()
+    const body = trimmedKey ? { ...payload, fantasypros_api_key: trimmedKey } : payload
+
     setLoading(true)
     onLoading(true)
     try {
       const res = await fetch(`${API_URL}/api/sheet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(body),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
@@ -329,6 +350,25 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
                 onChange={e => update('auction_budget', e.target.value)} />
             </label>
           )}
+        </section>
+
+        {/* ECR (optional) */}
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>ECR <span className={styles.hint}>(optional)</span></h3>
+          <label className={styles.keyField}>
+            <span>FantasyPros API key</span>
+            <input type="password" autoComplete="off" spellCheck={false}
+              className={styles.keyInput}
+              placeholder="Enables real Expert Consensus Rankings"
+              value={fpKey}
+              onChange={e => setFpKey(e.target.value)} />
+          </label>
+          <p className={styles.keyHelp}>
+            Optional. With a key, the ECR column uses real FantasyPros consensus
+            rankings; without one it falls back to ADP. Get a key at{' '}
+            <a href="https://www.fantasypros.com/apis/" target="_blank" rel="noreferrer">fantasypros.com/apis</a>.
+            Stored only in this browser tab and sent only to this app&apos;s backend.
+          </p>
         </section>
       </div>
 
