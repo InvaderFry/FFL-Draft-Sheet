@@ -31,18 +31,16 @@ describe('valBgStyle', () => {
     expect(style.backgroundColor).toBe('rgba(250, 179, 135, 0.3)')
   })
 
-  it('returns interpolated midpoint for mocha theme', () => {
+  it('returns the green spectrum stop at the midpoint for mocha theme', () => {
     const style = valBgStyle(20, -60, 100, 'mocha')
-    // midpoint of #89b4fa and #fab387:
-    // r: round(137 + (250-137)*0.5) = round(137+56.5) = round(193.5) = 194
-    // g: round(180 + (179-180)*0.5) = round(180-0.5) = round(179.5) = 180
-    // b: round(250 + (135-250)*0.5) = round(250-57.5) = round(192.5) = 193
-    expect(style.backgroundColor).toBe('rgba(194, 180, 193, 0.3)')
+    // 5 stops → t=0.5 lands exactly on the middle (green) stop #a6e3a1 → rgb(166, 227, 161)
+    expect(style.backgroundColor).toBe('rgba(166, 227, 161, 0.3)')
   })
 
   it('uses the full negative-to-positive range instead of flattening zero to blue', () => {
     expect(valBgStyle(-20, -20, 40, 'mocha').backgroundColor).toBe('rgba(137, 180, 250, 0.3)')
-    expect(valBgStyle(0, -20, 40, 'mocha').backgroundColor).toBe('rgba(175, 180, 212, 0.3)')
+    // t=1/3 → between the sky (#89dceb) and green (#a6e3a1) stops
+    expect(valBgStyle(0, -20, 40, 'mocha').backgroundColor).toBe('rgba(147, 222, 210, 0.3)')
   })
 
   it('returns low color (blue) at t=0 for latte theme', () => {

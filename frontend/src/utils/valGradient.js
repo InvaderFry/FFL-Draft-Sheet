@@ -1,16 +1,19 @@
 /**
- * valGradient — blue→orange background coloring for VAL and PS% cells.
+ * valGradient — spectrum background coloring for VAL and PS% cells.
  *
  * Follows the same pattern as ecrColor.js: pure functions, no React deps.
- * Colors match the existing --c-ecr-blue / --c-ecr-orange CSS variables
- * for each theme, using the Catppuccin palette for mocha/latte.
- * The print theme uses hardcoded paper-safe blue/orange endpoints.
+ * Each theme defines an ordered list of color stops sweeping from low (t=0)
+ * to high (t=1): blue → sky → green → yellow → orange. Interpolating across
+ * adjacent palette stops keeps the mid-range vivid (green/yellow) instead of
+ * passing through a muddy gray when blending blue straight into orange.
+ * The print theme uses hardcoded paper-safe stops.
  */
 
-const GRADIENT_COLORS = {
-  mocha: { low: '#89b4fa', high: '#fab387' },
-  latte: { low: '#1e66f5', high: '#fe640b' },
-  print: { low: '#2563eb', high: '#ea580c' },
+// Ordered low (t=0) → high (t=1): blue → sky → green → yellow → peach/orange
+const GRADIENT_STOPS = {
+  mocha: ['#89b4fa', '#89dceb', '#a6e3a1', '#f9e2af', '#fab387'], // blue, sky, green, yellow, peach
+  latte: ['#1e66f5', '#04a5e5', '#40a02b', '#df8e1d', '#fe640b'], // blue, sky, green, yellow, peach
+  print: ['#2563eb', '#0891b2', '#16a34a', '#ca8a04', '#ea580c'], // paper-safe blue→cyan→green→amber→orange
 }
 
 const VAL_RANGE_POSITIONS = ['QB', 'RB', 'WR', 'TE']
@@ -31,6 +34,13 @@ function interpolateHex(hexA, hexB, t) {
   const g = Math.round(g1 + (g2 - g1) * t)
   const b = Math.round(b1 + (b2 - b1) * t)
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+}
+
+function interpolateStops(stops, t) {
+  if (stops.length === 1) return stops[0]
+  const scaled = t * (stops.length - 1)
+  const i = Math.min(Math.floor(scaled), stops.length - 2) // clamp last segment
+  return interpolateHex(stops[i], stops[i + 1], scaled - i)
 }
 
 function hexToRgba(hex, alpha) {
@@ -84,8 +94,8 @@ export function valGradientPosition(value, minValue, maxValue) {
 export function valBgStyle(value, minValue, maxValue, theme, alpha = 0.30) {
   const t = valGradientPosition(value, minValue, maxValue)
   if (t == null) return {}
-  const colors = GRADIENT_COLORS[theme] ?? GRADIENT_COLORS.mocha
-  const hex = interpolateHex(colors.low, colors.high, t)
+  const stops = GRADIENT_STOPS[theme] ?? GRADIENT_STOPS.mocha
+  const hex = interpolateStops(stops, t)
   return { backgroundColor: hexToRgba(hex, alpha) }
 }
 
