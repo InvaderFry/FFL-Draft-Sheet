@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react'
 import { ecrColor } from '../utils/ecrColor'
-import { fmtVal } from '../utils/formatters'
+import { fmtVal, fmtInt, fmtPct } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle, valGradientPosition, valRangeFromPositions } from '../utils/valGradient'
 import '../styles/print.css'
 
@@ -145,12 +145,10 @@ function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, au
                 </td>
                 <td className="col-tmbw">{teamBye(player)}</td>
                 <td className="col-ecr" style={printEcrStyle(ecr)}>{player.ecr_fmt || '—'}</td>
-                <td className="col-num">{fmtVal(player.floor)}</td>
+                <td className="col-num">{fmtInt(player.floor)}</td>
                 <td className="col-num col-val" style={printValStyle(player.val, minVal, maxVal)}>{fmtVal(player.val)}</td>
-                <td className="col-num">{fmtVal(player.ceil)}</td>
-                <td className="col-num" style={printPsStyle(player.ps_pct)}>
-                  {player.ps_pct != null ? `${Math.round(player.ps_pct)}%` : '—'}
-                </td>
+                <td className="col-num">{fmtInt(player.ceil)}</td>
+                <td className="col-num" style={printPsStyle(player.ps_pct)}>{fmtPct(player.ps_pct)}</td>
                 {auctionMode && (
                   <td className="col-num col-auction">
                     {player.auction_price != null ? `$${player.auction_price}` : '—'}
