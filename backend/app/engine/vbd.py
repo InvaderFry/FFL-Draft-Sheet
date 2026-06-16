@@ -137,7 +137,6 @@ def aggregate_projections(
                 "gsis_id": row.get("gsis_id"),
                 "player_name": name,
                 "team": team,
-                "bye_week": row.get("bye_week"),
             }
         else:
             # Prefer non-null IDs
@@ -147,8 +146,6 @@ def aggregate_projections(
                 meta[key]["espn_id"] = eid
             if not meta[key]["gsis_id"] and row.get("gsis_id"):
                 meta[key]["gsis_id"] = row.get("gsis_id")
-            if not meta[key]["bye_week"] and row.get("bye_week"):
-                meta[key]["bye_week"] = row.get("bye_week")
 
     records: list[PlayerVBD] = []
     for key, pts_list in groups.items():
@@ -166,9 +163,6 @@ def aggregate_projections(
             rec = player_info_map[sid]
             bye = getattr(rec, "bye_week", None)
             gsis_id = getattr(rec, "gsis_id", None) or gsis_id
-        # Fallback: use bye_week scraped directly from a projection source (e.g. FP HTML)
-        if bye is None:
-            bye = m.get("bye_week")
 
         val = mean - baseline
         band = sd

@@ -86,24 +86,6 @@ def test_floor_ceil_falls_back_to_pos_median_cv():
     assert p.ceil == pytest.approx((100.0 + 50.0) - 40.0)
 
 
-def test_bye_week_from_row_when_player_map_missing():
-    """bye_week scraped directly from a source row is used when player_info_map is absent."""
-    rows = [
-        {**_make_row("Josh Allen", "BUF", 380.0, "FantasyPros", "ja_id", pos="QB"), "bye_week": 9},
-        {**_make_row("Josh Allen", "BUF", 370.0, "FFToday",     "ja_id", pos="QB"), "bye_week": None},
-    ]
-    p = aggregate_projections(rows, "QB", baseline=100.0, player_info_map=None)[0]
-    assert p.bye_week == 9
-
-
-def test_bye_week_from_player_map_takes_precedence():
-    """player_info_map bye_week wins over the scraper row value."""
-    rows = [{**_make_row("CMC", "SF", 300.0, "FantasyPros", "cmc_id"), "bye_week": 7}]
-    player_map = {"cmc_id": SimpleNamespace(bye_week=11, gsis_id=None)}
-    p = aggregate_projections(rows, "RB", baseline=50.0, player_info_map=player_map)[0]
-    assert p.bye_week == 11
-
-
 def test_floor_ceil_no_gsis_uses_source_sigma_with_variance_loaded():
     rows = [_make_row("Unresolved TE", "FA", 180.0, "ESPN", "unresolved_id", pos="TE")]
     player_map = {"unresolved_id": SimpleNamespace(bye_week=None, gsis_id=None)}

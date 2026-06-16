@@ -33,6 +33,7 @@ function buildSourceDetails(metadata) {
       status: entry.status || (entry.used ? 'used' : 'unavailable'),
       used: entry.used || entry.status === 'used' || entry.status === 'partial',
       positions: entry.positions || [],
+      positionCounts: entry.position_counts || {},
       reason: entry.reason || entry.failures?.[0]?.reason || null,
       failures: entry.failures || [],
     }))
@@ -49,6 +50,7 @@ function buildSourceDetails(metadata) {
     status: 'used',
     used: true,
     positions: [],
+    positionCounts: {},
     reason: null,
     failures: [],
   }))
@@ -57,6 +59,7 @@ function buildSourceDetails(metadata) {
     status: 'unavailable',
     used: false,
     positions: [],
+    positionCounts: {},
     reason: null,
     failures: [],
   }))
@@ -70,6 +73,28 @@ function buildSourceDetails(metadata) {
 
 function sourceCountLabel(count) {
   return `${count} source${count !== 1 ? 's' : ''}`
+}
+
+// "QB 60 · RB 120 · WR 140" when row counts are present, else the plain
+// position list ("QB, RB, WR"). Order follows the positions array.
+function formatPositions(entry) {
+  const counts = entry.positionCounts || {}
+  if (entry.positions.length === 0) return ''
+  const hasCounts = entry.positions.some((pos) => counts[pos] != null)
+  if (!hasCounts) return entry.positions.join(', ')
+  return entry.positions
+    .map((pos) => (counts[pos] != null ? `${pos} ${counts[pos]}` : pos))
+    .join(' · ')
+}
+
+// A short note on ADP availability / prior-season fallback for the panel.
+function adpStatusNote(metadata) {
+  if (metadata?.adp_available === false) return 'ADP unavailable'
+  const { adp_season: adpSeason, season } = metadata || {}
+  if (adpSeason && season && adpSeason !== season) {
+    return `ADP from ${adpSeason} — ${season} not yet published`
+  }
+  return null
 }
 
 export default function DraftBoard({
@@ -217,7 +242,7 @@ export default function DraftBoard({
                               )}
                             </div>
                             {entry.positions.length > 0 && (
-                              <div className={styles.sourceMeta}>{entry.positions.join(', ')}</div>
+                              <div className={styles.sourceMeta}>{formatPositions(entry)}</div>
                             )}
                             {entry.failures.length > 0 && (
                               <ul className={styles.warningList}>
@@ -249,6 +274,20 @@ export default function DraftBoard({
                               )}
                             </div>
                           </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(adpStatusNote(metadata) || (metadata?.data_quality_warnings?.length > 0)) && (
+                    <div className={styles.sourceSection}>
+                      <div className={styles.sourceSectionTitle}>Diagnostics</div>
+                      <ul className={styles.warningList}>
+                        {adpStatusNote(metadata) && (
+                          <li key="adp-status">{adpStatusNote(metadata)}</li>
+                        )}
+                        {(metadata?.data_quality_warnings || []).map((warning) => (
+                          <li key={warning}>{warning}</li>
                         ))}
                       </ul>
                     </div>
