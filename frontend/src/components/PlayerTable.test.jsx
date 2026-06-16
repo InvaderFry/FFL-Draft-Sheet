@@ -78,8 +78,10 @@ describe('PlayerTable', () => {
       player('Highest', 3, false, 40),
     ], { minVal: -20, maxVal: 40 })
 
-    expect(screen.getByText('(20.0)')).toHaveStyle({ backgroundColor: 'rgba(137, 180, 250, 0.3)' })
-    expect(screen.getByText('0.0')).toHaveStyle({ backgroundColor: 'rgba(166, 227, 161, 0.3)' })
+    // Use closest row to scope queries — val=0 and ps_pct=0 both render as "0.0"
+    expect(screen.getByText('-20.0')).toHaveStyle({ backgroundColor: 'rgba(137, 180, 250, 0.3)' })
+    const middleValCell = screen.getByText('Middle').closest('tr').querySelector('[class*="valCell"]')
+    expect(middleValCell).toHaveStyle({ backgroundColor: 'rgba(166, 227, 161, 0.3)' })
     expect(screen.getByText('40.0')).toHaveStyle({ backgroundColor: 'rgba(250, 179, 135, 0.3)' })
   })
 

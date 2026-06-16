@@ -119,7 +119,7 @@ describe('PrintView', () => {
     )
 
     // Endpoints keep their blue/orange colors; alpha is now a uniform 0.30.
-    expect(screen.getByText('(20.0)')).toHaveStyle({ backgroundColor: 'rgba(37, 99, 235, 0.3)' })
+    expect(screen.getByText('-20.0')).toHaveStyle({ backgroundColor: 'rgba(37, 99, 235, 0.3)' })
     expect(screen.getByText('40.0')).toHaveStyle({ backgroundColor: 'rgba(234, 88, 12, 0.3)' })
     // Mid-range value (t=0.5) is now colored too, where it used to be blank.
     expect(screen.getByText('10.0')).toHaveStyle({ backgroundColor: 'rgba(112, 151, 39, 0.3)' })
