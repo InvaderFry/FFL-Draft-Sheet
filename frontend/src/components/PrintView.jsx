@@ -187,12 +187,15 @@ export default function PrintView({ sheetData, config, isDrafted }) {
     <div className="zsheet-print print-sheet" aria-hidden="true">
       <header className="print-heading">
         <div className="print-title-row">
-          <h2>ZSheet — {nTeams} Team · {pprLabel(scoring)}</h2>
-          <span className="print-title-roster">{buildRosterLine(config)}</span>
+          <div className="print-brand">
+            <span className="print-wordmark">ZSheet</span>
+            <span className="print-format">{nTeams}-Team · {pprLabel(scoring)}</span>
+          </div>
           <time>{new Date().toLocaleDateString()}</time>
         </div>
-        <div className="print-subtitle">
-          {buildScoringLine(scoring)}
+        <div className="print-meta-strip">
+          <span className="print-meta-label">Roster</span>
+          <span className="print-meta-value">{buildRosterLine(config)}</span>
         </div>
       </header>
 
@@ -258,6 +261,7 @@ export default function PrintView({ sheetData, config, isDrafted }) {
         </section>
 
         <section className="print-notes">
+          <p className="print-scoring"><strong>Scoring:</strong> {buildScoringLine(scoring)}</p>
           <p><strong>ECR:</strong> Player rank from FantasyPros Expert Consensus Ranking formatted as Rnd|Pick, so 1|3 means the 3rd pick of the 1st round. Orange means ADP is a round or more behind consensus: value, likely available later than expected. Blue means ADP is a round or more ahead: tends to go earlier than experts suggest.</p>
           <p><strong>F, VAL, C:</strong> Player projected weekly value above a positional baseline replacement player. Rows are shaded by value tiers. A thicker top border marks a new tier. F and C are floor and ceiling based on projection variance.</p>
           <p><strong>PS:</strong> Positional scarcity, the percentage of total positive value remaining in the position after this player is selected.</p>
