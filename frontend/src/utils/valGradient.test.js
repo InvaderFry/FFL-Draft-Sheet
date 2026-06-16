@@ -31,16 +31,16 @@ describe('valBgStyle', () => {
     expect(style.backgroundColor).toBe('rgba(250, 179, 135, 0.3)')
   })
 
-  it('returns the green spectrum stop at the midpoint for mocha theme', () => {
+  it('blends through the green/yellow spectrum at the midpoint for mocha theme', () => {
     const style = valBgStyle(20, -60, 100, 'mocha')
-    // 5 stops → t=0.5 lands exactly on the middle (green) stop #a6e3a1 → rgb(166, 227, 161)
-    expect(style.backgroundColor).toBe('rgba(166, 227, 161, 0.3)')
+    // 4 stops → t=0.5 falls between the green (#a6e3a1) and yellow (#f9e2af) stops
+    expect(style.backgroundColor).toBe('rgba(208, 227, 168, 0.3)')
   })
 
   it('uses the full negative-to-positive range instead of flattening zero to blue', () => {
     expect(valBgStyle(-20, -20, 40, 'mocha').backgroundColor).toBe('rgba(137, 180, 250, 0.3)')
-    // t=1/3 → between the sky (#89dceb) and green (#a6e3a1) stops
-    expect(valBgStyle(0, -20, 40, 'mocha').backgroundColor).toBe('rgba(147, 222, 210, 0.3)')
+    // t=1/3 → lands exactly on the green stop (#a6e3a1)
+    expect(valBgStyle(0, -20, 40, 'mocha').backgroundColor).toBe('rgba(166, 227, 161, 0.3)')
   })
 
   it('returns low color (blue) at t=0 for latte theme', () => {

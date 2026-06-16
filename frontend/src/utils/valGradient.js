@@ -3,17 +3,17 @@
  *
  * Follows the same pattern as ecrColor.js: pure functions, no React deps.
  * Each theme defines an ordered list of color stops sweeping from low (t=0)
- * to high (t=1): blue → sky → green → yellow → orange. Interpolating across
+ * to high (t=1): blue → green → yellow → orange. Interpolating across
  * adjacent palette stops keeps the mid-range vivid (green/yellow) instead of
  * passing through a muddy gray when blending blue straight into orange.
  * The print theme uses hardcoded paper-safe stops.
  */
 
-// Ordered low (t=0) → high (t=1): blue → sky → green → yellow → peach/orange
+// Ordered low (t=0) → high (t=1): blue → green → yellow → peach/orange
 const GRADIENT_STOPS = {
-  mocha: ['#89b4fa', '#89dceb', '#a6e3a1', '#f9e2af', '#fab387'], // blue, sky, green, yellow, peach
-  latte: ['#1e66f5', '#04a5e5', '#40a02b', '#df8e1d', '#fe640b'], // blue, sky, green, yellow, peach
-  print: ['#2563eb', '#0891b2', '#16a34a', '#ca8a04', '#ea580c'], // paper-safe blue→cyan→green→amber→orange
+  mocha: ['#89b4fa', '#a6e3a1', '#f9e2af', '#fab387'], // blue, green, yellow, peach
+  latte: ['#1e66f5', '#40a02b', '#df8e1d', '#fe640b'], // blue, green, yellow, peach
+  print: ['#2563eb', '#16a34a', '#ca8a04', '#ea580c'], // paper-safe blue→green→amber→orange
 }
 
 const VAL_RANGE_POSITIONS = ['QB', 'RB', 'WR', 'TE']
