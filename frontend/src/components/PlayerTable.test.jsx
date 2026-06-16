@@ -78,9 +78,9 @@ describe('PlayerTable', () => {
       player('Highest', 3, false, 40),
     ], { minVal: -20, maxVal: 40 })
 
-    expect(screen.getByText('(20.0)')).toHaveStyle({ backgroundColor: 'rgba(96, 165, 250, 0.3)' })
-    expect(screen.getByText('0.0')).toHaveStyle({ backgroundColor: 'rgba(148, 159, 187, 0.3)' })
-    expect(screen.getByText('40.0')).toHaveStyle({ backgroundColor: 'rgba(251, 146, 60, 0.3)' })
+    expect(screen.getByText('(20.0)')).toHaveStyle({ backgroundColor: 'rgba(137, 180, 250, 0.3)' })
+    expect(screen.getByText('0.0')).toHaveStyle({ backgroundColor: 'rgba(147, 222, 210, 0.3)' })
+    expect(screen.getByText('40.0')).toHaveStyle({ backgroundColor: 'rgba(250, 179, 135, 0.3)' })
   })
 
   it('omits Val gradient styles when all values share the same range endpoint', () => {

@@ -1,21 +1,11 @@
-export const POS_COLORS = {
-  ALL: '#94a3b8',
-  QB:  '#ef4444',
-  RB:  '#22c55e',
-  WR:  '#60a5fa',
-  TE:  '#f59e0b',
-  DST: '#a855f7',
-}
-
 export const THEME_POS_COLORS = {
-  dark: POS_COLORS,
-  macchiato: {
-    ALL: '#939ab7',
-    QB:  '#ed8796',
-    RB:  '#a6da95',
-    WR:  '#8aadf4',
-    TE:  '#eed49f',
-    DST: '#c6a0f6',
+  mocha: {
+    ALL: '#9399b2',
+    QB:  '#f38ba8',
+    RB:  '#a6e3a1',
+    WR:  '#89b4fa',
+    TE:  '#f9e2af',
+    DST: '#cba6f7',
   },
   latte: {
     ALL: '#9ca0b0',

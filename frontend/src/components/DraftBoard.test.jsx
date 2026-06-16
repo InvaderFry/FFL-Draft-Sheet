@@ -68,8 +68,8 @@ describe('DraftBoard', () => {
       K: [player('Kicker', 'K', 100)],
     })
 
-    expect(screen.getByText('5.0')).toHaveStyle({ backgroundColor: 'rgba(96, 165, 250, 0.3)' })
-    expect(screen.getByText('40.0')).toHaveStyle({ backgroundColor: 'rgba(251, 146, 60, 0.3)' })
+    expect(screen.getByText('5.0')).toHaveStyle({ backgroundColor: 'rgba(137, 180, 250, 0.3)' })
+    expect(screen.getByText('40.0')).toHaveStyle({ backgroundColor: 'rgba(250, 179, 135, 0.3)' })
   })
 
   it('searches visible rows from the board header', async () => {
