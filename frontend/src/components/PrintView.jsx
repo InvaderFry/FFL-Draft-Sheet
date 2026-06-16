@@ -2,8 +2,11 @@ import { memo, useMemo } from 'react'
 import { ecrColor } from '../utils/ecrColor'
 import { fmtVal, fmtInt, fmtPct } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle, valGradientPosition, valRangeFromPositions } from '../utils/valGradient'
-import { tierFor } from '../utils/tierAccess'
+import { tierFor, TIER_METHODS } from '../utils/tierAccess'
 import '../styles/print.css'
+
+const METHOD_LABEL = Object.fromEntries(TIER_METHODS.map(m => [m.id, m.label]))
+const methodLabel = (id) => METHOD_LABEL[id] || id
 
 const POSITION_LABELS = {
   QB: 'QUARTERBACK',
@@ -285,7 +288,7 @@ export default function PrintView({ sheetData, config, isDrafted, shadeBy = 'jen
         <section className="print-notes">
           <p className="print-scoring"><strong>Scoring:</strong> {buildScoringLine(scoring)}</p>
           <p><strong>ECR:</strong> Player rank from FantasyPros Expert Consensus Ranking formatted as Rnd|Pick, so 1|3 means the 3rd pick of the 1st round. Orange means ADP is a round or more behind consensus: value, likely available later than expected. Blue means ADP is a round or more ahead: tends to go earlier than experts suggest.</p>
-          <p><strong>F, VAL, C:</strong> Player projected weekly value above a positional baseline replacement player. Rows are shaded by value tiers. A thicker top border marks a new tier. F and C are floor and ceiling based on projection variance.</p>
+          <p><strong>F, VAL, C:</strong> Player projected weekly value above a positional baseline replacement player. Rows are shaded into tiers by the {methodLabel(shadeBy)} method; a thicker top border marks each new tier.{linesBy !== 'none' && ` A second, darker border marks ${methodLabel(linesBy)} tier boundaries, so two tiering methods can be compared at a glance.`} F and C are floor and ceiling based on projection variance.</p>
           <p><strong>PS:</strong> Positional scarcity, the percentage of total positive value remaining in the position after this player is selected.</p>
           {auctionMode && <p><strong>$:</strong> Estimated auction price derived from each player&apos;s share of total positive draft value.</p>}
           {metadata?.baselines && (

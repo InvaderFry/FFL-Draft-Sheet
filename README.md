@@ -2,7 +2,7 @@
 
 **A free, league-customizable fantasy football draft cheat sheet** — the BeerSheets-style tool the r/fantasyfootball community has been missing since 2023.
 
-Generates a Value-Based Drafting board with man-games baseline, Jenks natural-break tiers, ECR round|pick formatting, and a printable one-page layout — all from public data, no paid subscriptions required.
+Generates a Value-Based Drafting board with man-games baseline, switchable tier methods (Jenks / GMM / manual), ECR round|pick formatting, and a printable one-page layout — all from public data, no paid subscriptions required.
 
 ---
 
@@ -10,7 +10,11 @@ Generates a Value-Based Drafting board with man-games baseline, Jenks natural-br
 
 - **Value-Based Drafting (VBD)** with the Frank Dupont "man-games" replacement baseline
 - **Floor / VAL / Ceiling** columns using historical weekly outcome variance, with source-σ fallback
-- **Jenks natural-break tiers** (12 for RB/WR, 8 for QB/TE, 6 for DST)
+- **Switchable tier methods** (12 tiers for RB/WR, 8 for QB/TE, 6 for DST):
+  - **Jenks** natural breaks (default) and a **GMM** (Gaussian-mixture, Boris-Chen-style) method, both computed server-side
+  - **Boris Chen** published tiers (scaffolded — lights up when a tier CSV is supplied)
+  - **Manual** tiers you edit yourself, seeded from any method and saved per league
+- **Dual-encoding tier display** — shade rows by one method *and* draw colored boundary lines for a second, to compare two tiering methods at a glance (the "Shade" / "Lines" selectors)
 - **Positional scarcity (PS%)** — share of value remaining after each player
 - **ECR** formatted as `round|pick` with ADP-divergence coloring (blue = going earlier, orange = later)
 - **Auction dollar values** using the standard VBD-to-dollars formula
@@ -99,7 +103,7 @@ npm run lint    # eslint
 }
 ```
 
-**Response:** Player rows per position with `val`, `floor`, `ceil`, `ps_pct`, `ecr_fmt`, `tier`, `tier_is_even`.
+**Response:** Player rows per position with `val`, `floor`, `ceil`, `ps_pct`, `ecr_fmt`, `tier`, `tier_is_even`, and `tiers` (a per-method map, e.g. `{"jenks": 3, "gmm": 4}`; `tier`/`tier_is_even` mirror the default Jenks method for back-compat). Manual tiers are not in the response — they live in the browser's `localStorage`, keyed per league.
 
 > **Note:** `K` (kicker) is accepted in the request for forward-compatibility but is
 > not yet scored — there is no kicker projection source wired in, so the response
@@ -244,7 +248,7 @@ frontend/ (React 18 + Vite)      backend/ (Python 3.12 + FastAPI)
   useDraftState.js                    ├── nfl_data_py attrition curves + weekly variance
   ecrColor.js                         ├── Man-games baseline (Dupont)
                                       ├── VBD (Floor/VAL/Ceil)
-                                      ├── Jenks tier assignment
+                                      ├── Multi-method tiers (Jenks + GMM; Boris Chen scaffold)
                                       ├── Positional scarcity (PS%)
                                       ├── Auction dollar conversion
                                       └── ADP/ECR enrichment (FFC ADP + FantasyPros ECR)
@@ -257,7 +261,7 @@ frontend/ (React 18 + Vite)      backend/ (Python 3.12 + FastAPI)
 | Python 3.12 + FastAPI | Async-friendly; pandas/numpy/jenkspy are Python-native |
 | React 18 + Vite | Interactive draft state; zero-cost Vercel hosting |
 | Sleeper API | Free, no key; ESPN/Yahoo/MFL ID crosswalk built in |
-| Jenks natural breaks | Best 1-D clustering for VBD tiers (jenkspy library) |
+| Jenks + GMM tiers | Two server-side 1-D clusterings of VAL for tiers — Jenks via jenkspy, GMM via a dependency-free 1-D EM; both selectable, plus manual edits |
 | File-based JSON cache | No Redis needed in MVP; 12h preseason / 24h off-season TTL |
 | CSS @media print | Zero-dependency printable layout; no headless browser |
 
@@ -366,6 +370,33 @@ ps[i] = (Σ positive_val − Σ cumulative_val[0..i]) / Σ positive_val
 
 Lower PS% = higher urgency (less value remains once this player is gone).
 
+### Tiers (multi-method + dual display)
+
+Each position is clustered into tiers on its VAL distribution. Players above the
+baseline (VAL > 0) get up to `k-1` tiers from the chosen break method; the
+sub-baseline tail is split into equal-count rank bands so granularity stays
+consistent all the way down. The backend computes every method into a per-player
+`tiers` map and mirrors the default (Jenks) into the flat `tier` field:
+
+| Method | How |
+|---|---|
+| **Jenks** | Jenks natural breaks (`jenkspy`) — the default |
+| **GMM** | A dependency-free 1-D Gaussian-mixture EM; tier breaks are the decision boundaries between mean-ordered components (Boris-Chen-style) |
+| **Boris Chen** | Maps Boris Chen's published per-position tier CSV onto players by name (scaffold: inert until a CSV is dropped at `backend/app/data/boris_chen/<season>/<POS>.csv`) |
+| **Manual** | Browser-side, seeded from any method, then nudged — stored in `localStorage` per `season:scoring` |
+
+**Dual-encoding display.** The board exposes two independent channels so two
+methods can be read at once:
+
+- **Shade** — alternating light/dark row bands follow the selected method's tiers.
+- **Lines** — a colored top-border rule marks a *second* method's tier
+  boundaries. Where a line falls *inside* a shaded band, the two methods disagree.
+
+**Manual editing.** Selecting **Manual** seeds boundaries from the active method.
+A handle before each player name then toggles a tier break: **┃** starts a new
+tier at that row, **╌** removes the break. Edits persist per league and apply to
+both the interactive board and the printed sheet.
+
 ### Auction dollars
 
 ```
@@ -397,7 +428,7 @@ price[i] = $1 + (val[i] / Σ val) × discretionary
 - Dynasty / keeper / IDP support
 - Superflex / 2QB flex allocation
 - Kicker (K) projection source + scoring
-- GMM tier method (Boris Chen style) as alternative
+- Boris Chen live tier-data ingestion (the loader is scaffolded; needs a published-CSV fetch)
 - Mobile PWA / offline caching
 - DST Strength of Schedule grid
 

@@ -475,7 +475,7 @@ export default function DraftBoard({
       </div>
 
       {/* Column legend */}
-      <Legend auctionMode={auctionMode} />
+      <Legend auctionMode={auctionMode} shadeBy={shadeBy} linesBy={linesBy} manualEdit={manualEdit} />
 
       {/* Player table + drafted panel */}
       <div className={styles.contentRow}>

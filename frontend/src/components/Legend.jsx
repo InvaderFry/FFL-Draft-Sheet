@@ -1,25 +1,56 @@
 import { useState } from 'react'
+import { TIER_METHODS } from '../utils/tierAccess'
 import styles from './Legend.module.css'
 
-const BASE_ENTRIES = [
+const METHOD_LABEL = Object.fromEntries(TIER_METHODS.map(m => [m.id, m.label]))
+const methodLabel = (id) => METHOD_LABEL[id] || id
+
+const COLUMN_ENTRIES = [
   { abbrev: 'TM/BW',  full: 'Team / Bye Week',        desc: 'NFL team abbreviation and the team\'s bye week number' },
   { abbrev: 'ECR',    full: 'Expert Consensus Rank',   desc: 'Draft position shown as Round|Pick (e.g. 3|07). Blue = ADP >1 round earlier than experts (crowd reach); Orange = ADP >1 round later (hidden value)' },
   { abbrev: 'F',      full: 'Floor',                   desc: 'Projected points minus one standard deviation, above the positional baseline (pessimistic outcome)' },
   { abbrev: 'VAL',    full: 'Value',                   desc: 'Mean projected points above the positional replacement baseline — the core VBD metric' },
   { abbrev: 'C',      full: 'Ceiling',                 desc: 'Projected points plus one standard deviation, above the positional baseline (optimistic outcome)' },
   { abbrev: 'PS%',    full: 'Positional Scarcity',     desc: '% of total positive positional value remaining after this player is drafted. Lower % = more urgent pick' },
-  { abbrev: 'Tiers',  full: 'Tier Shading',            desc: 'Alternating light/dark row shading groups players of similar projected value using Jenks natural breaks' },
 ]
 
 const AUCTION_ENTRY = { abbrev: '$', full: 'Auction Price', desc: 'Estimated dollar value in auction mode, derived from each player\'s share of total VBD value' }
 
-export default function Legend({ auctionMode }) {
+// Tier-display entries reflect the active Shade / Lines selection so the guide
+// explains exactly what's on screen.
+function tierEntries({ shadeBy, linesBy, manualEdit }) {
+  const entries = [{
+    abbrev: 'Tiers',
+    full: 'Tier Shading',
+    desc: `Alternating light/dark row shading groups players into tiers using the ${methodLabel(shadeBy)} method. Change it with the "Shade" selector.`,
+  }]
+  if (linesBy && linesBy !== 'none') {
+    entries.push({
+      abbrev: '▬',
+      color: 'var(--c-tier-line)',
+      full: 'Tier Line',
+      desc: `Colored rule marking ${methodLabel(linesBy)} tier boundaries — set with the "Lines" selector — so you can compare two tiering methods at once: shading is one method, the line is another.`,
+    })
+  }
+  if (manualEdit) {
+    entries.push({
+      abbrev: '┃ ╌',
+      color: 'var(--c-tier-line)',
+      full: 'Tier Break',
+      desc: 'In Manual mode, click the handle before a name to start a new tier (┃) or remove a break (╌) at that row. Manual tiers seed from the other selected method and are saved per league.',
+    })
+  }
+  return entries
+}
+
+export default function Legend({ auctionMode, shadeBy = 'jenks', linesBy = 'none', manualEdit = false }) {
   const [open, setOpen] = useState(false)
 
-  const tiersEntry = BASE_ENTRIES.find(e => e.abbrev === 'Tiers')
-  const entries = auctionMode
-    ? [...BASE_ENTRIES.filter(e => e.abbrev !== 'Tiers'), AUCTION_ENTRY, tiersEntry]
-    : BASE_ENTRIES
+  const entries = [
+    ...COLUMN_ENTRIES,
+    ...(auctionMode ? [AUCTION_ENTRY] : []),
+    ...tierEntries({ shadeBy, linesBy, manualEdit }),
+  ]
 
   return (
     <div className={styles.legend}>
@@ -34,9 +65,9 @@ export default function Legend({ auctionMode }) {
       </button>
       {open && (
         <div id="legend-grid" className={styles.grid}>
-          {entries.map(({ abbrev, full, desc }) => (
-            <div key={abbrev} className={styles.entry}>
-              <span className={styles.abbrev}>{abbrev}</span>
+          {entries.map(({ abbrev, full, desc, color }) => (
+            <div key={full} className={styles.entry}>
+              <span className={styles.abbrev} style={color ? { color } : undefined}>{abbrev}</span>
               <span className={styles.text}>
                 <span className={styles.full}>{full}</span>
                 {' — '}

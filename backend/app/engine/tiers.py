@@ -1,26 +1,37 @@
 """
-U8 — Jenks tier assignment.
+U8 — Multi-method tier assignment.
 
-Assigns a tier number (1 = best tier) to each player within their position
-using Jenks natural breaks on the VAL distribution.
+Assigns a tier number (1 = best tier) to each player within their position by
+clustering the VAL distribution. Every method in TIER_METHODS is computed into
+the per-player `tiers` map (e.g. {"jenks": 3, "gmm": 4}); the default method is
+also mirrored into the flat tier/tier_is_even fields for back-compat.
+
+Methods (see TIER_METHODS):
+- "jenks" — Jenks natural breaks (jenkspy), the default.
+- "gmm"   — dependency-free 1-D Gaussian-mixture EM; tier breaks are the
+            decision boundaries between mean-ordered components (Boris-Chen-style).
+Boris Chen's published tiers are applied separately (app/data/boris_chen.py),
+and manual tiers live client-side; neither is computed here.
+
+Both methods share one two-stage structure, differing only in the break
+function for positive players:
 
 N_TIERS_BY_POS: QB/TE → 8, RB/WR → 12, DST/K → 6
 (matches beersheet_clone.R and the plan)
 
-Positive players (val > 0) are tiered over k-1 tiers (1 through k-1) using
-Jenks. Sub-baseline players (val <= 0) get equal-count rank bands instead:
-the VAL distribution just below baseline is dense and the deep tail sparse,
-so Jenks would lump everyone near zero into one giant tier. Rank bands keep
-the visual tier granularity consistent all the way down the list (like
-BeerSheets), numbered contiguously after the last positive tier with no cap.
+Positive players (val > 0) are tiered over k-1 tiers (1 through k-1) using the
+method's breaks. Sub-baseline players (val <= 0) get equal-count rank bands
+instead: the VAL distribution just below baseline is dense and the deep tail
+sparse, so clustering would lump everyone near zero into one giant tier. Rank
+bands keep the visual tier granularity consistent all the way down the list
+(like BeerSheets), numbered contiguously after the last positive tier.
 
 Edge cases:
 - Fewer unique positive values than requested tiers → direct contiguous tier mapping
 - All same value in a group → everyone shares one tier
 - Equal sub-baseline values never straddle a band boundary
 - No positive players → sub-baseline bands start at 1
-
-Also sets tier_is_even (bool) for alternating row shading.
+- GMM numerical failure → falls back to Jenks breaks
 """
 
 from __future__ import annotations
