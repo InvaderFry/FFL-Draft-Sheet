@@ -140,7 +140,7 @@ def test_default_sheet_returns_200(mock_adp, mock_players, mock_curves, mock_scr
     mock_scrape.return_value = _mock_scrape_result()
     mock_curves.return_value = _mock_attrition_curves()
     mock_players.return_value = {}
-    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None: (rows, False, False)
+    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None, fantasypros_api_key=None: (rows, False, False)
 
     payload = {
         "n_teams": 12,
@@ -169,7 +169,7 @@ def test_inflated_projection_adds_data_quality_warning(mock_adp, mock_players, m
     mock_scrape.return_value = rows
     mock_curves.return_value = _mock_attrition_curves()
     mock_players.return_value = {}
-    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None: (rows, False, False)
+    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None, fantasypros_api_key=None: (rows, False, False)
 
     resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
                                            "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
@@ -190,7 +190,7 @@ def test_all_positions_populated(mock_adp, mock_players, mock_curves, mock_scrap
     mock_scrape.return_value = _mock_scrape_result()
     mock_curves.return_value = _mock_attrition_curves()
     mock_players.return_value = {}
-    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None: (rows, False, False)
+    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None, fantasypros_api_key=None: (rows, False, False)
 
     resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
                                            "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
@@ -211,7 +211,7 @@ def test_kicker_starters_accepted_but_no_k_position(mock_adp, mock_players, mock
     mock_scrape.return_value = _mock_scrape_result()  # QB/RB/WR/TE/DST only
     mock_curves.return_value = _mock_attrition_curves()
     mock_players.return_value = {}
-    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None: (rows, False, False)
+    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None, fantasypros_api_key=None: (rows, False, False)
 
     # K=1 must validate (forward-compat) but produce no K board.
     resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
@@ -260,7 +260,7 @@ def test_all_sources_down_returns_200_with_empty_positions(mock_adp, mock_player
     mock_scrape.return_value = {pos: [] for pos in ["QB", "RB", "WR", "TE", "DST"]}
     mock_curves.return_value = _mock_attrition_curves()
     mock_players.return_value = {}
-    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None: (rows, False, False)
+    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None, fantasypros_api_key=None: (rows, False, False)
 
     resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
                                            "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
@@ -277,7 +277,7 @@ def test_sheet_metadata_includes_structured_used_source_statuses(mock_adp, mock_
     mock_scrape.return_value = _mock_scrape_result_with_sources(["FantasyPros", "ESPN"])
     mock_curves.return_value = _mock_attrition_curves()
     mock_players.return_value = {}
-    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None: (rows, False, False)
+    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None, fantasypros_api_key=None: (rows, False, False)
 
     resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
                                            "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
@@ -305,7 +305,7 @@ def test_sheet_metadata_includes_unavailable_source_reason(mock_adp, mock_player
     mock_scrape.return_value = ScrapeResult(rows, outcomes=outcomes)
     mock_curves.return_value = _mock_attrition_curves()
     mock_players.return_value = {}
-    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None: (rows, False, False)
+    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None, fantasypros_api_key=None: (rows, False, False)
 
     resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
                                            "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
@@ -351,7 +351,7 @@ def test_sheet_metadata_marks_partial_sources_used_with_warnings(mock_adp, mock_
     ])
     mock_curves.return_value = _mock_attrition_curves()
     mock_players.return_value = {}
-    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None: (rows, False, False)
+    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None, fantasypros_api_key=None: (rows, False, False)
 
     resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
                                            "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
@@ -381,7 +381,7 @@ def test_all_sources_down_includes_unavailable_source_statuses(mock_adp, mock_pl
     )
     mock_curves.return_value = _mock_attrition_curves()
     mock_players.return_value = {}
-    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None: (rows, False, False)
+    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None, fantasypros_api_key=None: (rows, False, False)
 
     resp = client.post("/api/sheet", json={"n_teams": 12, "QB": 1, "RB": 2, "WR": 3,
                                            "TE": 1, "DST": 1, "K": 0, "flex_slots": 1})
@@ -402,7 +402,7 @@ def test_cached_sheet_preserves_source_status_metadata(mock_adp, mock_players, m
     mock_scrape.return_value = _mock_scrape_result_with_sources(["FantasyPros"])
     mock_curves.return_value = _mock_attrition_curves()
     mock_players.return_value = {}
-    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None: (rows, False, False)
+    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None, fantasypros_api_key=None: (rows, False, False)
     payload = {"n_teams": 12, "QB": 1, "RB": 2, "WR": 3, "TE": 1, "DST": 1, "K": 0, "flex_slots": 1}
 
     first = client.post("/api/sheet", json=payload)
@@ -462,6 +462,47 @@ def test_sheet_cache_key_includes_bench_spots():
     assert "_6bench_" in default_key
     assert "_8bench_" in deep_bench_key
     assert default_key != deep_bench_key
+
+
+def test_sheet_cache_key_distinguishes_fantasypros_key_presence():
+    from app.main import _sheet_cache_key
+    from app.config import LeagueConfig
+
+    cfg = LeagueConfig(n_teams=12, QB=1, RB=2, WR=3, TE=1, DST=1, K=0, flex_slots=1)
+    keyless = _sheet_cache_key(cfg, has_fp_key=False)
+    keyed = _sheet_cache_key(cfg, has_fp_key=True)
+
+    assert "_fpkey" in keyed
+    assert "_fpkey" not in keyless
+    # A keyed sheet must never collide with the keyless (proxy-mode) sheet.
+    assert keyed != keyless
+
+
+@patch("app.main.scrape_all", new_callable=AsyncMock)
+@patch("app.main.load_attrition_curves")
+@patch("app.main.load_player_map_async")
+@patch("app.main.enrich_with_adp")
+def test_fantasypros_key_reaches_enrichment_and_is_not_logged(
+    mock_adp, mock_players, mock_curves, mock_scrape, client, caplog
+):
+    mock_scrape.return_value = _mock_scrape_result()
+    mock_curves.return_value = _mock_attrition_curves()
+    mock_players.return_value = {}
+    mock_adp.side_effect = lambda rows, n_teams, ppr, season=None, fantasypros_api_key=None: (rows, False, True)
+
+    secret = "fp-secret-abc123"
+    with caplog.at_level("DEBUG"):
+        resp = client.post("/api/sheet", json={
+            "n_teams": 12, "QB": 1, "RB": 2, "WR": 3, "TE": 1, "DST": 1, "K": 0,
+            "flex_slots": 1, "fantasypros_api_key": secret,
+        })
+
+    assert resp.status_code == 200
+    # The unwrapped key is threaded down as the 5th positional arg.
+    assert mock_adp.call_args.args[4] == secret
+    # The secret must never appear in logs or the cached/serialized response.
+    assert secret not in caplog.text
+    assert secret not in resp.text
 
 
 # ---- CORS header present -----------------------------------------------------

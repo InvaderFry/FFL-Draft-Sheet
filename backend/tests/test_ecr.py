@@ -87,6 +87,28 @@ def test_unresolvable_player_is_skipped(monkeypatch):
     assert ecr.fetch_ecr(SEASON, ppr=0.5) == {}
 
 
+def test_explicit_api_key_works_without_env(monkeypatch):
+    # No env var set (cleared by the fixture); an explicit key still fetches.
+    get_mock = MagicMock(return_value=_ok_response())
+    monkeypatch.setattr(ecr.httpx, "get", get_mock)
+    monkeypatch.setattr(ecr, "find_player", lambda name, pos, team: _rec(f"sid_{name.split()[0]}"))
+
+    result = ecr.fetch_ecr(SEASON, ppr=1.0, api_key="request-key")
+
+    assert result == {"sid_Ja'Marr": 1, "sid_Bijan": 2}
+    assert get_mock.call_args.kwargs["headers"]["x-api-key"] == "request-key"
+
+
+def test_explicit_api_key_takes_precedence_over_env(monkeypatch):
+    monkeypatch.setenv(ecr.API_KEY_ENV, "env-key")
+    get_mock = MagicMock(return_value=_ok_response({"players": []}))
+    monkeypatch.setattr(ecr.httpx, "get", get_mock)
+
+    ecr.fetch_ecr(SEASON, ppr=0.5, api_key="request-key")
+
+    assert get_mock.call_args.kwargs["headers"]["x-api-key"] == "request-key"
+
+
 def test_http_error_returns_empty(monkeypatch):
     monkeypatch.setenv(ecr.API_KEY_ENV, "test-key")
     monkeypatch.setattr(

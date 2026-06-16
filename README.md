@@ -308,15 +308,19 @@ Navigate to your Vercel URL in Safari. To add it to the iPad home screen as a sh
 | `FANTASYPROS_API_KEY` | Backend (Render) | Enables real FantasyPros Expert Consensus Rankings (ECR). Optional — without it the ECR column falls back to FFC ADP (see below) | _(unset)_ |
 
 > **FantasyPros ECR (optional).** "ECR" is FantasyPros' term — their
-> consensus-rankings API is the canonical source. Set `FANTASYPROS_API_KEY`
-> to a [FantasyPros API key](https://www.fantasypros.com/apis/) to populate the
-> ECR column from real expert rankings (independent of ADP, which is what makes
-> the ADP-divergence coloring meaningful). The free tier is **non-commercial**
+> consensus-rankings API is the canonical source. You can supply a
+> [FantasyPros API key](https://www.fantasypros.com/apis/) two ways: set the
+> `FANTASYPROS_API_KEY` env var on the backend (applies to everyone), **or**
+> paste it into the optional **FantasyPros API key** field on the sheet-setup
+> screen (per-request; a request key takes precedence over the env var, and is
+> kept only in that browser tab's `sessionStorage`). Either way it populates the
+> ECR column from real expert rankings — independent of ADP, which is what makes
+> the ADP-divergence coloring meaningful. The free tier is **non-commercial**
 > and rate-limited to **1 request/second, 100/day**; the backend fetches once
 > per scoring format per day and caches the result, so a normal draft stays well
-> within that. With no key set, nothing breaks — the board falls back to using
-> FFC ADP as an ECR proxy (the prior behavior) and the board header shows an
-> "ECR: ADP proxy" tag.
+> within that. With no key supplied, nothing breaks — the board falls back to
+> using FFC ADP as an ECR proxy (the prior behavior) and the board header shows
+> an "ECR: ADP proxy" tag.
 
 ### Common issues
 

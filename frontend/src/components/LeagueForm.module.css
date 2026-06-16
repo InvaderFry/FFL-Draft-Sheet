@@ -69,6 +69,27 @@
   flex-wrap: wrap;
 }
 
+/* Optional FantasyPros API key — a full-width credential field, distinct from
+   the right-aligned numeric inputs above. */
+.keyField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 13px;
+  color: var(--c-text-muted);
+}
+
+.keyInput {
+  width: 100%;
+  text-align: left;
+}
+
+.keyHelp {
+  margin: var(--space-1) 0 0;
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+
 .radio {
   display: flex;
   align-items: center;

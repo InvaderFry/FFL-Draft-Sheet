@@ -118,13 +118,16 @@ class SheetResponse(BaseModel):
 # Sheet cache key
 # --------------------------------------------------------------------------- #
 
-def _sheet_cache_key(cfg: LeagueConfig) -> str:
+def _sheet_cache_key(cfg: LeagueConfig, has_fp_key: bool = False) -> str:
     from datetime import date
     ppr = cfg.scoring.rec
+    # Presence-only marker (never the key value): a sheet built with real
+    # FantasyPros ECR must not be served to a keyless request, or vice versa.
+    fp = "_fpkey" if has_fp_key else ""
     return (
         f"sheet_{cfg.season}_{cfg.n_teams}t_{ppr}ppr_"
         f"{cfg.qb}QB{cfg.rb}RB{cfg.wr}WR{cfg.te}TE_{cfg.flex_slots}FLEX_"
-        f"{cfg.fantasy_weeks}wk_{cfg.bench_spots}bench_{date.today()}"
+        f"{cfg.fantasy_weeks}wk_{cfg.bench_spots}bench{fp}_{date.today()}"
     )
 
 
@@ -266,7 +269,7 @@ def _backfill_cached_diagnostic_fields(sheet: dict[str, Any]) -> None:
 # Core pipeline
 # --------------------------------------------------------------------------- #
 
-async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
+async def _generate_sheet(cfg: LeagueConfig, fantasypros_api_key: str | None = None) -> dict[str, Any]:
     t0 = time.perf_counter()
 
     # 1. Load player map (for bye weeks + ID bridging)
@@ -319,7 +322,7 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
     # position. Still off the event loop for the cold-cache HTTP case.
     all_rows = [p.__dict__ for p in all_players]
     enriched, adp_available, ecr_available = await asyncio.to_thread(
-        enrich_with_adp, all_rows, cfg.n_teams, ppr, cfg.season
+        enrich_with_adp, all_rows, cfg.n_teams, ppr, cfg.season, fantasypros_api_key
     )
     for p, row in zip(all_players, enriched):
         p.adp_rank = row.get("adp_rank")
@@ -377,6 +380,16 @@ async def health() -> dict:
 async def clear_cache() -> dict:
     cache.clear_projections()
     return {"status": "cleared"}
+
+
+class SheetRequest(LeagueConfig):
+    """LeagueConfig plus an optional user-supplied FantasyPros API key.
+
+    SecretStr so the key never appears in reprs/validation errors. It is
+    unwrapped once at the endpoint boundary and never stored in LeagueConfig,
+    logged, or written to the cache.
+    """
+    fantasypros_api_key: SecretStr | None = None
 
 
 class EspnDraftRequest(BaseModel):
@@ -451,8 +464,10 @@ async def espn_draft_status(req: EspnDraftRequest) -> DraftStatus:
 
 
 @app.post("/api/sheet", response_model=SheetResponse)
-async def generate_sheet(cfg: LeagueConfig) -> SheetResponse:
-    ck = _sheet_cache_key(cfg)
+async def generate_sheet(req: SheetRequest) -> SheetResponse:
+    # Unwrap the secret once at the boundary; pass only the plain string down.
+    api_key = req.fantasypros_api_key.get_secret_value() if req.fantasypros_api_key else None
+    ck = _sheet_cache_key(req, has_fp_key=api_key is not None)
     cached = cache.get(ck)
     if cached is not None:
         _backfill_cached_diagnostic_fields(cached)
@@ -466,7 +481,7 @@ async def generate_sheet(cfg: LeagueConfig) -> SheetResponse:
         return SheetResponse(**cached)
 
     try:
-        result = await _generate_sheet(cfg)
+        result = await _generate_sheet(req, fantasypros_api_key=api_key)
     except Exception as exc:
         logger.exception("Sheet generation failed: %s", exc)
         # Arbitrary exception text can expose paths and upstream internals —

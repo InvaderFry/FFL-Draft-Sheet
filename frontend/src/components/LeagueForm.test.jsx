@@ -19,7 +19,11 @@ const submit = () =>
   userEvent.click(screen.getByRole('button', { name: /Generate Draft Sheet/i }))
 
 describe('LeagueForm', () => {
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    sessionStorage.clear()
+    localStorage.clear()
+  })
 
   it('blocks submit when flex allocations do not sum to 1.0', async () => {
     const fetch = vi.fn()
@@ -71,6 +75,46 @@ describe('LeagueForm', () => {
     const payload = JSON.parse(fetch.mock.calls[0][1].body)
     expect(payload.flex_qb).toBe(1.0)
     expect(payload.flex_rb + payload.flex_wr + payload.flex_te).toBe(0)
+  })
+
+  it('omits the FantasyPros key from the payload when the field is blank', async () => {
+    const sheet = { positions: {}, metadata: {} }
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => sheet })
+    vi.stubGlobal('fetch', fetch)
+    renderForm()
+
+    await submit()
+
+    const payload = JSON.parse(fetch.mock.calls[0][1].body)
+    expect(payload).not.toHaveProperty('fantasypros_api_key')
+  })
+
+  it('sends the FantasyPros key in the body but not to onSheet, and stores it in sessionStorage', async () => {
+    const sheet = { positions: {}, metadata: {} }
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => sheet })
+    vi.stubGlobal('fetch', fetch)
+    const { onSheet } = renderForm()
+
+    await userEvent.type(screen.getByLabelText(/FantasyPros API key/i), 'fp-secret-123')
+    await submit()
+
+    const body = JSON.parse(fetch.mock.calls[0][1].body)
+    expect(body.fantasypros_api_key).toBe('fp-secret-123')
+
+    // The key must not leak into App-level config state via onSheet.
+    await vi.waitFor(() => expect(onSheet).toHaveBeenCalledOnce())
+    const handedBack = onSheet.mock.calls[0][1]
+    expect(handedBack).not.toHaveProperty('fantasypros_api_key')
+
+    // Persisted to sessionStorage only — never localStorage.
+    expect(sessionStorage.getItem('beersheet_fp_key')).toBe('fp-secret-123')
+    expect(localStorage.getItem('beersheet_settings') || '').not.toContain('fp-secret-123')
+  })
+
+  it('prefills the key field from sessionStorage', async () => {
+    sessionStorage.setItem('beersheet_fp_key', 'restored-key')
+    renderForm()
+    expect(screen.getByLabelText(/FantasyPros API key/i)).toHaveValue('restored-key')
   })
 
   it('surfaces a backend error via onError without calling onSheet', async () => {

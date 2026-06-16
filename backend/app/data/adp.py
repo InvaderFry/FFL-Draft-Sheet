@@ -140,6 +140,7 @@ def enrich_with_adp(
     n_teams: int,
     ppr: float = 0.5,
     season: int | None = None,
+    fantasypros_api_key: str | None = None,
 ) -> tuple[list[dict], bool, bool]:
     """
     Join ADP (FFC, by espn_id) and ECR (FantasyPros, by sleeper_id) onto rows.
@@ -153,7 +154,7 @@ def enrich_with_adp(
     Returns (enriched_rows, adp_available, ecr_available).
     """
     adp_map = fetch_adp(n_teams, ppr, season)
-    ecr_map = ecr.fetch_ecr(season, ppr) if season is not None else {}
+    ecr_map = ecr.fetch_ecr(season, ppr, api_key=fantasypros_api_key) if season is not None else {}
     adp_available = bool(adp_map)
     ecr_available = bool(ecr_map)
 

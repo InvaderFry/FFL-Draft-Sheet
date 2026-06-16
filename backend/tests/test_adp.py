@@ -67,7 +67,7 @@ def test_enrich_prefers_ecr_over_adp(monkeypatch):
     monkeypatch.setattr(adp, "fetch_adp", lambda n, ppr, season: {
         "5001": {"adp_rank": 7, "player_name": "A", "pos": "RB", "team": "KC"},
     })
-    monkeypatch.setattr(adp.ecr, "fetch_ecr", lambda season, ppr: {"sid_a": 3})
+    monkeypatch.setattr(adp.ecr, "fetch_ecr", lambda season, ppr, api_key=None: {"sid_a": 3})
 
     rows = [{"espn_id": "5001", "sleeper_id": "sid_a"}]
     enriched, adp_avail, ecr_avail = adp.enrich_with_adp(rows, n_teams=12, ppr=0.5, season=SEASON)
@@ -82,7 +82,7 @@ def test_enrich_falls_back_to_adp_as_ecr_proxy(monkeypatch):
     monkeypatch.setattr(adp, "fetch_adp", lambda n, ppr, season: {
         "5001": {"adp_rank": 7, "player_name": "A", "pos": "RB", "team": "KC"},
     })
-    monkeypatch.setattr(adp.ecr, "fetch_ecr", lambda season, ppr: {})  # no ECR
+    monkeypatch.setattr(adp.ecr, "fetch_ecr", lambda season, ppr, api_key=None: {})  # no ECR
 
     rows = [{"espn_id": "5001", "sleeper_id": "sid_a"}]
     enriched, adp_avail, ecr_avail = adp.enrich_with_adp(rows, n_teams=12, ppr=0.5, season=SEASON)
@@ -94,7 +94,7 @@ def test_enrich_falls_back_to_adp_as_ecr_proxy(monkeypatch):
 
 def test_enrich_unmatched_player_is_blank(monkeypatch):
     monkeypatch.setattr(adp, "fetch_adp", lambda n, ppr, season: {})
-    monkeypatch.setattr(adp.ecr, "fetch_ecr", lambda season, ppr: {})
+    monkeypatch.setattr(adp.ecr, "fetch_ecr", lambda season, ppr, api_key=None: {})
 
     rows = [{"espn_id": "9999", "sleeper_id": "nope"}]
     enriched, adp_avail, ecr_avail = adp.enrich_with_adp(rows, n_teams=12, ppr=0.5, season=SEASON)

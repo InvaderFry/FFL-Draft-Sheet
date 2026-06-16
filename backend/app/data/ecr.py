@@ -54,9 +54,17 @@ def _cache_key(season: int, scoring: str) -> str:
     return f"fp_ecr_{scoring}_{season}_{date.today()}"
 
 
-def fetch_ecr(season: int, ppr: float = 0.5, force_refresh: bool = False) -> dict[str, int]:
+def fetch_ecr(
+    season: int,
+    ppr: float = 0.5,
+    force_refresh: bool = False,
+    api_key: str | None = None,
+) -> dict[str, int]:
     """
     Fetch and cache FantasyPros consensus rankings.
+
+    A request-supplied ``api_key`` takes precedence over the FANTASYPROS_API_KEY
+    env var, so a self-hosting user can enable real ECR without redeploying.
 
     Returns
     -------
@@ -72,9 +80,9 @@ def fetch_ecr(season: int, ppr: float = 0.5, force_refresh: bool = False) -> dic
             logger.info("ECR loaded from cache (%d players)", len(cached))
             return cached
 
-    api_key = os.environ.get(API_KEY_ENV)
+    api_key = api_key or os.environ.get(API_KEY_ENV)
     if not api_key:
-        logger.info("ECR skipped: %s not set (falling back to ADP-as-ECR)", API_KEY_ENV)
+        logger.info("ECR skipped: no API key (falling back to ADP-as-ECR)")
         return {}
 
     url = f"{FP_BASE}/{season}/consensus-rankings"
