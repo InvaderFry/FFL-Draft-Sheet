@@ -318,7 +318,9 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
     # (and its cache-file read) happens once per request instead of once per
     # position. Still off the event loop for the cold-cache HTTP case.
     all_rows = [p.__dict__ for p in all_players]
-    enriched, adp_available = await asyncio.to_thread(enrich_with_adp, all_rows, cfg.n_teams, ppr)
+    enriched, adp_available, ecr_available = await asyncio.to_thread(
+        enrich_with_adp, all_rows, cfg.n_teams, ppr, cfg.season
+    )
     for p, row in zip(all_players, enriched):
         p.adp_rank = row.get("adp_rank")
         p.ecr_rank = row.get("ecr_rank")
@@ -342,6 +344,7 @@ async def _generate_sheet(cfg: LeagueConfig) -> dict[str, Any]:
             "baselines": {k: round(v, 1) for k, v in baselines.items()},
             "data_quality_warnings": data_quality_warnings,
             "adp_available": adp_available,
+            "ecr_available": ecr_available,
             "cache_hit": False,
             "generation_time_s": round(elapsed, 2),
         },

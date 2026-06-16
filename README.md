@@ -247,7 +247,7 @@ frontend/ (React 18 + Vite)      backend/ (Python 3.12 + FastAPI)
                                       ├── Jenks tier assignment
                                       ├── Positional scarcity (PS%)
                                       ├── Auction dollar conversion
-                                      └── FFC ADP enrichment
+                                      └── ADP/ECR enrichment (FFC ADP + FantasyPros ECR)
 ```
 
 ### Key technical choices
@@ -305,6 +305,18 @@ Navigate to your Vercel URL in Safari. To add it to the iPad home screen as a sh
 | `VITE_API_URL` | Frontend (Vercel) | Full URL of the Render backend | `''` (same-origin) |
 | `CACHE_DIR` | Backend (Render) | Cache directory path | `cache/` |
 | `WEB_CONCURRENCY` | Backend (Render) | Uvicorn worker count | `1` |
+| `FANTASYPROS_API_KEY` | Backend (Render) | Enables real FantasyPros Expert Consensus Rankings (ECR). Optional — without it the ECR column falls back to FFC ADP (see below) | _(unset)_ |
+
+> **FantasyPros ECR (optional).** "ECR" is FantasyPros' term — their
+> consensus-rankings API is the canonical source. Set `FANTASYPROS_API_KEY`
+> to a [FantasyPros API key](https://www.fantasypros.com/apis/) to populate the
+> ECR column from real expert rankings (independent of ADP, which is what makes
+> the ADP-divergence coloring meaningful). The free tier is **non-commercial**
+> and rate-limited to **1 request/second, 100/day**; the backend fetches once
+> per scoring format per day and caches the result, so a normal draft stays well
+> within that. With no key set, nothing breaks — the board falls back to using
+> FFC ADP as an ECR proxy (the prior behavior) and the board header shows an
+> "ECR: ADP proxy" tag.
 
 ### Common issues
 
@@ -364,7 +376,8 @@ price[i] = $1 + (val[i] / Σ val) × discretionary
 | Source | Used for |
 |---|---|
 | Sleeper API | Canonical player IDs, ESPN/Yahoo/MFL crosswalk |
-| Fantasy Football Calculator | ADP as ECR proxy |
+| Fantasy Football Calculator | ADP (with prior-season fallback in the off-season); ECR proxy when no FantasyPros key |
+| FantasyPros API | Expert Consensus Rankings (ECR) — requires `FANTASYPROS_API_KEY` |
 | FantasyPros (HTML) | Consensus projections |
 | FFToday | Projection scrape |
 | NumberFire | Projection scrape |

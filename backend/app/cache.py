@@ -107,6 +107,6 @@ def clear_projections() -> None:
     refetching every upstream dataset.
     """
     if CACHE_DIR.exists():
-        for pattern in ("proj_*.json", "sheet_*.json", "ffc_adp_*.json"):
+        for pattern in ("proj_*.json", "sheet_*.json", "ffc_adp_*.json", "fp_ecr_*.json"):
             for f in CACHE_DIR.glob(pattern):
                 f.unlink(missing_ok=True)
