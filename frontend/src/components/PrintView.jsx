@@ -168,10 +168,16 @@ const PositionTable = memo(PositionTableBase)
 export default function PrintView({ sheetData, config, isDrafted }) {
   const positions = sheetData?.positions ?? EMPTY_POSITIONS
   const metadata = sheetData?.metadata
-  const { minVal, maxVal } = useMemo(
-    () => valRangeFromPositions(positions),
-    [positions]
-  )
+  const { minVal, maxVal } = useMemo(() => {
+    // Scale the gradient to the players actually printed (top N per position),
+    // not the full dataset — so the lowest listed VAL maps to the bottom of the
+    // range and the full blue→orange spectrum is used across the printed rows.
+    const visiblePositions = {}
+    for (const pos of ['QB', 'RB', 'WR', 'TE']) {
+      visiblePositions[pos] = (positions[pos] || []).slice(0, POSITION_LIMITS[pos])
+    }
+    return valRangeFromPositions(visiblePositions)
+  }, [positions])
 
   if (!sheetData) return null
 
