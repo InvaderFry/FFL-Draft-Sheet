@@ -35,6 +35,8 @@ function renderTable(players, {
   toggleWatch = vi.fn(),
   isDrafted = () => false,
   onToggle = vi.fn(),
+  shadeBy = 'jenks',
+  linesBy = 'none',
 } = {}) {
   return render(
     <ThemeProvider>
@@ -51,6 +53,8 @@ function renderTable(players, {
         watchedOnly={watchedOnly}
         isWatched={isWatched}
         toggleWatch={toggleWatch}
+        shadeBy={shadeBy}
+        linesBy={linesBy}
       />
     </ThemeProvider>
   )
@@ -69,6 +73,29 @@ describe('PlayerTable', () => {
 
     expect(tierTwoRow.className).toContain(styles.tierStart)
     expect(baselineRow.className).toContain(styles.tierStart)
+  })
+
+  it('shades by the selected method and draws colored lines by another', () => {
+    // Two methods that disagree: jenks groups [1,1,2], gmm groups [1,2,2].
+    const withTiers = (name, jenks, gmm) => ({
+      ...player(name, jenks, jenks % 2 === 0),
+      tiers: { jenks, gmm },
+    })
+    renderTable([
+      withTiers('Alpha', 1, 1),
+      withTiers('Bravo', 1, 2),
+      withTiers('Charlie', 2, 2),
+    ], { shadeBy: 'jenks', linesBy: 'gmm' })
+
+    const bravo = screen.getByText('Bravo').closest('tr')
+    const charlie = screen.getByText('Charlie').closest('tr')
+
+    // Shading boundary (jenks) falls between Bravo and Charlie.
+    expect(charlie.className).toContain(styles.tierStart)
+    expect(bravo.className).not.toContain(styles.tierStart)
+    // GMM line boundary falls between Alpha and Bravo, not Bravo/Charlie.
+    expect(bravo.className).toContain(styles.tierLineStart)
+    expect(charlie.className).not.toContain(styles.tierLineStart)
   })
 
   it('uses the full positive and negative Val range for cell gradients', () => {

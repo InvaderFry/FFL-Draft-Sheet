@@ -181,6 +181,12 @@
   border-top: 1px solid var(--c-border2);
 }
 
+/* Dual-encoding: bold colored rule marking a second tier method's boundary.
+   Placed after the separators above so it wins when both fall on the same row. */
+.tierLineStart td {
+  border-top: 2px solid var(--c-tier-line);
+}
+
 @media (max-width: 768px) {
   .table {
     min-width: 460px;

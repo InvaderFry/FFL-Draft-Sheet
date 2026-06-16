@@ -10,6 +10,7 @@ import { ecrColor, ecrColorStyle } from '../utils/ecrColor'
 import { fmtVal, fmtInt, fmtPct } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle } from '../utils/valGradient'
 import { survivalStatus } from '../utils/draftStrategy'
+import { tierFor } from '../utils/tierAccess'
 import { useTheme } from '../context/ThemeContext'
 import styles from './PlayerTable.module.css'
 
@@ -54,6 +55,9 @@ export default function PlayerTable({
   watchedOnly = false,
   isWatched = () => false,
   toggleWatch = () => {},
+  shadeBy = 'jenks',
+  linesBy = 'none',
+  manualTiers = null,
 }) {
   const { theme } = useTheme()
   const cols = auctionMode
@@ -83,9 +87,14 @@ export default function PlayerTable({
         </thead>
         <tbody>
           {visible.map((player, idx) => {
-            const tierClass = player.tier_is_even ? styles.tierEven : styles.tierOdd
             const previous = visible[idx - 1]
-            const isTierStart = idx > 0 && player.tier != null && previous?.tier !== player.tier
+            // Shading channel: alternating bands by the selected method's tier.
+            const shadeTier = tierFor(player, shadeBy, manualTiers)
+            const tierClass = shadeTier != null && shadeTier % 2 === 0 ? styles.tierEven : styles.tierOdd
+            const isTierStart = idx > 0 && shadeTier != null && tierFor(previous, shadeBy, manualTiers) !== shadeTier
+            // Lines channel: a bold colored rule at a second method's boundaries.
+            const lineTier = tierFor(player, linesBy, manualTiers)
+            const isLineStart = idx > 0 && lineTier != null && tierFor(previous, linesBy, manualTiers) !== lineTier
             const ecr = ecrColor(player.adp_rank, player.ecr_rank, nTeams)
             const ecrStyle = { color: ecrColorStyle(ecr) }
             const valStyle = valBgStyle(player.val, minVal, maxVal, theme)
@@ -99,7 +108,7 @@ export default function PlayerTable({
             return (
               <tr
                 key={player.sleeper_id || `${player.player_name}-${idx}`}
-                className={`${tierClass} ${isTierStart ? styles.tierStart : ''}`}
+                className={`${tierClass} ${isTierStart ? styles.tierStart : ''} ${isLineStart ? styles.tierLineStart : ''}`}
                 onClick={() => onToggle(id, player.player_name, player.pos)}
                 title="Click to mark as drafted"
               >

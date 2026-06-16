@@ -57,6 +57,9 @@ class PlayerVBD:
     # Tier and scarcity (filled later)
     tier: int = 1
     tier_is_even: bool = False
+    # Per-method tier numbers, e.g. {"jenks": 3, "gmm": 4}. The default method
+    # is mirrored into the flat tier/tier_is_even fields above for back-compat.
+    tiers: dict[str, int] = field(default_factory=dict)
     ps_pct: float = 0.0
     auction_price: float | None = None
     extra: dict = field(default_factory=dict)
@@ -82,6 +85,7 @@ class PlayerVBD:
             "ecr_fmt": self.ecr_fmt,
             "tier": self.tier,
             "tier_is_even": self.tier_is_even,
+            "tiers": dict(self.tiers),
             "ps_pct": round(self.ps_pct * 100, 1),
             "auction_price": round(self.auction_price, 0) if self.auction_price is not None else None,
         }

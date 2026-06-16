@@ -29,6 +29,9 @@ export default function CombinedView({
   watchedOnly = false,
   isWatched = () => false,
   toggleWatch = () => {},
+  shadeBy = 'jenks',
+  linesBy = 'none',
+  manualTiers = null,
 }) {
   const { posColors } = useTheme()
   return (
@@ -54,6 +57,9 @@ export default function CombinedView({
                 watchedOnly={watchedOnly}
                 isWatched={isWatched}
                 toggleWatch={toggleWatch}
+                shadeBy={shadeBy}
+                linesBy={linesBy}
+                manualTiers={manualTiers}
                 wrapStyle={tableStyle}
               />
             </div>

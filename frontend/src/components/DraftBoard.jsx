@@ -6,12 +6,13 @@
  * and the print view stay in sync. Switching tabs preserves it.
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import PlayerTable from './PlayerTable'
 import CombinedView from './CombinedView'
 import DraftedPanel from './DraftedPanel'
 import DraftSync from './DraftSync'
 import Legend from './Legend'
+import { TIER_METHODS, methodAvailable } from '../utils/tierAccess'
 import { useTheme } from '../context/ThemeContext'
 import { downloadCsv, toCsv } from '../utils/exportCsv'
 import { valRangeFromPositions } from '../utils/valGradient'
@@ -24,6 +25,17 @@ import {
 import styles from './DraftBoard.module.css'
 
 const TAB_ORDER = ['ALL', 'QB', 'RB', 'WR', 'TE', 'DST']
+
+const SHADE_STORAGE_KEY = 'ffl_tier_shade'
+const LINES_STORAGE_KEY = 'ffl_tier_lines'
+
+function readStored(key, fallback) {
+  try {
+    return localStorage.getItem(key) || fallback
+  } catch {
+    return fallback
+  }
+}
 
 function buildSourceDetails(metadata) {
   const richStatuses = Array.isArray(metadata?.source_statuses) ? metadata.source_statuses : []
@@ -116,8 +128,35 @@ export default function DraftBoard({
   const [sourceDetailsOpen, setSourceDetailsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [watchedOnly, setWatchedOnly] = useState(false)
+  // Tier display: shade rows by one method, draw colored boundary lines by
+  // another. Persisted like the theme toggle. Manual tiers are a later phase.
+  const [shadeBy, setShadeBy] = useState(() => readStored(SHADE_STORAGE_KEY, 'jenks'))
+  const [linesBy, setLinesBy] = useState(() => readStored(LINES_STORAGE_KEY, 'none'))
+  const manualTiers = null
 
   const { positions, metadata } = sheetData
+
+  useEffect(() => {
+    try { localStorage.setItem(SHADE_STORAGE_KEY, shadeBy) } catch { /* ignore */ }
+  }, [shadeBy])
+  useEffect(() => {
+    try { localStorage.setItem(LINES_STORAGE_KEY, linesBy) } catch { /* ignore */ }
+  }, [linesBy])
+
+  // Which methods actually have data in this sheet (Jenks/None always do).
+  const availableMethods = useMemo(() => {
+    const map = {}
+    for (const m of TIER_METHODS) map[m.id] = methodAvailable(positions, m.id, manualTiers)
+    return map
+  }, [positions])
+
+  // Fall back to Jenks/None if a persisted selection isn't available this sheet.
+  useEffect(() => {
+    if (shadeBy !== 'jenks' && !availableMethods[shadeBy]) setShadeBy('jenks')
+  }, [availableMethods, shadeBy])
+  useEffect(() => {
+    if (linesBy !== 'none' && !availableMethods[linesBy]) setLinesBy('none')
+  }, [availableMethods, linesBy])
   const players = positions[activePos] || []
   const nTeams = config?.n_teams || 12
   const auctionMode = config?.auction_mode || false
@@ -327,6 +366,37 @@ export default function DraftBoard({
             >
               ★ only
             </button>
+            <label className={styles.tierControl}>
+              <span className={styles.tierControlLabel}>Shade</span>
+              <select
+                className={styles.tierSelect}
+                aria-label="Shade tiers by method"
+                value={shadeBy}
+                onChange={(event) => setShadeBy(event.target.value)}
+              >
+                {TIER_METHODS.map(m => (
+                  <option key={m.id} value={m.id} disabled={!availableMethods[m.id]}>
+                    {m.label}{availableMethods[m.id] ? '' : ' (n/a)'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={styles.tierControl}>
+              <span className={styles.tierControlLabel}>Lines</span>
+              <select
+                className={styles.tierSelect}
+                aria-label="Tier boundary lines by method"
+                value={linesBy}
+                onChange={(event) => setLinesBy(event.target.value)}
+              >
+                <option value="none">None</option>
+                {TIER_METHODS.map(m => (
+                  <option key={m.id} value={m.id} disabled={!availableMethods[m.id]}>
+                    {m.label}{availableMethods[m.id] ? '' : ' (n/a)'}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           {myTeamPicks.length > 0 && (
             <button type="button" className={styles.printBtn} onClick={handleExportCsv}>
@@ -408,6 +478,9 @@ export default function DraftBoard({
               watchedOnly={watchedOnly}
               isWatched={isWatched}
               toggleWatch={toggleWatch}
+              shadeBy={shadeBy}
+              linesBy={linesBy}
+              manualTiers={manualTiers}
             />
           ) : (
             <PlayerTable
@@ -424,6 +497,9 @@ export default function DraftBoard({
               watchedOnly={watchedOnly}
               isWatched={isWatched}
               toggleWatch={toggleWatch}
+              shadeBy={shadeBy}
+              linesBy={linesBy}
+              manualTiers={manualTiers}
               wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
             />
           )}
