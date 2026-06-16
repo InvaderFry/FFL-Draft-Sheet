@@ -4,14 +4,14 @@ import { THEME_POS_COLORS } from '../utils/posColors'
 const ThemeContext = createContext(null)
 
 const STORAGE_KEY = 'ffl_theme'
-const VALID_THEMES = ['dark', 'macchiato', 'latte']
+const VALID_THEMES = ['mocha', 'latte']
 
 function readSavedTheme() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    return VALID_THEMES.includes(saved) ? saved : 'dark'
+    return VALID_THEMES.includes(saved) ? saved : 'mocha'
   } catch {
-    return 'dark'
+    return 'mocha'
   }
 }
 

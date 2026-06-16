@@ -22,9 +22,8 @@ import { useTheme } from './context/ThemeContext'
 import styles from './App.module.css'
 
 const THEMES = [
-  { id: 'dark',      label: 'Dark' },
-  { id: 'macchiato', label: 'Macchiato' },
-  { id: 'latte',     label: 'Latte' },
+  { id: 'mocha', label: 'Mocha' },
+  { id: 'latte', label: 'Latte' },
 ]
 
 export default function App() {

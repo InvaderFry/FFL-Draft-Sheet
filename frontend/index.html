@@ -6,7 +6,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#d97706" />
+    <meta name="theme-color" content="#fab387" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Draft Sheet" />
@@ -19,7 +19,7 @@
       (function() {
         try {
           var t = localStorage.getItem('ffl_theme');
-          document.documentElement.setAttribute('data-theme', ['dark','macchiato','latte'].includes(t) ? t : 'dark');
+          document.documentElement.setAttribute('data-theme', ['mocha','latte'].includes(t) ? t : 'mocha');
         } catch(e) {}
       })();
     </script>
