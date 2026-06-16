@@ -16,6 +16,9 @@ const COLUMN_ENTRIES = [
 
 const AUCTION_ENTRY = { abbrev: '$', full: 'Auction Price', desc: 'Estimated dollar value in auction mode, derived from each player\'s share of total VBD value' }
 
+// Abbreviations hidden from the table (and thus the guide) in thin mode.
+const THIN_HIDDEN = new Set(['TM/BW', 'F'])
+
 // Tier-display entries reflect the active Shade / Lines selection so the guide
 // explains exactly what's on screen.
 function tierEntries({ shadeBy, linesBy, manualEdit }) {
@@ -43,11 +46,14 @@ function tierEntries({ shadeBy, linesBy, manualEdit }) {
   return entries
 }
 
-export default function Legend({ auctionMode, shadeBy = 'jenks', linesBy = 'none', manualEdit = false }) {
+export default function Legend({ auctionMode, thinMode = false, shadeBy = 'jenks', linesBy = 'none', manualEdit = false }) {
   const [open, setOpen] = useState(false)
 
+  const columnEntries = thinMode
+    ? COLUMN_ENTRIES.filter(e => !THIN_HIDDEN.has(e.abbrev))
+    : COLUMN_ENTRIES
   const entries = [
-    ...COLUMN_ENTRIES,
+    ...columnEntries,
     ...(auctionMode ? [AUCTION_ENTRY] : []),
     ...tierEntries({ shadeBy, linesBy, manualEdit }),
   ]

@@ -125,6 +125,13 @@ export default function DraftBoard({
   const [sourceDetailsOpen, setSourceDetailsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [watchedOnly, setWatchedOnly] = useState(false)
+  const [thinMode, setThinMode] = useState(
+    () => localStorage.getItem('ffl_thin_mode') === '1'
+  )
+
+  useEffect(() => {
+    localStorage.setItem('ffl_thin_mode', thinMode ? '1' : '0')
+  }, [thinMode])
 
   const { positions, metadata } = sheetData
 
@@ -369,6 +376,15 @@ export default function DraftBoard({
             >
               ★ only
             </button>
+            <button
+              type="button"
+              className={`${styles.watchToggle} ${thinMode ? styles.watchToggleActive : ''}`}
+              aria-pressed={thinMode}
+              title="Thin mode — hide Team/Bye and Floor columns for a narrower table"
+              onClick={() => setThinMode(active => !active)}
+            >
+              Thin
+            </button>
             <label className={styles.tierControl}>
               <span className={styles.tierControlLabel}>Shade</span>
               <select
@@ -475,7 +491,7 @@ export default function DraftBoard({
       </div>
 
       {/* Column legend */}
-      <Legend auctionMode={auctionMode} shadeBy={shadeBy} linesBy={linesBy} manualEdit={manualEdit} />
+      <Legend auctionMode={auctionMode} thinMode={thinMode} shadeBy={shadeBy} linesBy={linesBy} manualEdit={manualEdit} />
 
       {/* Player table + drafted panel */}
       <div className={styles.contentRow}>
@@ -499,6 +515,7 @@ export default function DraftBoard({
               manualTiers={manualTiers}
               manualEdit={manualEdit}
               onToggleBoundary={onToggleBoundary}
+              thinMode={thinMode}
             />
           ) : (
             <PlayerTable
@@ -520,6 +537,7 @@ export default function DraftBoard({
               manualTiers={manualTiers}
               manualEdit={manualEdit}
               onToggleBoundary={onToggleBoundary}
+              thinMode={thinMode}
               wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
             />
           )}

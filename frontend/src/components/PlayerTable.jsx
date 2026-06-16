@@ -60,11 +60,16 @@ export default function PlayerTable({
   manualTiers = null,
   manualEdit = false,
   onToggleBoundary = () => {},
+  thinMode = false,
 }) {
   const { theme } = useTheme()
-  const cols = auctionMode
+  // Thin mode hides the lowest-value, widest columns: Team/Bye and Floor.
+  // Floor is symmetric with Ceiling around VAL, so the range stays inferable.
+  const hidden = thinMode ? new Set(['tm_bw', 'floor']) : new Set()
+  const allCols = auctionMode
     ? [...COLUMNS, { key: 'auction_price', label: '$', align: 'right', width: '42px' }]
     : COLUMNS
+  const cols = allCols.filter(col => !hidden.has(col.key))
 
   const searchTerm = search.trim().toLowerCase()
   const visible = players.filter(p => {
@@ -77,7 +82,7 @@ export default function PlayerTable({
 
   return (
     <div className={styles.tableWrap} style={wrapStyle}>
-      <table className={styles.table}>
+      <table className={`${styles.table} ${thinMode ? styles.thin : ''}`}>
         <thead>
           <tr>
             {cols.map(col => (
@@ -147,14 +152,18 @@ export default function PlayerTable({
                   {surv && <span className={`${styles.survDot} ${surv.cls}`} title={surv.title} />}
                   <span className={styles.playerName}>{player.player_name}</span>
                 </td>
-                <td className={styles.teamCell}>
-                  <span className={styles.team}>{player.team}</span>
-                  {player.bye_week && <span className={styles.bye}>{player.bye_week}</span>}
-                </td>
+                {!hidden.has('tm_bw') && (
+                  <td className={styles.teamCell}>
+                    <span className={styles.team}>{player.team}</span>
+                    {player.bye_week && <span className={styles.bye}>{player.bye_week}</span>}
+                  </td>
+                )}
                 <td className={styles.ecrCell} style={ecrStyle}>
                   {player.ecr_fmt}
                 </td>
-                <td className={styles.numCell}>{fmtInt(player.floor)}</td>
+                {!hidden.has('floor') && (
+                  <td className={styles.numCell}>{fmtInt(player.floor)}</td>
+                )}
                 <td className={`${styles.numCell} ${styles.valCell}`} style={valStyle}>{fmtVal(player.val)}</td>
                 <td className={styles.numCell}>{fmtInt(player.ceil)}</td>
                 <td className={styles.numCell} style={psStyle}>{fmtPct(player.ps_pct)}</td>

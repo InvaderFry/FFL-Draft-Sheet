@@ -34,6 +34,7 @@ export default function CombinedView({
   manualTiers = null,
   manualEdit = false,
   onToggleBoundary = () => {},
+  thinMode = false,
 }) {
   const { posColors } = useTheme()
   return (
@@ -64,6 +65,7 @@ export default function CombinedView({
                 manualTiers={manualTiers}
                 manualEdit={manualEdit}
                 onToggleBoundary={onToggleBoundary}
+                thinMode={thinMode}
                 wrapStyle={tableStyle}
               />
             </div>

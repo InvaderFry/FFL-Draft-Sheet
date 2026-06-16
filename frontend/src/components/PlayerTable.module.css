@@ -216,6 +216,11 @@
     min-width: 460px;
   }
 
+  /* Thin mode drops TM/BW + Floor, so the table can shrink further on mobile. */
+  .table.thin {
+    min-width: 340px;
+  }
+
   .table thead th {
     padding: 7px 6px;
   }
