@@ -7,7 +7,7 @@
  */
 
 import { ecrColor, ecrColorStyle } from '../utils/ecrColor'
-import { fmtVal } from '../utils/formatters'
+import { fmtVal, fmtInt, fmtPct } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle } from '../utils/valGradient'
 import { survivalStatus } from '../utils/draftStrategy'
 import { useTheme } from '../context/ThemeContext'
@@ -126,10 +126,10 @@ export default function PlayerTable({
                 <td className={styles.ecrCell} style={ecrStyle}>
                   {player.ecr_fmt}
                 </td>
-                <td className={styles.numCell}>{fmtVal(player.floor)}</td>
+                <td className={styles.numCell}>{fmtInt(player.floor)}</td>
                 <td className={`${styles.numCell} ${styles.valCell}`} style={valStyle}>{fmtVal(player.val)}</td>
-                <td className={styles.numCell}>{fmtVal(player.ceil)}</td>
-                <td className={styles.numCell} style={psStyle}>{player.ps_pct != null ? `${player.ps_pct}%` : '—'}</td>
+                <td className={styles.numCell}>{fmtInt(player.ceil)}</td>
+                <td className={styles.numCell} style={psStyle}>{fmtPct(player.ps_pct)}</td>
                 {auctionMode && (
                   <td className={`${styles.numCell} ${styles.auctionCell}`}>
                     {player.auction_price != null ? `$${player.auction_price}` : '—'}
