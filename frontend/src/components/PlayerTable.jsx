@@ -100,8 +100,11 @@ export default function PlayerTable({
             const tierClass = shadeTier != null && shadeTier % 2 === 0 ? styles.tierEven : styles.tierOdd
             const isTierStart = idx > 0 && shadeTier != null && tierFor(previous, shadeBy, manualTiers) !== shadeTier
             // Lines channel: a bold colored rule at a second method's boundaries.
+            // The rule color cycles through 4 colors keyed on the tier number, so
+            // consecutive tiers are visually distinct and a given tier is consistent.
             const lineTier = tierFor(player, linesBy, manualTiers)
             const isLineStart = idx > 0 && lineTier != null && tierFor(previous, linesBy, manualTiers) !== lineTier
+            const lineColorClass = isLineStart ? styles[`tierLine${((lineTier - 1) % 4) + 1}`] : ''
             // Manual-edit handle reflects the manual boundary, independent of channels.
             const manualTier = tierFor(player, 'manual', manualTiers)
             const isManualStart = idx === 0 || (manualTier != null && tierFor(previous, 'manual', manualTiers) !== manualTier)
@@ -118,7 +121,7 @@ export default function PlayerTable({
             return (
               <tr
                 key={player.sleeper_id || `${player.player_name}-${idx}`}
-                className={`${tierClass} ${isTierStart ? styles.tierStart : ''} ${isLineStart ? styles.tierLineStart : ''}`}
+                className={`${tierClass} ${isTierStart ? styles.tierStart : ''} ${isLineStart ? styles.tierLineStart : ''} ${lineColorClass}`}
                 onClick={() => onToggle(id, player.player_name, player.pos)}
                 title="Click to mark as drafted"
               >
