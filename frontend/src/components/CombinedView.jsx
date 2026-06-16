@@ -29,6 +29,7 @@ export default function CombinedView({
   watchedOnly = false,
   isWatched = () => false,
   toggleWatch = () => {},
+  thinMode = false,
 }) {
   const { posColors } = useTheme()
   return (
@@ -54,6 +55,7 @@ export default function CombinedView({
                 watchedOnly={watchedOnly}
                 isWatched={isWatched}
                 toggleWatch={toggleWatch}
+                thinMode={thinMode}
                 wrapStyle={tableStyle}
               />
             </div>

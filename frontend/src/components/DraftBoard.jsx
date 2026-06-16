@@ -6,7 +6,7 @@
  * and the print view stay in sync. Switching tabs preserves it.
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import PlayerTable from './PlayerTable'
 import CombinedView from './CombinedView'
 import DraftedPanel from './DraftedPanel'
@@ -116,6 +116,13 @@ export default function DraftBoard({
   const [sourceDetailsOpen, setSourceDetailsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [watchedOnly, setWatchedOnly] = useState(false)
+  const [thinMode, setThinMode] = useState(
+    () => localStorage.getItem('ffl_thin_mode') === '1'
+  )
+
+  useEffect(() => {
+    localStorage.setItem('ffl_thin_mode', thinMode ? '1' : '0')
+  }, [thinMode])
 
   const { positions, metadata } = sheetData
   const players = positions[activePos] || []
@@ -327,6 +334,15 @@ export default function DraftBoard({
             >
               ★ only
             </button>
+            <button
+              type="button"
+              className={`${styles.watchToggle} ${thinMode ? styles.watchToggleActive : ''}`}
+              aria-pressed={thinMode}
+              title="Thin mode — hide Team/Bye and Floor columns for a narrower table"
+              onClick={() => setThinMode(active => !active)}
+            >
+              Thin
+            </button>
           </div>
           {myTeamPicks.length > 0 && (
             <button type="button" className={styles.printBtn} onClick={handleExportCsv}>
@@ -389,7 +405,7 @@ export default function DraftBoard({
       </div>
 
       {/* Column legend */}
-      <Legend auctionMode={auctionMode} />
+      <Legend auctionMode={auctionMode} thinMode={thinMode} />
 
       {/* Player table + drafted panel */}
       <div className={styles.contentRow}>
@@ -408,6 +424,7 @@ export default function DraftBoard({
               watchedOnly={watchedOnly}
               isWatched={isWatched}
               toggleWatch={toggleWatch}
+              thinMode={thinMode}
             />
           ) : (
             <PlayerTable
@@ -424,6 +441,7 @@ export default function DraftBoard({
               watchedOnly={watchedOnly}
               isWatched={isWatched}
               toggleWatch={toggleWatch}
+              thinMode={thinMode}
               wrapStyle={{ height: '100%', maxHeight: 'none', overflow: 'auto', flex: 1 }}
             />
           )}
