@@ -82,11 +82,9 @@ function printEcrStyle(color) {
 }
 
 function printValStyle(value, minValue, maxValue) {
-  const t = valGradientPosition(value, minValue, maxValue)
-  if (t == null) return {}
-  if (t >= 0.67) return valBgStyle(value, minValue, maxValue, 'print', 0.40)
-  if (t <= 0.33) return valBgStyle(value, minValue, maxValue, 'print', 0.25)
-  return {}
+  // Continuous full-range gradient on the shared (global) val range, matching
+  // the web view so every position's VAL column is shaded — not just the extremes.
+  return valBgStyle(value, minValue, maxValue, 'print', 0.30)
 }
 
 function printPsStyle(psPct) {
