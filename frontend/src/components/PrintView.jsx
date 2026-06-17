@@ -22,7 +22,7 @@ const POSITION_LIMITS = {
   TE: 24,
 }
 
-const DST_LIMIT = 14
+const DST_LIMIT = 12
 const EMPTY_POSITIONS = {}
 
 function fmtNumber(value) {
