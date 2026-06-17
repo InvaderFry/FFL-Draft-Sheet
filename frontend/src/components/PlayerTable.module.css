@@ -32,7 +32,6 @@
 }
 
 .table tbody tr {
-  position: relative; /* containing block for the far-left .tierNum chip */
   cursor: pointer;
   transition: filter 0.1s;
 }
@@ -71,20 +70,28 @@
 }
 
 .nameCell {
+  position: relative; /* containing block for the far-left .tierNum chip */
   padding: 5px 8px;
   color: var(--c-text);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-family: var(--font-body);
   font-size: 12.5px;
   font-weight: 500;
 }
 
-/* Tier number straddling the tier line at the far left of each tier band. It is
-   anchored to the row (not the name cell) so the cell's overflow:hidden doesn't
-   clip it; the surface background masks the row's top border so the number sits
-   "on" the line. */
+/* Truncates long names to the fixed column width. The .tierNum chip lives
+   outside this wrapper, so it is not clipped. */
+.nameInner {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tier number straddling the tier line at the far left of each tier band.
+   Anchored to the (transparent) name cell so it doesn't repaint over the
+   collapsed tier-line borders; the surface background masks the row's top
+   border so the number sits "on" the line. */
 .tierNum {
   position: absolute;
   top: -7px;

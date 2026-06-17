@@ -154,7 +154,7 @@ function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, au
               >
                 <td className={`col-name ${drafted ? 'name-drafted' : ''}`}>
                   {isNumberStart && <span className="tier-num" aria-hidden="true">{numTier}</span>}
-                  {player.player_name}
+                  <span className="print-name-inner">{player.player_name}</span>
                 </td>
                 <td className="col-tmbw">{teamBye(player)}</td>
                 <td className="col-ecr" style={printEcrStyle(ecr)}>{player.ecr_fmt || '—'}</td>
