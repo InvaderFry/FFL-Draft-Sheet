@@ -110,6 +110,7 @@ export default function DraftBoard({
   onRemoveDrafted,
   draftedList = [],
   espnSync = null,
+  sleeperSync = null,
   isWatched = () => false,
   toggleWatch = () => {},
   shadeBy = 'jenks',
@@ -191,10 +192,15 @@ export default function DraftBoard({
   // format and after the draft ends; next-pick, runs, and the per-row survival
   // markers are snake-only, so they're gated to a *live snake* draft (no auction,
   // not yet complete) to avoid showing confidently-wrong advice.
-  const myTeamId = espnSync?.myTeamId || null
+  // Whichever provider is connected drives the strategy gates; both share the
+  // same DraftStatus semantics, so the logic below stays provider-blind.
+  const activeSync = espnSync?.status && espnSync.status !== 'disconnected'
+    ? espnSync
+    : (sleeperSync?.status && sleeperSync.status !== 'disconnected' ? sleeperSync : espnSync)
+  const myTeamId = activeSync?.myTeamId || null
   const rosterActive = !!myTeamId &&
-    (espnSync?.status === 'connected' || espnSync?.status === 'complete')
-  const snakeLive = !!myTeamId && espnSync?.status === 'connected' && !auctionMode
+    (activeSync?.status === 'connected' || activeSync?.status === 'complete')
+  const snakeLive = !!myTeamId && activeSync?.status === 'connected' && !auctionMode
   const myTeamPicks = useMemo(() => {
     if (!myTeamId) return []
     return draftedList
@@ -368,7 +374,13 @@ export default function DraftBoard({
               Generated in {metadata.generation_time_s}s
             </span>
           )}
-          {espnSync && <DraftSync espnSync={espnSync} defaultSeason={metadata?.season} />}
+          {espnSync && sleeperSync && (
+            <DraftSync
+              espnSync={espnSync}
+              sleeperSync={sleeperSync}
+              defaultSeason={metadata?.season}
+            />
+          )}
           {count > 0 && (
             <span className={styles.draftCount}>
               {count} drafted —{' '}
@@ -564,8 +576,8 @@ export default function DraftBoard({
           draftedList={draftedList}
           onToggle={toggle}
           onRemove={onRemoveDrafted}
-          myTeamId={espnSync?.myTeamId}
-          syncActive={espnSync?.status === 'connected' || espnSync?.status === 'connecting'}
+          myTeamId={activeSync?.myTeamId}
+          syncActive={activeSync?.status === 'connected' || activeSync?.status === 'connecting'}
           needs={strategy?.needs}
           runs={strategy?.runs}
           nextPick={strategy?.nextPick}

@@ -41,3 +41,32 @@ export async function testEspnConnection(settings) {
     return { ok: false, status: 0, detail: 'Could not reach the sheet backend.' }
   }
 }
+
+/** The POST body for /api/draft/sleeper from a connect-form settings object. */
+export function sleeperDraftBody(settings) {
+  return { draft_id: String(settings.draftId || '').trim() }
+}
+
+/**
+ * One-shot pre-flight against the live Sleeper endpoint, mirroring
+ * testEspnConnection. Sleeper drafts are public (no credentials), so this only
+ * confirms the draft ID is reachable BEFORE the draft starts. Returns
+ * { ok, status, detail }; network failures surface as status 0.
+ */
+export async function testSleeperConnection(settings) {
+  try {
+    const resp = await fetch(`${API_URL}/api/draft/sleeper`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sleeperDraftBody(settings)),
+    })
+    let detail = ''
+    try {
+      const data = await resp.json()
+      if (typeof data?.detail === 'string') detail = data.detail
+    } catch (_) { /* non-JSON body — leave detail blank */ }
+    return { ok: resp.ok, status: resp.status, detail }
+  } catch (_) {
+    return { ok: false, status: 0, detail: 'Could not reach the sheet backend.' }
+  }
+}

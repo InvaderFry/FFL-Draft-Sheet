@@ -1,0 +1,29 @@
+[
+  {
+    "pick_no": 2,
+    "round": 1,
+    "draft_slot": 2,
+    "roster_id": 2,
+    "player_id": "DEN",
+    "picked_by": "u2",
+    "metadata": { "first_name": "Denver", "last_name": "Broncos", "position": "DEF", "team": "DEN" }
+  },
+  {
+    "pick_no": 1,
+    "round": 1,
+    "draft_slot": 1,
+    "roster_id": 1,
+    "player_id": "4034",
+    "picked_by": "u1",
+    "metadata": { "first_name": "Christian", "last_name": "McCaffrey", "position": "RB", "team": "SF" }
+  },
+  {
+    "pick_no": 3,
+    "round": 2,
+    "draft_slot": 2,
+    "roster_id": 2,
+    "player_id": "9999999",
+    "picked_by": "u2",
+    "metadata": { "first_name": "Harrison", "last_name": "Butker", "position": "K", "team": "KC" }
+  }
+]

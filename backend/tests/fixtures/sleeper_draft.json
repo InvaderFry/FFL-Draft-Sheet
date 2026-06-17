@@ -1,0 +1,9 @@
+{
+  "draft_id": "123456",
+  "status": "complete",
+  "type": "snake",
+  "league_id": "888999",
+  "settings": { "teams": 2, "rounds": 2 },
+  "draft_order": { "u1": 1, "u2": 2 },
+  "slot_to_roster_id": { "1": 1, "2": 2 }
+}
