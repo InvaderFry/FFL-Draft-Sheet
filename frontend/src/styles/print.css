@@ -162,6 +162,12 @@
     text-transform: uppercase;
   }
 
+  /* Containing block for the far-left .tier-num chip, so the cell's
+     overflow:hidden doesn't clip it. */
+  .print-player-table tbody tr {
+    position: relative;
+  }
+
   .print-player-table tbody td {
     border-bottom: 0.25pt solid #d5d5d5;
     overflow: hidden;
@@ -181,6 +187,20 @@
   /* Dual-encoding: second method's boundary, distinct from the tier-start rule. */
   .tier-line-start td {
     border-top: 1.5pt solid #444 !important;
+  }
+
+  /* Tier number straddling the line at the far left of each tier band. */
+  .tier-num {
+    position: absolute;
+    top: -3pt;
+    left: 0;
+    z-index: 1;
+    padding: 0 1pt;
+    background: #ffffff;
+    color: #000;
+    font-size: 4.8pt;
+    font-weight: 800;
+    line-height: 1;
   }
 
   .drafted {

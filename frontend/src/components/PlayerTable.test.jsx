@@ -106,6 +106,54 @@ describe('PlayerTable', () => {
     expect(bravo.className).toContain(styles.tierLine2)
   })
 
+  describe('tier numbers', () => {
+    const withTiers = (name, jenks, gmm) => ({
+      ...player(name, jenks, jenks % 2 === 0),
+      tiers: { jenks, gmm },
+    })
+    const tierNumOf = (name) =>
+      screen.getByText(name).closest('tr').querySelector(`.${styles.tierNum}`)
+
+    it('numbers each tier band by the Lines method, including the first row', () => {
+      renderTable([
+        withTiers('Alpha', 1, 1),
+        withTiers('Bravo', 1, 2),
+        withTiers('Charlie', 2, 2),
+      ], { shadeBy: 'jenks', linesBy: 'gmm' })
+
+      // Number follows gmm (the Lines method): 1 at Alpha, 2 at Bravo, none mid-tier.
+      expect(tierNumOf('Alpha')).toHaveTextContent('1')
+      expect(tierNumOf('Bravo')).toHaveTextContent('2')
+      expect(tierNumOf('Charlie')).toBeNull()
+    })
+
+    it('falls back to the Shade method when Lines = None', () => {
+      renderTable([
+        withTiers('Alpha', 1, 1),
+        withTiers('Bravo', 1, 2),
+        withTiers('Charlie', 2, 2),
+      ], { shadeBy: 'jenks', linesBy: 'none' })
+
+      // Number follows jenks (the Shade method): 1 at Alpha, none at Bravo, 2 at Charlie.
+      expect(tierNumOf('Alpha')).toHaveTextContent('1')
+      expect(tierNumOf('Bravo')).toBeNull()
+      expect(tierNumOf('Charlie')).toHaveTextContent('2')
+    })
+
+    it('shows the true tier number (with a gap) when the tier above is drafted off', () => {
+      renderTable([
+        withTiers('Alpha', 1, 1),
+        withTiers('Bravo', 2, 2),
+        withTiers('Charlie', 2, 2),
+      ], { shadeBy: 'jenks', linesBy: 'none', isDrafted: id => id === 'alpha' })
+
+      // Tier 1 is gone; the now-top row keeps its real number (2), not renumbered to 1.
+      expect(screen.queryByText('Alpha')).not.toBeInTheDocument()
+      expect(tierNumOf('Bravo')).toHaveTextContent('2')
+      expect(tierNumOf('Charlie')).toBeNull()
+    })
+  })
+
   it('shows the tier-break handle only in manual-edit mode', () => {
     const { rerender } = renderTable([player('Mahomes', 1, false)])
     expect(screen.queryByRole('button', { name: /tier break/i })).not.toBeInTheDocument()

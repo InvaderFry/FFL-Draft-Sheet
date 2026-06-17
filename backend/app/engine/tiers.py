@@ -13,23 +13,28 @@ Methods (see TIER_METHODS):
 Boris Chen's published tiers are applied separately (app/data/boris_chen.py),
 and manual tiers live client-side; neither is computed here.
 
-Both methods share one two-stage structure, differing only in the break
-function for positive players:
+Both methods share one two-stage structure, applying the same break function to
+each group:
 
 N_TIERS_BY_POS: QB/TE → 8, RB/WR → 12, DST/K → 6
 (matches beersheet_clone.R and the plan)
 
 Positive players (val > 0) are tiered over k-1 tiers (1 through k-1) using the
-method's breaks. Sub-baseline players (val <= 0) get equal-count rank bands
-instead: the VAL distribution just below baseline is dense and the deep tail
-sparse, so clustering would lump everyone near zero into one giant tier. Rank
-bands keep the visual tier granularity consistent all the way down the list
-(like BeerSheets), numbered contiguously after the last positive tier.
+method's breaks. Sub-baseline players (val <= 0) are then clustered by the SAME
+method, into bands numbered contiguously after the last positive tier. The band
+count is sized to the average positive tier so the list keeps BeerSheets-style
+granularity below the baseline, but each method places its own breaks — so Jenks
+and GMM produce genuinely different sub-baseline shading rather than a shared
+fallback.
+
+Boris Chen's published tiers cover only the ranked players; extend_method_tiers
+fills the deeper players the same way (GMM-clustered bands below the published
+list) so its shading stays granular too.
 
 Edge cases:
-- Fewer unique positive values than requested tiers → direct contiguous tier mapping
+- Fewer unique values than requested tiers → direct contiguous tier mapping
 - All same value in a group → everyone shares one tier
-- Equal sub-baseline values never straddle a band boundary
+- Equal values share a tier (digitize is deterministic per value)
 - No positive players → sub-baseline bands start at 1
 - GMM numerical failure → falls back to Jenks breaks
 """
@@ -236,27 +241,6 @@ def _sub_tier_size(n_positive: int, last_pos_tier: int, n_players: int, k: int) 
     return max(3, ceil(n_players / k))
 
 
-def _assign_rank_band_tiers(
-    group: list[PlayerVBD], band_size: int, offset: int, method: str
-) -> int:
-    """
-    Tier `group` (sorted descending by val) into equal-count bands of
-    `band_size` players, extending a band so equal values never straddle a
-    boundary. Tiers are numbered offset+1, offset+2, ... and written into
-    p.tiers[method]. Returns the highest tier number assigned (offset if empty).
-    """
-    tier = offset
-    in_band = band_size  # force a new band on the first player
-    for i, p in enumerate(group):
-        starts_new_band = in_band >= band_size and (i == 0 or p.val != group[i - 1].val)
-        if starts_new_band:
-            tier += 1
-            in_band = 0
-        p.tiers[method] = tier
-        in_band += 1
-    return tier
-
-
 # Registry of tier methods → breaks function. Each method gets its own entry in
 # every player's `tiers` map; the default is mirrored into the flat
 # tier/tier_is_even fields for back-compat. Add new computed methods here.
@@ -290,8 +274,15 @@ def assign_tiers(players: list[PlayerVBD]) -> list[PlayerVBD]:
             positive_players, max(1, k - 1), offset=0, breaks_fn=breaks_fn, method=method
         )
         if sub_players:
-            target = _sub_tier_size(len(positive_players), last_pos_tier, len(players), k)
-            _assign_rank_band_tiers(sub_players, target, offset=last_pos_tier, method=method)
+            # Cluster the sub-baseline group with the method's own break function
+            # so each method (Jenks vs GMM) drives its own below-baseline shading.
+            # The band size keeps the tier count near the positive average so the
+            # list stays granular; the method decides where the breaks fall.
+            band_size = _sub_tier_size(len(positive_players), last_pos_tier, len(players), k)
+            n_sub = max(1, ceil(len(sub_players) / band_size))
+            _assign_group_tiers(
+                sub_players, n_sub, offset=last_pos_tier, breaks_fn=breaks_fn, method=method
+            )
 
     # Back-compat: mirror the default method into the flat tier fields.
     for p in players:
@@ -299,3 +290,29 @@ def assign_tiers(players: list[PlayerVBD]) -> list[PlayerVBD]:
         p.tier_is_even = p.tier % 2 == 0
 
     return players
+
+
+def extend_method_tiers(
+    players: list[PlayerVBD], method: str, breaks_fn: BreaksFn = _gmm_breaks
+) -> None:
+    """
+    Extend an externally-assigned method (e.g. Boris Chen's published tiers)
+    below its covered range. Players that already carry tiers[method] are left
+    untouched; the rest (the deeper/unmatched players) are clustered by
+    `breaks_fn` into bands numbered after the method's current max tier, so the
+    shading stays granular all the way down like Jenks/GMM.
+
+    `players` must be sorted descending by val. No-op when the method covers
+    everyone or no one.
+    """
+    covered = [p for p in players if method in p.tiers]
+    uncovered = [p for p in players if method not in p.tiers]
+    if not covered or not uncovered:
+        return
+
+    max_tier = max(p.tiers[method] for p in covered)
+    band_size = _sub_tier_size(len(covered), max_tier, len(players), max_tier)
+    n_bands = max(1, ceil(len(uncovered) / band_size))
+    _assign_group_tiers(
+        uncovered, n_bands, offset=max_tier, breaks_fn=breaks_fn, method=method
+    )

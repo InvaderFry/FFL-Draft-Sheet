@@ -32,6 +32,14 @@ export function tierFor(player, method, manualTiers = null) {
 }
 
 /**
+ * Which method's tiers the far-left tier number should count: the Lines method
+ * when one is selected, otherwise the Shade method.
+ */
+export function tierNumberMethod(shadeBy, linesBy) {
+  return linesBy && linesBy !== 'none' ? linesBy : shadeBy
+}
+
+/**
  * Whether a method has any data across the loaded positions. Jenks/none are
  * always available; manual is available once seeded (non-empty manualTiers).
  */
