@@ -76,6 +76,15 @@ export default function App() {
   }, [])
 
   const handlePrint = useCallback(() => {
+    // Browsers render the document title in the print header. Blank it for the
+    // print job (restored on afterprint) so the printed sheet has no title text.
+    const originalTitle = document.title
+    const restore = () => {
+      document.title = originalTitle
+      window.removeEventListener('afterprint', restore)
+    }
+    window.addEventListener('afterprint', restore)
+    document.title = ''
     window.print()
   }, [])
 
@@ -94,9 +103,9 @@ export default function App() {
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <div className={styles.logo}>
-            <span className={styles.logoEmoji}>🍺</span>
-            <span className={styles.logoText}>FFL Draft Sheet</span>
-            <span className={styles.logoBadge}>Free VBD</span>
+            <span className={styles.logoEmoji}>🏈</span>
+            <span className={styles.logoText}>Zach's FFL Draft Sheet</span>
+            <span className={styles.logoBadge}>🏆</span>
           </div>
           <div className={styles.headerRight}>
             <div className={styles.themeToggle}>
