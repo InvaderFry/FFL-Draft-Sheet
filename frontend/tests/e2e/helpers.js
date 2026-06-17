@@ -25,3 +25,14 @@ export async function stubDraft(page, body = fixture('draft_ingest.json')) {
     route.fulfill({ json: body })
   )
 }
+
+/**
+ * Stub the live Sleeper draft endpoint. The DraftStatus shape is provider-
+ * agnostic and its picks already carry sleeper_id, so the recorded ESPN
+ * snapshot maps onto the same sheet rows.
+ */
+export async function stubSleeperDraft(page, body = fixture('draft_ingest.json')) {
+  await page.route('**/api/draft/sleeper', route =>
+    route.fulfill({ json: body })
+  )
+}
