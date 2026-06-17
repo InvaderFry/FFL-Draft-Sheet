@@ -3,7 +3,7 @@
 import pytest
 from app.engine.vbd import PlayerVBD
 from app.engine import tiers as tiers_mod
-from app.engine.tiers import _jenks_breaks, assign_tiers
+from app.engine.tiers import _jenks_breaks, assign_tiers, extend_method_tiers
 
 
 def _make_player(name, pos, val):
@@ -131,17 +131,17 @@ def test_sub_baseline_split_into_multiple_tiers():
     assert len(sub_tiers) >= 2
 
 
-def test_dense_near_zero_cluster_still_splits():
-    """The dense cluster just below baseline must split into multiple tiers
-    even when a sparse deep tail follows (Jenks lumps the dense cluster into
-    one giant tier; rank bands must not)."""
+def test_methods_differ_below_baseline():
+    """Each method clusters the sub-baseline group with its own break function,
+    so Jenks and GMM can disagree below zero (they previously shared one
+    equal-count rank-band scheme and were always identical there)."""
     pos_vals = [60, 50, 40, 30, 20, 10, 5, 2]
-    dense = [-(0.1 * i) for i in range(1, 31)]       # 30 players, -0.1 .. -3.0
-    sparse = [-50, -100, -150, -200, -250, -300]
-    players = _make_qbs(pos_vals + dense + sparse)
+    sub = [-2, -3, -4, -5, -6, -30, -32, -34, -90, -92, -150, -210, -280, -360]
+    players = _make_qbs(pos_vals + sub)
     result = assign_tiers(players)
-    dense_tiers = {p.tier for p in result if -3.5 <= p.val <= 0}
-    assert len(dense_tiers) >= 3
+    jenks_sub = [p.tiers["jenks"] for p in result if p.val <= 0]
+    gmm_sub = [p.tiers["gmm"] for p in result if p.val <= 0]
+    assert jenks_sub != gmm_sub
 
 
 def test_single_sub_baseline_player():
@@ -153,17 +153,19 @@ def test_single_sub_baseline_player():
     assert sub[0].tier == max(pos_tiers) + 1
 
 
-def test_sub_tier_bands_are_even():
-    """Tail tiers are equal-count bands; no tier swallows the whole tail."""
+def test_sub_baseline_tiers_contiguous_and_monotonic():
+    """Sub-baseline tiers (default = jenks) continue contiguously after the last
+    positive tier and never improve as val drops — clustering keeps the tail
+    split into many bands rather than swallowing it into one tier."""
     players = _make_qbs([30, 20, 10] + [-float(i) for i in range(1, 201)])
     result = assign_tiers(players)
-    sub = [p for p in result if p.val <= 0]
-    from collections import Counter
-    sizes = Counter(p.tier for p in sub)
-    band_sizes = [sizes[t] for t in sorted(sizes)]
-    # All distinct vals: every band except possibly the last has the same size
-    assert len(set(band_sizes[:-1])) == 1
-    assert max(band_sizes) <= band_sizes[0]
+    tier_set = sorted({p.tier for p in result})
+    assert tier_set == list(range(1, max(tier_set) + 1))
+    for a, b in zip(result, result[1:]):
+        assert a.tier <= b.tier
+    # The 200-player tail is split into many bands, not lumped into one.
+    sub_tiers = {p.tier for p in result if p.val <= 0}
+    assert len(sub_tiers) >= 10
 
 
 def test_ties_do_not_straddle_tier_boundary():
@@ -278,6 +280,38 @@ def test_gmm_falls_back_to_jenks_on_failure(monkeypatch, caplog):
     for a, b in zip(result, result[1:]):
         assert a.tiers["gmm"] <= b.tiers["gmm"]
     assert any("falling back to Jenks" in r.message for r in caplog.records)
+
+
+# ---- extend_method_tiers (Boris Chen below-baseline extension) ---------------
+
+def test_extend_method_tiers_fills_uncovered_below_max():
+    """Players lacking the method get clustered tiers numbered after its current
+    max tier, so an externally-assigned method stays granular down the list."""
+    players = _make_qbs([40, 30, 20, 10, 5, 2, -5, -10, -20, -40, -80])
+    # Simulate a published method covering only the top four players.
+    for i, p in enumerate(players[:4]):
+        p.tiers["boris_chen"] = (i // 2) + 1   # tiers 1, 1, 2, 2
+    extend_method_tiers(players, "boris_chen")
+
+    assert all("boris_chen" in p.tiers for p in players)
+    extended = [p.tiers["boris_chen"] for p in players[4:]]
+    assert min(extended) == 3                  # contiguous after max published tier
+    seq = [p.tiers["boris_chen"] for p in players]
+    assert seq == sorted(seq)                  # monotonic, never improves downlist
+
+
+def test_extend_method_tiers_noop_when_fully_covered():
+    players = _make_qbs([40, 30, 20])
+    for i, p in enumerate(players):
+        p.tiers["boris_chen"] = i + 1
+    extend_method_tiers(players, "boris_chen")
+    assert [p.tiers["boris_chen"] for p in players] == [1, 2, 3]
+
+
+def test_extend_method_tiers_noop_when_none_covered():
+    players = _make_qbs([40, 30, 20])
+    extend_method_tiers(players, "boris_chen")
+    assert all("boris_chen" not in p.tiers for p in players)
 
 
 def test_jenks_runtime_failure_falls_back_loudly(monkeypatch, caplog):

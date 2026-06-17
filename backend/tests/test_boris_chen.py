@@ -1,6 +1,7 @@
 """Tests for the Boris Chen tier scaffold (app/data/boris_chen.py)."""
 
 from app.data import boris_chen
+from app.engine.tiers import extend_method_tiers
 from app.engine.vbd import PlayerVBD
 
 
@@ -49,3 +50,27 @@ def test_apply_normalizes_suffix_differences(tmp_path, monkeypatch):
 
     boris_chen.apply_boris_chen_tiers(players, 2026)
     assert players[0].tiers["boris_chen"] == 1
+
+
+def test_extend_tiers_deep_players_below_published_list(tmp_path, monkeypatch):
+    """Players missing from the published list (the deep tail) get tiered below
+    the max published tier instead of collapsing into one flat shade."""
+    season_dir = tmp_path / "2026"
+    season_dir.mkdir()
+    (season_dir / "WR.csv").write_text(
+        "player_name,tier\nAlpha,1\nBravo,1\nCharlie,2\n"
+    )
+    monkeypatch.setattr(boris_chen, "_DATA_DIR", tmp_path)
+    # Sorted descending by val; only the first three appear in the CSV.
+    players = [
+        _player("Alpha", val=50.0), _player("Bravo", val=45.0), _player("Charlie", val=30.0),
+        _player("Deep One", val=-5.0), _player("Deep Two", val=-15.0),
+        _player("Deep Three", val=-30.0), _player("Deep Four", val=-60.0),
+    ]
+
+    assert boris_chen.apply_boris_chen_tiers(players, 2026) is True
+    extend_method_tiers(players, boris_chen.BORIS_CHEN_METHOD)
+
+    assert all("boris_chen" in p.tiers for p in players)
+    deep = [p.tiers["boris_chen"] for p in players[3:]]
+    assert min(deep) == 3   # contiguous after the max published tier (2)

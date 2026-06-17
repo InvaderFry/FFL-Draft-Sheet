@@ -30,8 +30,8 @@ from app.data.adp import enrich_with_adp
 from app.data.schedule import load_team_byes
 from app.engine.baseline import compute_baselines
 from app.engine.vbd import aggregate_projections, PlayerVBD
-from app.data.boris_chen import apply_boris_chen_tiers
-from app.engine.tiers import assign_tiers
+from app.data.boris_chen import BORIS_CHEN_METHOD, apply_boris_chen_tiers
+from app.engine.tiers import assign_tiers, extend_method_tiers
 from app.engine.scarcity import assign_positional_scarcity, assign_auction_prices
 
 logging.basicConfig(level=logging.INFO)
@@ -325,8 +325,11 @@ async def _generate_sheet(cfg: LeagueConfig, fantasypros_api_key: str | None = N
         players = aggregate_projections(rows, pos, baselines.get(pos, 0.0), player_map, variance=variance)
         players = assign_tiers(players)
         # Boris Chen tiers are scaffolded: applied only when a tier file for the
-        # season/position exists, otherwise a no-op (method stays absent).
-        apply_boris_chen_tiers(players, cfg.season)
+        # season/position exists, otherwise a no-op (method stays absent). When
+        # present, extend it below the published list so deep players are tiered
+        # (GMM-clustered) instead of collapsing into one flat shade.
+        if apply_boris_chen_tiers(players, cfg.season):
+            extend_method_tiers(players, BORIS_CHEN_METHOD)
         players = assign_positional_scarcity(players)
         # Fill bye week from the per-team map when the player map didn't supply it.
         if team_byes:

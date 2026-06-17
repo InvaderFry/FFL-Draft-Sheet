@@ -97,7 +97,9 @@ export default function PlayerTable({
             const previous = visible[idx - 1]
             // Shading channel: alternating bands by the selected method's tier.
             const shadeTier = tierFor(player, shadeBy, manualTiers)
-            const tierClass = shadeTier != null && shadeTier % 2 === 0 ? styles.tierEven : styles.tierOdd
+            // No tier for the selected method (or "none") → leave the row unshaded
+            // rather than rendering it as a real (odd) tier band.
+            const tierClass = shadeTier == null ? '' : (shadeTier % 2 === 0 ? styles.tierEven : styles.tierOdd)
             const isTierStart = idx > 0 && shadeTier != null && tierFor(previous, shadeBy, manualTiers) !== shadeTier
             // Lines channel: a bold colored rule at a second method's boundaries.
             // The rule color cycles through 4 colors keyed on the tier number, so
