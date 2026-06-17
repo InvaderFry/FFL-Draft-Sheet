@@ -9,14 +9,17 @@ test.describe('sheet generation', () => {
     await page.getByRole('button', { name: /generate draft sheet/i }).click()
 
     const board = page.locator('main')
+    // Player names also appear in the RECOMMENDED sidebar (a <ul>), so scope
+    // board-table assertions to the table itself.
+    const table = board.locator('table')
     // Top RB on the default (ALL) view.
-    await expect(board.getByText('Christian McCaffrey')).toBeVisible()
+    await expect(table.getByText('Christian McCaffrey')).toBeVisible()
 
     // Switching to the QB tab shows QBs. The tab's accessible name includes
     // its remaining-player count (e.g. "QB 2"), so match loosely.
     await board.getByRole('button', { name: /QB/ }).first().click()
-    await expect(board.getByText('Josh Allen')).toBeVisible()
-    await expect(board.getByText('Patrick Mahomes')).toBeVisible()
+    await expect(table.getByText('Josh Allen')).toBeVisible()
+    await expect(table.getByText('Patrick Mahomes')).toBeVisible()
   })
 
   test('clicking a player marks them drafted', async ({ page }) => {
@@ -25,7 +28,8 @@ test.describe('sheet generation', () => {
     await page.getByRole('button', { name: /generate draft sheet/i }).click()
 
     const board = page.locator('main')
-    await board.getByText('Christian McCaffrey').click()
+    // Click the board-table row (the name is also in the RECOMMENDED sidebar).
+    await board.locator('table').getByText('Christian McCaffrey').click()
 
     await expect(board.getByText(/1 drafted/)).toBeVisible()
   })

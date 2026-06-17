@@ -67,6 +67,42 @@
   max-height: 40%;
 }
 
+/* Recommended-picks shortlist at the top of the panel */
+.recList {
+  flex: 0 1 auto;
+  max-height: 35%;
+}
+
+.recItem {
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.recName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recRank {
+  display: inline-block;
+  min-width: 12px;
+  margin-right: 4px;
+  color: var(--c-text-dim);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.recReason {
+  margin-top: 1px;
+  font-size: 9px;
+  color: var(--c-text-muted);
+  font-family: var(--font-data);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .empty {
   padding: 4px 8px;
   font-size: 10px;

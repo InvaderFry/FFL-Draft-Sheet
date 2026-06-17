@@ -104,7 +104,7 @@ export default function App() {
         <div className={styles.headerInner}>
           <div className={styles.logo}>
             <span className={styles.logoEmoji}>🏈</span>
-            <span className={styles.logoText}>Zach's FFL Draft Sheet</span>
+            <span className={styles.logoText}>Zach&apos;s FFL Draft Sheet</span>
             <span className={styles.logoBadge}>🏆</span>
           </div>
           <div className={styles.headerRight}>

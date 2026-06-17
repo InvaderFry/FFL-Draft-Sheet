@@ -10,7 +10,8 @@ test.describe('live ESPN draft sync', () => {
     // Generate the sheet first so the sync hook can map picks onto its rows.
     await page.getByRole('button', { name: /generate draft sheet/i }).click()
     const board = page.locator('main')
-    await expect(board.getByText('Christian McCaffrey')).toBeVisible()
+    // Name also appears in the RECOMMENDED sidebar; scope to the board table.
+    await expect(board.locator('table').getByText('Christian McCaffrey')).toBeVisible()
 
     // Open the sync form, enter a league, and connect.
     await page.getByRole('button', { name: /sync espn draft/i }).click()

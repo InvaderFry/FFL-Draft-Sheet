@@ -85,6 +85,31 @@ describe('DraftedPanel', () => {
     expect(screen.queryByText('MY TEAM')).toBeNull()
   })
 
+  it('renders a RECOMMENDED section and marks a pick drafted on click', async () => {
+    const onToggle = vi.fn()
+    const recommendations = [
+      {
+        player: { sleeper_id: 'r1', player_name: 'Bijan Robinson', pos: 'RB', val: 42 },
+        score: 50,
+        reasons: { primary: 'Fills RB need (0/2)', all: ['Fills RB need (0/2)', 'Top value (VAL 42)'] },
+      },
+    ]
+    render(
+      <DraftedPanel draftedList={[]} onToggle={onToggle} recommendations={recommendations} />
+    )
+
+    expect(screen.getByText('RECOMMENDED')).toBeInTheDocument()
+    expect(screen.getByText('Fills RB need (0/2)')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByText('Bijan Robinson'))
+    expect(onToggle).toHaveBeenCalledWith('r1', 'Bijan Robinson', 'RB')
+  })
+
+  it('omits the RECOMMENDED section when there are no recommendations', () => {
+    render(<DraftedPanel draftedList={[]} onToggle={() => {}} recommendations={[]} />)
+    expect(screen.queryByText('RECOMMENDED')).toBeNull()
+  })
+
   it('renders the strategy block: next pick, roster needs, runs, bye conflicts', () => {
     render(
       <DraftedPanel
