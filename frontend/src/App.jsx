@@ -18,6 +18,7 @@ import PrintView from './components/PrintView'
 import { useDraftState } from './hooks/useDraftState'
 import { useWatchlist } from './hooks/useWatchlist'
 import { useEspnDraftSync } from './hooks/useEspnDraftSync'
+import { useSleeperDraftSync } from './hooks/useSleeperDraftSync'
 import { useTierDisplay } from './hooks/useTierDisplay'
 import { useManualTiers } from './hooks/useManualTiers'
 import { deriveManualTiers } from './utils/tierAccess'
@@ -44,17 +45,22 @@ export default function App() {
     () => deriveManualTiers(sheetData?.positions || {}, boundaries),
     [sheetData, boundaries]
   )
+  // ESPN and Sleeper share the single drafted-state store; only one connects
+  // at a time (DraftSync enforces this), so both feed applySyncedPicks safely.
   const espnSync = useEspnDraftSync({ sheetData, applySyncedPicks })
+  const sleeperSync = useSleeperDraftSync({ sheetData, applySyncedPicks })
   // Destructured so hooks below can depend on the stable callback instead of
-  // the espnSync object, which is recreated every render.
+  // the sync objects, which are recreated every render.
   const { disconnect: espnDisconnect } = espnSync
+  const { disconnect: sleeperDisconnect } = sleeperSync
+  const synced = espnSync.status !== 'disconnected' || sleeperSync.status !== 'disconnected'
 
   // The board's "clear" wipes manual marks; synced picks survive while a
   // sync session exists, because once polling has stopped (draft complete,
   // permanent error) they would not re-hydrate.
   const handleClearDrafted = useCallback(() => {
-    clearDrafted({ keepSynced: espnSync.status !== 'disconnected' })
-  }, [clearDrafted, espnSync.status])
+    clearDrafted({ keepSynced: synced })
+  }, [clearDrafted, synced])
 
   const handleSheet = useCallback((data, cfg) => {
     setSheetData(data)
@@ -95,7 +101,8 @@ export default function App() {
     setError(null)
     clearDrafted()
     espnDisconnect()
-  }, [clearDrafted, espnDisconnect])
+    sleeperDisconnect()
+  }, [clearDrafted, espnDisconnect, sleeperDisconnect])
 
   return (
     <div className={styles.app}>
@@ -168,6 +175,7 @@ export default function App() {
               onRemoveDrafted={removeDrafted}
               draftedList={draftedList}
               espnSync={espnSync}
+              sleeperSync={sleeperSync}
               isWatched={isWatched}
               toggleWatch={toggleWatch}
               shadeBy={shadeBy}

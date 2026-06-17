@@ -20,6 +20,7 @@ Generates a Value-Based Drafting board with man-games baseline, switchable tier 
 - **Auction dollar values** using the standard VBD-to-dollars formula
 - **Click-to-cross-off** drafted players; state persists for the session
 - **Live ESPN draft-room sync** — picks made in your ESPN draft are crossed off automatically, with team attribution and a "My Team" roster panel (private leagues supported via espn_s2/SWID cookies)
+- **Live Sleeper draft-room sync** — paste a draft ID and Sleeper picks (including public mock drafts) stream in the same way, no login or cookies required
 - **Printable one-pager** matching the classic BeerSheets landscape layout (`@media print`)
 - All from **free public APIs** (Sleeper, Fantasy Football Calculator, public projection sites)
 
@@ -140,6 +141,26 @@ where each pick has `overall`, `round`, `team_id`, and bridged
 > The frontend stores them only in your browser's localStorage ("Forget saved
 > credentials" in the sync panel removes them).
 
+### `POST /api/draft/sleeper`
+
+Live draft-room sync for Sleeper. A stateless proxy in front of Sleeper's
+public v1 API: fetches the draft object and its picks (plus league users for
+team names), normalizes picks, and enriches them with player identity via the
+Sleeper map. Because a Sleeper pick's `player_id` IS the Sleeper id, enrichment
+is a direct lookup — no ID crosswalk. Sleeper's REST reflects every pick live
+(mock drafts included), so the frontend just polls this every ~5s; nothing is
+stored server-side. No credentials are involved — Sleeper draft endpoints are
+public.
+
+**Request body:**
+```json
+{ "draft_id": "1109123456789012345" }
+```
+
+**Response:** the same `{provider, in_progress, complete, picks[], teams[],
+fetched_at}` shape as the ESPN endpoint, with `team_id` set to the Sleeper
+`roster_id` and `sleeper_id`/`player_name`/`pos` filled in when known.
+
 ---
 
 ## Setting up ESPN live draft sync
@@ -234,6 +255,37 @@ the setup steps.
 
 Practice replay is still the dependable way to rehearse without depending on
 a live ESPN mock room.
+
+---
+
+## Setting up Sleeper live draft sync
+
+Sleeper's draft API is public, so there's nothing to log in to — you only need
+the draft ID.
+
+### Step 1 — Find your draft ID
+
+Open your draft room on [sleeper.com](https://sleeper.com) (or in the app) and
+look at the URL:
+
+```
+https://sleeper.com/draft/nfl/1109123456789012345
+                              ^^^^^^^^^^^^^^^^^^^^^
+```
+
+The number after `/draft/nfl/` is what goes in the **Draft ID** field. Public
+mock drafts have a draft ID too and sync exactly the same way.
+
+### Step 2 — Connect
+
+1. Generate your sheet, then click **⚡ Sync live draft** in the board header.
+2. Choose the **Sleeper** tab, paste the **Draft ID**, and click **Connect**
+   (use **Test connection** first if you want to confirm it's reachable).
+3. Pick your team from the **My team…** dropdown so your roster shows in the
+   MY TEAM panel.
+
+Picks stream in as they're made — including autodraft and mock-draft picks —
+and the board crosses them off automatically.
 
 ---
 
@@ -423,7 +475,7 @@ price[i] = $1 + (val[i] / Σ val) × discretionary
 
 ## Stage 2 roadmap
 
-- Live draft-room sync (ESPN / Sleeper / Yahoo)
+- Live draft-room sync for Yahoo (ESPN and Sleeper are supported today)
 - Real-time auction inflation as players go off the board
 - Dynasty / keeper / IDP support
 - Superflex / 2QB flex allocation

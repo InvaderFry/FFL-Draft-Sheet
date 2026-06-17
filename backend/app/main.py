@@ -21,6 +21,7 @@ from app.config import LeagueConfig, POSITIONS
 from app import cache
 from app.providers import espn as espn_provider
 from app.providers import espn_ws
+from app.providers import sleeper as sleeper_provider
 from app.providers.base import DraftStatus
 from app.data.players import canonical_key, load_player_map_async
 from app.data.scraper import scrape_all
@@ -437,6 +438,12 @@ class EspnDraftIngestRequest(BaseModel):
     complete: bool = False
 
 
+class SleeperDraftRequest(BaseModel):
+    # Sleeper draft ids are public and carry nothing sensitive, so there are no
+    # credentials here (unlike EspnDraftRequest).
+    draft_id: str = Field(min_length=1)
+
+
 # Unauthenticated by design: the userscript posts from fantasy.espn.com using
 # wildcard CORS/no credentials, and draft pick lines are low-sensitivity state
 # keyed only by league id + season.
@@ -488,6 +495,23 @@ async def espn_draft_status(req: EspnDraftRequest) -> DraftStatus:
         raise HTTPException(status_code=502, detail=str(exc))
     # No catch-all: exception text from arbitrary errors must not reach the
     # response, since this is the one endpoint that handles credentials.
+
+
+# Stateless per-request proxy in front of Sleeper's public draft API. No
+# credentials here (Sleeper draft endpoints are unauthenticated); the catch-all
+# is kept omitted only to mirror the ESPN handler's shape.
+@app.post("/api/draft/sleeper", response_model=DraftStatus)
+async def sleeper_draft_status(req: SleeperDraftRequest) -> DraftStatus:
+    try:
+        return await sleeper_provider.fetch_draft(draft_id=req.draft_id)
+    except sleeper_provider.SleeperNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except sleeper_provider.SleeperSchemaError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except sleeper_provider.SleeperTimeoutError as exc:
+        raise HTTPException(status_code=504, detail=str(exc))
+    except sleeper_provider.SleeperUpstreamError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @app.post("/api/sheet", response_model=SheetResponse)
