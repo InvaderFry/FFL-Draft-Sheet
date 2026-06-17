@@ -232,17 +232,20 @@
 }
 
 /* Dual-encoding: bold colored rule marking a second tier method's boundary.
-   Placed after the separators above so it wins when both fall on the same row. */
-.tierLineStart td {
+   Scoped under .table so its specificity (0,2,1) matches the adjacent-sibling
+   separators above; being later in source it then wins when a colored line
+   coincides with a shading parity flip (otherwise the gray 1px separator, at
+   the same specificity, would override the colored line and it would vanish). */
+.table .tierLineStart td {
   border-top: 2px solid var(--c-tier-line);
 }
 
 /* Cycle the tier-line color per tier (see PlayerTable.jsx). Placed after
    .tierLineStart so the color override wins. */
-.tierLine1 td { border-top-color: var(--c-tier-line-1); }
-.tierLine2 td { border-top-color: var(--c-tier-line-2); }
-.tierLine3 td { border-top-color: var(--c-tier-line-3); }
-.tierLine4 td { border-top-color: var(--c-tier-line-4); }
+.table .tierLine1 td { border-top-color: var(--c-tier-line-1); }
+.table .tierLine2 td { border-top-color: var(--c-tier-line-2); }
+.table .tierLine3 td { border-top-color: var(--c-tier-line-3); }
+.table .tierLine4 td { border-top-color: var(--c-tier-line-4); }
 
 @media (max-width: 768px) {
   .table {
