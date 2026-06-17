@@ -139,34 +139,36 @@ export default function PlayerTable({
                   {isNumberStart && (
                     <span className={styles.tierNum} aria-hidden="true">{numTier}</span>
                   )}
-                  {manualEdit && (
+                  <span className={styles.nameInner}>
+                    {manualEdit && (
+                      <button
+                        type="button"
+                        className={`${styles.tierBreakBtn} ${isManualStart ? styles.tierBreakActive : ''}`}
+                        aria-label={`${isManualStart ? 'Remove' : 'Add'} tier break at ${player.player_name}`}
+                        title={isManualStart ? 'Remove tier break here' : 'Start a new tier here'}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          onToggleBoundary(player.pos, id)
+                        }}
+                      >
+                        {isManualStart ? '┃' : '╌'}
+                      </button>
+                    )}
                     <button
                       type="button"
-                      className={`${styles.tierBreakBtn} ${isManualStart ? styles.tierBreakActive : ''}`}
-                      aria-label={`${isManualStart ? 'Remove' : 'Add'} tier break at ${player.player_name}`}
-                      title={isManualStart ? 'Remove tier break here' : 'Start a new tier here'}
+                      className={`${styles.starBtn} ${watched ? styles.watched : ''}`}
+                      aria-label={`${watched ? 'Remove' : 'Add'} ${player.player_name} ${watched ? 'from' : 'to'} watchlist`}
+                      title={watched ? 'Remove from watchlist' : 'Add to watchlist'}
                       onClick={(event) => {
                         event.stopPropagation()
-                        onToggleBoundary(player.pos, id)
+                        toggleWatch(id)
                       }}
                     >
-                      {isManualStart ? '┃' : '╌'}
+                      {watched ? '★' : '☆'}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className={`${styles.starBtn} ${watched ? styles.watched : ''}`}
-                    aria-label={`${watched ? 'Remove' : 'Add'} ${player.player_name} ${watched ? 'from' : 'to'} watchlist`}
-                    title={watched ? 'Remove from watchlist' : 'Add to watchlist'}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      toggleWatch(id)
-                    }}
-                  >
-                    {watched ? '★' : '☆'}
-                  </button>
-                  {surv && <span className={`${styles.survDot} ${surv.cls}`} title={surv.title} />}
-                  <span className={styles.playerName}>{player.player_name}</span>
+                    {surv && <span className={`${styles.survDot} ${surv.cls}`} title={surv.title} />}
+                    <span className={styles.playerName}>{player.player_name}</span>
+                  </span>
                 </td>
                 {!hidden.has('tm_bw') && (
                   <td className={styles.teamCell}>

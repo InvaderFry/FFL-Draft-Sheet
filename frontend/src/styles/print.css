@@ -162,12 +162,6 @@
     text-transform: uppercase;
   }
 
-  /* Containing block for the far-left .tier-num chip, so the cell's
-     overflow:hidden doesn't clip it. */
-  .print-player-table tbody tr {
-    position: relative;
-  }
-
   .print-player-table tbody td {
     border-bottom: 0.25pt solid #d5d5d5;
     overflow: hidden;
@@ -215,6 +209,20 @@
     max-width: 72pt;
     text-align: left;
     width: 28%;
+  }
+
+  /* Name cell anchors the far-left .tier-num chip; override the general
+     td overflow:hidden so the chip isn't clipped, and truncate the name on an
+     inner wrapper instead. */
+  .print-player-table td.col-name {
+    position: relative;
+    overflow: visible;
+  }
+  .col-name .print-name-inner {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .col-tmbw {
