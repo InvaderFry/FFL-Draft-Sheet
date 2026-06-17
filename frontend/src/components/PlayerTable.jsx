@@ -137,7 +137,10 @@ export default function PlayerTable({
               >
                 <td className={styles.nameCell}>
                   {isNumberStart && (
-                    <span className={styles.tierNum} aria-hidden="true">{numTier}</span>
+                    <span
+                      className={`${styles.tierNum} ${styles[`tierNum${((numTier - 1) % 4) + 1}`]}`}
+                      aria-hidden="true"
+                    >{numTier}</span>
                   )}
                   <span className={styles.nameInner}>
                     {manualEdit && (

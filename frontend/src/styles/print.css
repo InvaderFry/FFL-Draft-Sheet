@@ -183,18 +183,20 @@
     border-top: 1.5pt solid #444 !important;
   }
 
-  /* Tier number at the far left of each tier band, just above the line. Transparent
-     background + halo so the line stays continuous past the number. */
+  /* Tier number as a solid dark pill sitting on the line (print lines are a
+     single color, so no cycling). */
   .tier-num {
     position: absolute;
-    top: -3.4pt;
+    top: -3pt;
     left: 0.3pt;
     z-index: 1;
-    color: #000;
+    padding: 0 1pt;
+    border-radius: 2pt;
+    background: #444;
+    color: #fff;
     font-size: 4.8pt;
     font-weight: 800;
-    line-height: 1;
-    text-shadow: 0 0 1pt #fff, 0 0 1pt #fff;
+    line-height: 1.4;
   }
 
   .drafted {

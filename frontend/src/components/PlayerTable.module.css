@@ -88,23 +88,30 @@
   white-space: nowrap;
 }
 
-/* Tier number sitting at the far left of each tier band, just above the line.
-   Anchored to the (transparent) name cell so it doesn't repaint over the
-   collapsed tier-line borders. Background is transparent so the colored line
-   runs continuously past it; a soft halo keeps the number legible instead of
-   masking the line into a hard gap. */
+/* Tier number rendered as a filled pill in the tier line's own color, sitting
+   on the line like a tab so the line flows into it (instead of striking through
+   the digits). Anchored to the (transparent, position:relative) name cell.
+   Text uses --c-bg so it contrasts in both themes (dark on Mocha's light
+   pastels, light on Latte's saturated lines). Color cycles per tier to match
+   the line; see PlayerTable.jsx. */
 .tierNum {
   position: absolute;
-  top: -8px;
+  top: -6px;
   left: 1px;
   z-index: 1;
+  padding: 0 3px;
+  border-radius: 999px;
   font-family: var(--font-display);
   font-size: 9px;
   font-weight: 700;
-  line-height: 1.2;
-  color: var(--c-tier-line);
-  text-shadow: 0 0 2px var(--c-surface), 0 0 2px var(--c-surface);
+  line-height: 1.5;
+  color: var(--c-bg);
+  background: var(--c-tier-line);
 }
+.tierNum1 { background: var(--c-tier-line-1); }
+.tierNum2 { background: var(--c-tier-line-2); }
+.tierNum3 { background: var(--c-tier-line-3); }
+.tierNum4 { background: var(--c-tier-line-4); }
 
 .starBtn {
   width: 20px;
