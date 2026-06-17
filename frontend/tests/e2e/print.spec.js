@@ -6,7 +6,8 @@ test.describe('print layout', () => {
     await stubSheet(page)
     await page.goto('/')
     await page.getByRole('button', { name: /generate draft sheet/i }).click()
-    await expect(page.locator('main').getByText('Christian McCaffrey')).toBeVisible()
+    // Name also appears in the RECOMMENDED sidebar; scope to the board table.
+    await expect(page.locator('main table').getByText('Christian McCaffrey')).toBeVisible()
 
     // The one-page print sheet is hidden on screen and revealed for print.
     const printSheet = page.locator('.print-sheet')

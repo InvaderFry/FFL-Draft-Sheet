@@ -10,9 +10,12 @@ test.describe('mobile board', () => {
     await page.getByRole('button', { name: /generate draft sheet/i }).click()
 
     const board = page.locator('main')
-    await expect(board.getByText('Christian McCaffrey')).toBeVisible()
+    // Player names also appear in the RECOMMENDED sidebar (a <ul>) regardless of
+    // the table's search filter, so scope these assertions to the board table.
+    const table = board.locator('table')
+    await expect(table.getByText('Christian McCaffrey')).toBeVisible()
 
-    const tableBox = await board.locator('table').first().boundingBox()
+    const tableBox = await table.first().boundingBox()
     const draftedBox = await board.getByText('DRAFTED', { exact: true }).boundingBox()
     expect(tableBox).not.toBeNull()
     expect(draftedBox).not.toBeNull()
@@ -20,7 +23,7 @@ test.describe('mobile board', () => {
 
     await board.getByRole('searchbox', { name: /search players/i }).fill('Bijan')
 
-    await expect(board.getByText('Bijan Robinson')).toBeVisible()
-    await expect(board.getByText('Christian McCaffrey')).not.toBeVisible()
+    await expect(table.getByText('Bijan Robinson')).toBeVisible()
+    await expect(table.getByText('Christian McCaffrey')).not.toBeVisible()
   })
 })
