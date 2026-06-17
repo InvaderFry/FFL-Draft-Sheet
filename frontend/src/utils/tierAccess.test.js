@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { tierFor, methodAvailable, computeBoundaries, deriveManualTiers } from './tierAccess'
+import { tierFor, tierNumberMethod, methodAvailable, computeBoundaries, deriveManualTiers } from './tierAccess'
 
 const player = (overrides = {}) => ({
   player_name: 'Test Player',
@@ -31,6 +31,17 @@ describe('tierFor', () => {
   it('returns null for none / missing inputs', () => {
     expect(tierFor(player(), 'none')).toBeNull()
     expect(tierFor(null, 'jenks')).toBeNull()
+  })
+})
+
+describe('tierNumberMethod', () => {
+  it('uses the Lines method when one is selected', () => {
+    expect(tierNumberMethod('jenks', 'gmm')).toBe('gmm')
+  })
+
+  it('falls back to the Shade method when Lines is none/empty', () => {
+    expect(tierNumberMethod('jenks', 'none')).toBe('jenks')
+    expect(tierNumberMethod('gmm', '')).toBe('gmm')
   })
 })
 

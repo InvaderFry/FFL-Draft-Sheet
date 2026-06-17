@@ -129,6 +129,31 @@ describe('PrintView', () => {
     expect(screen.getByText('Bravo').closest('tr').className).not.toContain('tier-start')
   })
 
+  it('numbers each tier band at the far left (Lines method)', () => {
+    const mk = (name, jenks, gmm) => ({
+      ...player, sleeper_id: name, player_name: name, pos: 'RB',
+      tiers: { jenks, gmm },
+    })
+    const rbs = [mk('Alpha', 1, 1), mk('Bravo', 1, 2), mk('Charlie', 2, 2)]
+
+    render(
+      <PrintView
+        sheetData={{ positions: { QB: [], RB: rbs, WR: [], TE: [], DST: [] }, metadata: {} }}
+        config={{ n_teams: 12, RB: 2, scoring: { rec: 0.5 } }}
+        isDrafted={() => false}
+        shadeBy="jenks"
+        linesBy="gmm"
+      />
+    )
+
+    const numOf = (name) =>
+      screen.getByText(name).closest('tr').querySelector('.tier-num')
+    // GMM tiers: 1 at Alpha, 2 at Bravo, none mid-tier at Charlie.
+    expect(numOf('Alpha')).toHaveTextContent('1')
+    expect(numOf('Bravo')).toHaveTextContent('2')
+    expect(numOf('Charlie')).toBeNull()
+  })
+
   it('shades the full Val range continuously, including mid-range values', () => {
     const lowValPlayer = { ...player, sleeper_id: 'low', player_name: 'Low Value', val: -20, floor: null, ceil: null }
     const midValPlayer = { ...player, sleeper_id: 'mid', player_name: 'Mid Value', pos: 'QB', val: 10, floor: null, ceil: null }

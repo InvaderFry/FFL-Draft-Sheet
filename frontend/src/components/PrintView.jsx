@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react'
 import { ecrColor } from '../utils/ecrColor'
 import { fmtVal, fmtInt, fmtPct } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle, valGradientPosition, valRangeFromPositions } from '../utils/valGradient'
-import { tierFor, TIER_METHODS } from '../utils/tierAccess'
+import { tierFor, tierNumberMethod, TIER_METHODS } from '../utils/tierAccess'
 import '../styles/print.css'
 
 const METHOD_LABEL = Object.fromEntries(TIER_METHODS.map(m => [m.id, m.label]))
@@ -140,6 +140,11 @@ function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, au
             const isTierStart = idx > 0 && shadeTier != null && tierFor(previous, shadeBy, manualTiers) !== shadeTier
             const lineTier = tierFor(player, linesBy, manualTiers)
             const isLineStart = idx > 0 && lineTier != null && tierFor(previous, linesBy, manualTiers) !== lineTier
+            // Far-left tier number per tier band (Lines method, or Shade when none).
+            const numMethod = tierNumberMethod(shadeBy, linesBy)
+            const numTier = tierFor(player, numMethod, manualTiers)
+            const isNumberStart = numTier != null &&
+              (idx === 0 || tierFor(previous, numMethod, manualTiers) !== numTier)
             const ecr = ecrColor(player.adp_rank, player.ecr_rank, nTeams)
 
             return (
@@ -148,6 +153,7 @@ function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, au
                 className={classNames(tierClass, isTierStart && 'tier-start', isLineStart && 'tier-line-start', drafted && 'drafted')}
               >
                 <td className={`col-name ${drafted ? 'name-drafted' : ''}`}>
+                  {isNumberStart && <span className="tier-num" aria-hidden="true">{numTier}</span>}
                   {player.player_name}
                 </td>
                 <td className="col-tmbw">{teamBye(player)}</td>

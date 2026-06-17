@@ -10,7 +10,7 @@ import { ecrColor, ecrColorStyle } from '../utils/ecrColor'
 import { fmtVal, fmtInt, fmtPct } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle } from '../utils/valGradient'
 import { survivalStatus } from '../utils/draftStrategy'
-import { tierFor } from '../utils/tierAccess'
+import { tierFor, tierNumberMethod } from '../utils/tierAccess'
 import { useTheme } from '../context/ThemeContext'
 import styles from './PlayerTable.module.css'
 
@@ -107,6 +107,14 @@ export default function PlayerTable({
             const lineTier = tierFor(player, linesBy, manualTiers)
             const isLineStart = idx > 0 && lineTier != null && tierFor(previous, linesBy, manualTiers) !== lineTier
             const lineColorClass = isLineStart ? styles[`tierLine${((lineTier - 1) % 4) + 1}`] : ''
+            // Far-left tier number, straddling the line at the start of each tier
+            // band. Counts the Lines method (or Shade when Lines = None) and shows
+            // the true tier number. Includes idx 0 so the top tier in view is
+            // always labeled even after the tier above it is fully drafted off.
+            const numMethod = tierNumberMethod(shadeBy, linesBy)
+            const numTier = tierFor(player, numMethod, manualTiers)
+            const isNumberStart = numTier != null &&
+              (idx === 0 || tierFor(previous, numMethod, manualTiers) !== numTier)
             // Manual-edit handle reflects the manual boundary, independent of channels.
             const manualTier = tierFor(player, 'manual', manualTiers)
             const isManualStart = idx === 0 || (manualTier != null && tierFor(previous, 'manual', manualTiers) !== manualTier)
@@ -128,6 +136,9 @@ export default function PlayerTable({
                 title="Click to mark as drafted"
               >
                 <td className={styles.nameCell}>
+                  {isNumberStart && (
+                    <span className={styles.tierNum} aria-hidden="true">{numTier}</span>
+                  )}
                   {manualEdit && (
                     <button
                       type="button"
