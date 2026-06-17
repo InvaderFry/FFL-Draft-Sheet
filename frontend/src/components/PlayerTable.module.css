@@ -88,23 +88,22 @@
   white-space: nowrap;
 }
 
-/* Tier number straddling the tier line at the far left of each tier band.
+/* Tier number sitting at the far left of each tier band, just above the line.
    Anchored to the (transparent) name cell so it doesn't repaint over the
-   collapsed tier-line borders; the surface background masks the row's top
-   border so the number sits "on" the line. */
+   collapsed tier-line borders. Background is transparent so the colored line
+   runs continuously past it; a soft halo keeps the number legible instead of
+   masking the line into a hard gap. */
 .tierNum {
   position: absolute;
-  top: -7px;
-  left: 0;
+  top: -8px;
+  left: 1px;
   z-index: 1;
-  padding: 0 3px;
   font-family: var(--font-display);
   font-size: 9px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.2;
   color: var(--c-tier-line);
-  background: var(--c-surface);
-  border-radius: 3px;
+  text-shadow: 0 0 2px var(--c-surface), 0 0 2px var(--c-surface);
 }
 
 .starBtn {
