@@ -50,15 +50,8 @@
 }
 
 .logoBadge {
-  background: var(--c-amber-dim);
-  color: var(--c-amber);
-  font-family: var(--font-display);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: 3px;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .headerRight {

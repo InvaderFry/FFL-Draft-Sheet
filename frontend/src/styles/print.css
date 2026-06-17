@@ -250,25 +250,26 @@
     font-weight: 900;
   }
 
-  /* QB/TE column overrides: shorter names free room for numeric values. */
+  /* QB/TE column overrides: shorter names free room for numeric values.
+     NAME and TM/BW get extra width, trimmed from ECR and the numeric columns. */
   .print-pos-qb .col-name,
   .print-pos-te .col-name {
-    width: 22%;
+    width: 26%;
   }
 
   .print-pos-qb .col-tmbw,
   .print-pos-te .col-tmbw {
-    width: 9%;
+    width: 11%;
   }
 
   .print-pos-qb .col-ecr,
   .print-pos-te .col-ecr {
-    width: 10%;
+    width: 9%;
   }
 
   .print-pos-qb .col-num,
   .print-pos-te .col-num {
-    width: 14.75%;
+    width: 13.5%;
   }
 
   .print-bottom {
