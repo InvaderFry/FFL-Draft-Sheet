@@ -22,6 +22,7 @@ import {
   positionRunsSinceLastPick,
   rosterNeeds,
 } from '../utils/draftStrategy'
+import { recommendPicks } from '../utils/recommendations'
 import styles from './DraftBoard.module.css'
 
 const TAB_ORDER = ['ALL', 'QB', 'RB', 'WR', 'TE', 'DST']
@@ -215,6 +216,23 @@ export default function DraftBoard({
   const tableStrategy = strategy && strategy.nextPick != null
     ? { currentPick: strategy.currentPick, nextPick: strategy.nextPick }
     : null
+
+  // "Who do I draft now?" — composes VAL + scarcity + roster needs + survival
+  // into a ranked shortlist. Degrades gracefully: best-available before a team
+  // is chosen, need-weighted once it is, survival-urgent once the draft is live.
+  // isDrafted changes identity on every pick, so the list refreshes as players
+  // come off the board.
+  const recommendations = useMemo(
+    () => recommendPicks({
+      positions,
+      isDrafted,
+      needs: strategy?.needs ?? null,
+      currentPick: strategy?.currentPick ?? null,
+      nextPick: strategy?.nextPick ?? null,
+      config,
+    }),
+    [positions, isDrafted, strategy, config]
+  )
 
   const handleExportCsv = () => {
     const headers = ['Overall', 'Pos', 'Player', 'Team', 'Bye', 'Value']
@@ -551,6 +569,7 @@ export default function DraftBoard({
           needs={strategy?.needs}
           runs={strategy?.runs}
           nextPick={strategy?.nextPick}
+          recommendations={recommendations}
         />
       </div>
     </div>

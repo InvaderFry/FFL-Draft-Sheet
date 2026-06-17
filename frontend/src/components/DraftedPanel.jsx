@@ -48,6 +48,37 @@ function StrategyBlock({ needs, runs, nextPick }) {
   )
 }
 
+// Ranked best-pick shortlist shown at the top of the panel. Each row marks the
+// player drafted on click (same as a manual pick), with the full reasoning in
+// the tooltip. Renders nothing when there are no recommendations.
+function RecommendedBlock({ recommendations, onToggle }) {
+  if (!recommendations || recommendations.length === 0) return null
+  return (
+    <>
+      <div className={styles.header}>RECOMMENDED</div>
+      <ul className={`${styles.list} ${styles.recList}`}>
+        {recommendations.map(({ player, reasons }, idx) => {
+          const id = player.sleeper_id || player.player_name
+          return (
+            <li
+              key={id}
+              className={`${styles.item} ${styles.recItem}`}
+              onClick={() => onToggle(id, player.player_name, player.pos)}
+              title={`${reasons.all.join(' · ')} — click to mark drafted`}
+            >
+              <div className={styles.recName}>
+                <span className={styles.recRank}>{idx + 1}</span>
+                {player.player_name} <span className={styles.pos}>{player.pos}</span>
+              </div>
+              <div className={styles.recReason}>{reasons.primary}</div>
+            </li>
+          )
+        })}
+      </ul>
+    </>
+  )
+}
+
 function PickItem({ pick, onToggle, onRemove, syncActive }) {
   const { id, name, pos, source, teamName } = pick
   const synced = source === 'espn'
@@ -79,7 +110,7 @@ function PickItem({ pick, onToggle, onRemove, syncActive }) {
 
 export default function DraftedPanel({
   draftedList, onToggle, onRemove = () => {}, myTeamId = null, syncActive = false,
-  needs = null, runs = null, nextPick = null,
+  needs = null, runs = null, nextPick = null, recommendations = [],
 }) {
   const myPicks = myTeamId
     ? draftedList
@@ -89,6 +120,7 @@ export default function DraftedPanel({
 
   return (
     <div className={styles.panel}>
+      <RecommendedBlock recommendations={recommendations} onToggle={onToggle} />
       {myTeamId && (
         <>
           <div className={styles.header}>MY TEAM</div>

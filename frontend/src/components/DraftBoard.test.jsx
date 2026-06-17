@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DraftBoard from './DraftBoard'
 import { ThemeProvider } from '../context/ThemeContext'
@@ -141,6 +141,10 @@ describe('DraftBoard', () => {
     expect(screen.getByText('40.0')).toHaveStyle({ backgroundColor: 'rgba(250, 179, 135, 0.3)' })
   })
 
+  // Search/watch filter the board table only — the RECOMMENDED panel is a
+  // global shortlist, so scope these assertions to the table area.
+  const tableArea = () => document.querySelector('[class*="tableArea"]')
+
   it('searches visible rows from the board header', async () => {
     const user = userEvent.setup()
     renderBoard({
@@ -151,14 +155,14 @@ describe('DraftBoard', () => {
       DST: [],
     })
 
-    expect(screen.getByText('Patrick Mahomes')).toBeInTheDocument()
-    expect(screen.getByText('Josh Allen')).toBeInTheDocument()
+    expect(within(tableArea()).getByText('Patrick Mahomes')).toBeInTheDocument()
+    expect(within(tableArea()).getByText('Josh Allen')).toBeInTheDocument()
 
     await user.type(screen.getByRole('searchbox', { name: /search players/i }), 'mahomes')
 
-    expect(screen.getByText('Patrick Mahomes')).toBeInTheDocument()
-    expect(screen.queryByText('Josh Allen')).not.toBeInTheDocument()
-    expect(screen.queryByText('Bijan Robinson')).not.toBeInTheDocument()
+    expect(within(tableArea()).getByText('Patrick Mahomes')).toBeInTheDocument()
+    expect(within(tableArea()).queryByText('Josh Allen')).not.toBeInTheDocument()
+    expect(within(tableArea()).queryByText('Bijan Robinson')).not.toBeInTheDocument()
   })
 
   it('filters the board to watched players only', async () => {
@@ -175,8 +179,8 @@ describe('DraftBoard', () => {
 
     await user.click(screen.getByRole('button', { name: /only/i }))
 
-    expect(screen.getByText('Patrick Mahomes')).toBeInTheDocument()
-    expect(screen.queryByText('Josh Allen')).not.toBeInTheDocument()
+    expect(within(tableArea()).getByText('Patrick Mahomes')).toBeInTheDocument()
+    expect(within(tableArea()).queryByText('Josh Allen')).not.toBeInTheDocument()
   })
 
   it('only shows Export CSV when My Team has picks', () => {

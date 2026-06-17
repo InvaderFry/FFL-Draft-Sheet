@@ -99,9 +99,12 @@ describe('App — draft state shared between board and print view', () => {
     const { container } = renderApp()
     await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
 
-    // Board renders QB players.
+    // Board renders QB players. The name also appears in the RECOMMENDED panel,
+    // so scope the board-table assertions to the table area.
     const board = container.querySelector('main')
-    expect(await within(board).findByText('Patrick Mahomes')).toBeInTheDocument()
+    await within(board).findAllByText('Patrick Mahomes')
+    const boardTable = board.querySelector('[class*="tableArea"]')
+    expect(within(boardTable).getByText('Patrick Mahomes')).toBeInTheDocument()
 
     // Print view is always mounted alongside; same player present.
     const printRoot = document.body.querySelector('.print-sheet')
@@ -109,7 +112,7 @@ describe('App — draft state shared between board and print view', () => {
     expect(printRowBefore.className).not.toContain('drafted')
 
     // Click the board row to mark drafted.
-    const boardRow = within(board).getByText('Patrick Mahomes').closest('tr')
+    const boardRow = within(boardTable).getByText('Patrick Mahomes').closest('tr')
     await user.click(boardRow)
 
     // Board shows the drafted state in the side panel…
@@ -133,8 +136,9 @@ describe('App — draft state shared between board and print view', () => {
     await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
 
     const board = container.querySelector('main')
-    const boardRow = within(board).findByText('Patrick Mahomes')
-    await user.click((await boardRow).closest('tr'))
+    await within(board).findAllByText('Patrick Mahomes')
+    const boardRow = within(board.querySelector('[class*="tableArea"]')).getByText('Patrick Mahomes')
+    await user.click(boardRow.closest('tr'))
     expect(within(board).getByText(/1 drafted/)).toBeInTheDocument()
 
     // New Sheet resets everything.
@@ -142,7 +146,7 @@ describe('App — draft state shared between board and print view', () => {
     await user.click(screen.getByRole('button', { name: /generate draft sheet/i }))
 
     const board2 = container.querySelector('main')
-    await within(board2).findByText('Patrick Mahomes')
+    await within(board2).findAllByText('Patrick Mahomes')
     expect(within(board2).queryByText(/1 drafted/)).not.toBeInTheDocument()
   })
 })
