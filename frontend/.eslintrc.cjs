@@ -19,4 +19,26 @@ module.exports = {
     // This project intentionally does not use the prop-types package.
     'react/prop-types': 'off',
   },
+  overrides: [
+    {
+      // TypeScript sources use the TS parser + plugin. Props are typed via
+      // interfaces, so prop-types stays off; the base no-unused-vars is
+      // replaced by the TS-aware version (which understands type-only usage).
+      files: ['**/*.ts', '**/*.tsx'],
+      parser: '@typescript-eslint/parser',
+      plugins: ['@typescript-eslint'],
+      extends: ['plugin:@typescript-eslint/recommended'],
+      rules: {
+        'no-unused-vars': 'off',
+        '@typescript-eslint/no-unused-vars': [
+          'error',
+          {
+            argsIgnorePattern: '^_',
+            varsIgnorePattern: '^_',
+            caughtErrorsIgnorePattern: '^_',
+          },
+        ],
+      },
+    },
+  ],
 }

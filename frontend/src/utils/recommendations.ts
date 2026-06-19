@@ -12,7 +12,38 @@
  * Tested in recommendations.test.js.
  */
 
+import type { PlayerRow } from '../types/api'
+import type { LeagueConfig, Positions, RosterNeeds } from '../types/domain'
 import { STARTER_POS, survivalStatus } from './draftStrategy'
+
+interface ReasonCtx {
+  needs: RosterNeeds | null
+  currentPick: number | null
+  nextPick: number | null
+  superflex: boolean
+}
+
+interface Reasons {
+  primary: string
+  all: string[]
+}
+
+interface RecommendArgs {
+  positions: Positions | null | undefined
+  isDrafted?: (id: string) => boolean
+  needs?: RosterNeeds | null
+  currentPick?: number | null
+  nextPick?: number | null
+  config?: LeagueConfig | null
+  limit?: number
+  maxPerPosition?: number
+}
+
+export interface Recommendation {
+  player: PlayerRow
+  score: number
+  reasons: Reasons
+}
 
 // Tunable weights. Multiplicative so each factor is an interpretable nudge on
 // the player's base VAL.
@@ -27,7 +58,7 @@ export const WEIGHTS = {
 
 const FLEX_ELIGIBLE = new Set(['RB', 'WR', 'TE'])
 
-function flexEligible(pos, superflex) {
+function flexEligible(pos: string, superflex: boolean): boolean {
   return FLEX_ELIGIBLE.has(pos) || (pos === 'QB' && superflex)
 }
 
@@ -35,7 +66,7 @@ function flexEligible(pos, superflex) {
  * Need factor for a position given the user's roster needs. 1.0 when there's no
  * roster context yet (best-player-available mode).
  */
-function needFactor(pos, needs, superflex) {
+function needFactor(pos: string, needs: RosterNeeds | null, superflex: boolean): number {
   if (!needs) return 1.0
   const slot = needs.positions?.[pos]
   if (slot && slot.filled < slot.need) return WEIGHTS.needStarter
@@ -47,7 +78,11 @@ function needFactor(pos, needs, superflex) {
 }
 
 /** Survival urgency factor. 1.0 when the next pick / ADP is unknown. */
-function urgencyFactor(adpRank, currentPick, nextPick) {
+function urgencyFactor(
+  adpRank: number | null | undefined,
+  currentPick: number | null,
+  nextPick: number | null,
+): number {
   const status = survivalStatus(adpRank, currentPick, nextPick)
   if (status === 'risky' || status === 'gone') return WEIGHTS.urgentRisky
   if (status === 'safe') return WEIGHTS.urgentSafe
@@ -55,7 +90,7 @@ function urgencyFactor(adpRank, currentPick, nextPick) {
 }
 
 /** Small scarcity nudge: up to +scarcityMax as the position's value empties. */
-function scarcityFactor(psPct) {
+function scarcityFactor(psPct: number | null | undefined): number {
   const pct = Number(psPct) || 0
   return 1 + (1 - pct / 100) * WEIGHTS.scarcityMax
 }
@@ -65,9 +100,9 @@ function scarcityFactor(psPct) {
  * drives the compact subtitle, all the full tooltip. Priority: urgency, then
  * need, then scarcity, then raw value.
  */
-function buildReasons(player, ctx) {
+function buildReasons(player: PlayerRow, ctx: ReasonCtx): Reasons {
   const { needs, currentPick, nextPick, superflex } = ctx
-  const all = []
+  const all: string[] = []
 
   const status = survivalStatus(player.adp_rank, currentPick, nextPick)
   if (status === 'risky') all.push(`Likely gone by #${nextPick}`)
@@ -95,16 +130,14 @@ function buildReasons(player, ctx) {
 /**
  * Rank available players into recommended picks.
  *
- * @param {object}   args
- * @param {object}   args.positions    sheet positions map ({ RB: [...], ... })
- * @param {function} args.isDrafted    (id) => bool, drafted players are excluded
- * @param {object}   [args.needs]      rosterNeeds() output; null = BPA mode
- * @param {number}   [args.currentPick] draft progress (snake-live only)
- * @param {number}   [args.nextPick]   user's next overall pick (snake-live only)
- * @param {object}   [args.config]     league config (reads flex_qb for superflex)
- * @param {number}   [args.limit]          how many to return (default 6)
- * @param {number}   [args.maxPerPosition] cap per position for variety (default 3)
- * @returns {Array<{ player, score, reasons: { primary, all } }>}
+ * @param args.positions      sheet positions map ({ RB: [...], ... })
+ * @param args.isDrafted      (id) => bool, drafted players are excluded
+ * @param args.needs          rosterNeeds() output; null = BPA mode
+ * @param args.currentPick    draft progress (snake-live only)
+ * @param args.nextPick       user's next overall pick (snake-live only)
+ * @param args.config         league config (reads flex_qb for superflex)
+ * @param args.limit          how many to return (default 6)
+ * @param args.maxPerPosition cap per position for variety (default 3)
  */
 export function recommendPicks({
   positions,
@@ -115,11 +148,11 @@ export function recommendPicks({
   config = null,
   limit = 6,
   maxPerPosition = 3,
-}) {
+}: RecommendArgs): Recommendation[] {
   if (!positions) return []
   const superflex = Number(config?.flex_qb || 0) > 0
 
-  const scored = []
+  const scored: { player: PlayerRow; score: number }[] = []
   for (const pos of STARTER_POS) {
     const players = positions[pos] || []
     for (const player of players) {
@@ -141,9 +174,9 @@ export function recommendPicks({
 
   scored.sort((a, b) => b.score - a.score)
 
-  const perPos = {}
-  const ctx = { needs, currentPick, nextPick, superflex }
-  const out = []
+  const perPos: Record<string, number> = {}
+  const ctx: ReasonCtx = { needs, currentPick, nextPick, superflex }
+  const out: Recommendation[] = []
   for (const entry of scored) {
     const pos = entry.player.pos
     if ((perPos[pos] || 0) >= maxPerPosition) continue

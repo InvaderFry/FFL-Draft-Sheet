@@ -1,21 +1,27 @@
 import { memo, useMemo } from 'react'
+import type { CSSProperties } from 'react'
 import { ecrColor } from '../utils/ecrColor'
+import type { EcrColor } from '../utils/ecrColor'
 import { fmtVal, fmtInt, fmtPct } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle, valGradientPosition, valRangeFromPositions } from '../utils/valGradient'
 import { tierFor, tierNumberMethod, TIER_METHODS } from '../utils/tierAccess'
+import type { PlayerRow, SheetResponse } from '../types/api'
+import type { LeagueConfig, ManualTiers, Positions, ScoringConfig } from '../types/domain'
 import '../styles/print.css'
 
-const METHOD_LABEL = Object.fromEntries(TIER_METHODS.map(m => [m.id, m.label]))
-const methodLabel = (id) => METHOD_LABEL[id] || id
+const METHOD_LABEL: Record<string, string> = Object.fromEntries(
+  TIER_METHODS.map((m): [string, string] => [m.id, m.label]),
+)
+const methodLabel = (id: string): string => METHOD_LABEL[id] || id
 
-const POSITION_LABELS = {
+const POSITION_LABELS: Record<string, string> = {
   QB: 'QUARTERBACK',
   RB: 'RUNNING BACK',
   WR: 'WIDE RECEIVER',
   TE: 'TIGHT END',
 }
 
-const POSITION_LIMITS = {
+const POSITION_LIMITS: Record<string, number> = {
   QB: 30,
   RB: 66,
   WR: 66,
@@ -23,14 +29,14 @@ const POSITION_LIMITS = {
 }
 
 const DST_LIMIT = 12
-const EMPTY_POSITIONS = {}
+const EMPTY_POSITIONS: Positions = {}
 
-function fmtNumber(value) {
-  if (value == null || isNaN(value)) return '0'
+function fmtNumber(value: number | string | null | undefined): string {
+  if (value == null || isNaN(Number(value))) return '0'
   return Number(value).toFixed(2).replace(/\.?0+$/, '')
 }
 
-function pprLabel(scoring) {
+function pprLabel(scoring: ScoringConfig): string {
   const ppr = Number(scoring?.rec ?? 0.5)
   if (isNaN(ppr)) return '0.5 PPR'
   if (ppr === 0) return 'Standard'
@@ -38,13 +44,13 @@ function pprLabel(scoring) {
   return `${fmtNumber(ppr)} PPR`
 }
 
-function slotValue(config, pos, fallback) {
+function slotValue(config: LeagueConfig | null | undefined, pos: string, fallback: number): number {
   return Number(config?.[pos] ?? fallback)
 }
 
-function buildRosterLine(config) {
+function buildRosterLine(config: LeagueConfig | null | undefined): string {
   const nTeams = Number(config?.n_teams ?? 12)
-  const slots = [
+  const slots: [string, number][] = [
     ['QB', slotValue(config, 'QB', 1)],
     ['RB', slotValue(config, 'RB', 2)],
     ['WR', slotValue(config, 'WR', 3)],
@@ -63,7 +69,7 @@ function buildRosterLine(config) {
   return starters.join(' / ')
 }
 
-function buildScoringLine(scoring = {}) {
+function buildScoringLine(scoring: ScoringConfig = {}): string {
   const passTd = fmtNumber(scoring.pass_td ?? 4)
   const passYd = fmtNumber(scoring.pass_yds ?? 0.04)
   const int = fmtNumber(scoring.interception ?? -2)
@@ -79,19 +85,19 @@ function buildScoringLine(scoring = {}) {
   return `Passing: ${passTd}pt TD, ${passYd}/yd, ${int} Int | Rushing: ${rushTd}pt TD, ${rushYd}/yd | Receiving: ${recTd}pt TD, ${recYd}/yd, ${rec} PPR${tePremiumLabel} | Turnovers: ${fumbleLost} Fum Lost`
 }
 
-function printEcrStyle(color) {
+function printEcrStyle(color: EcrColor): CSSProperties {
   if (color === 'orange') return { color: '#c2410c' }
   if (color === 'blue') return { color: '#1d4ed8' }
   return {}
 }
 
-function printValStyle(value, minValue, maxValue) {
+function printValStyle(value: number | null | undefined, minValue: number, maxValue: number): CSSProperties {
   // Continuous full-range gradient on the shared (global) val range, matching
   // the web view so every position's VAL column is shaded — not just the extremes.
   return valBgStyle(value, minValue, maxValue, 'print', 0.30)
 }
 
-function printPsStyle(psPct) {
+function printPsStyle(psPct: number | null | undefined): CSSProperties {
   const t = valGradientPosition(psPct, 0, 100)
   if (t == null) return {}
   if (t >= 0.67) return psPctBgStyle(psPct, 'print', 0.40)
@@ -99,20 +105,33 @@ function printPsStyle(psPct) {
   return {}
 }
 
-function playerKey(player, idx) {
+function playerKey(player: PlayerRow, idx: number): string {
   return player.sleeper_id || `${player.player_name}-${idx}`
 }
 
-function teamBye(player) {
+function teamBye(player: PlayerRow): string {
   const team = player.team || '—'
   return player.bye_week ? `${team}/${player.bye_week}` : team
 }
 
-function classNames(...classes) {
+function classNames(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(' ')
 }
 
-function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, auctionMode, shadeBy, linesBy, manualTiers }) {
+interface PositionTableProps {
+  pos: string
+  players: PlayerRow[]
+  nTeams: number
+  isDrafted: (id: string) => boolean
+  minVal: number
+  maxVal: number
+  auctionMode: boolean
+  shadeBy: string
+  linesBy: string
+  manualTiers: ManualTiers | null
+}
+
+function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, auctionMode, shadeBy, linesBy, manualTiers }: PositionTableProps) {
   const visible = players.slice(0, POSITION_LIMITS[pos] ?? players.length)
 
   return (
@@ -178,14 +197,23 @@ function PositionTableBase({ pos, players, nTeams, isDrafted, minVal, maxVal, au
 
 const PositionTable = memo(PositionTableBase)
 
-export default function PrintView({ sheetData, config, isDrafted, shadeBy = 'jenks', linesBy = 'none', manualTiers = null }) {
+interface PrintViewProps {
+  sheetData: SheetResponse | null | undefined
+  config: LeagueConfig | null | undefined
+  isDrafted: (id: string) => boolean
+  shadeBy?: string
+  linesBy?: string
+  manualTiers?: ManualTiers | null
+}
+
+export default function PrintView({ sheetData, config, isDrafted, shadeBy = 'jenks', linesBy = 'none', manualTiers = null }: PrintViewProps) {
   const positions = sheetData?.positions ?? EMPTY_POSITIONS
   const metadata = sheetData?.metadata
   const { minVal, maxVal } = useMemo(() => {
     // Scale the gradient to the players actually printed (top N per position),
     // not the full dataset — so the lowest listed VAL maps to the bottom of the
     // range and the full blue→orange spectrum is used across the printed rows.
-    const visiblePositions = {}
+    const visiblePositions: Positions = {}
     for (const pos of ['QB', 'RB', 'WR', 'TE']) {
       visiblePositions[pos] = (positions[pos] || []).slice(0, POSITION_LIMITS[pos])
     }
@@ -194,9 +222,9 @@ export default function PrintView({ sheetData, config, isDrafted, shadeBy = 'jen
 
   if (!sheetData) return null
 
-  const nTeams = config?.n_teams || 12
-  const scoring = config?.scoring ?? {}
-  const auctionMode = !!config?.auction_mode
+  const nTeams = Number(config?.n_teams) || 12
+  const scoring: ScoringConfig = config?.scoring ?? {}
+  const auctionMode = Boolean(config?.auction_mode)
   const dstPlayers = (positions.DST || [])
     .slice()
     .sort((a, b) => (b.val ?? 0) - (a.val ?? 0))

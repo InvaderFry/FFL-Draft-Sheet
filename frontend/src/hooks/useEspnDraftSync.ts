@@ -32,6 +32,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { espnDraftBody } from '../api'
 import { sameTeams, normName, matchByNamePos } from './draftSyncMatch'
+import type { DraftSettings, DraftStatus, DraftTeam, PlayerRow, SheetResponse } from '../types/api'
+import type { DraftedEntry, SheetEntry } from '../types/domain'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 const POLL_MS = 5000
@@ -39,26 +41,50 @@ const REPLAY_MS = 3000
 const MAX_BACKOFF_MS = 60000
 const MAX_SOFT_FAILURES = 3
 
-export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
-  const [status, setStatus] = useState('disconnected') // disconnected | connecting | connected | complete | error
-  const [teams, setTeams] = useState([])
-  const [myTeamId, setMyTeamId] = useState(null)
-  const [error, setError] = useState(null)
+type SyncStatus = 'disconnected' | 'connecting' | 'connected' | 'complete' | 'error'
+
+/** Connect settings: the request fields plus ESPN-only sync options. */
+interface EspnSettings extends DraftSettings {
+  myTeamId?: string | number | null
+  practice?: boolean
+}
+
+/** Errors thrown from a poll carry whether they are permanent / auth-related. */
+interface SyncError extends Error {
+  permanent?: boolean
+  auth?: boolean
+}
+
+interface SheetIndex {
+  byEspnId: Map<string, SheetEntry>
+  byNamePos: Map<string, SheetEntry[]>
+}
+
+interface DraftSyncArgs {
+  sheetData: SheetResponse | null | undefined
+  applySyncedPicks: (picks: DraftedEntry[]) => void
+}
+
+export function useEspnDraftSync({ sheetData, applySyncedPicks }: DraftSyncArgs) {
+  const [status, setStatus] = useState<SyncStatus>('disconnected')
+  const [teams, setTeams] = useState<DraftTeam[]>([])
+  const [myTeamId, setMyTeamId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   // True when the last failure was a 401: cookies are stale/missing, so the
   // fix is re-entering credentials, not retrying the same request.
   const [authExpired, setAuthExpired] = useState(false)
   const [pickCount, setPickCount] = useState(0)
   // Total picks of an active practice replay; null during real syncs.
-  const [replayTotal, setReplayTotal] = useState(null)
+  const [replayTotal, setReplayTotal] = useState<number | null>(null)
   // A ref, not state: it advances on every successful poll, and making it
   // state would re-render the whole board every 5s for a value only the
   // status chip (which has its own 1s ticker) reads.
-  const lastSyncAtRef = useRef(null)
-  const myTeamIdRef = useRef(myTeamId)
+  const lastSyncAtRef = useRef<number | null>(null)
+  const myTeamIdRef = useRef<string | null>(myTeamId)
   myTeamIdRef.current = myTeamId
 
-  const settingsRef = useRef(null)
-  const timerRef = useRef(null)
+  const settingsRef = useRef<EspnSettings | null>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inFlightRef = useRef(false)
   const failuresRef = useRef(0)
   // Permanent stop: draft complete or unrecoverable error. Blocks both the
@@ -66,18 +92,18 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   const stoppedRef = useRef(false)
   // Active practice replay: { picks, revealed }. While set, scheduler ticks
   // reveal the next pick instead of fetching.
-  const replayRef = useRef(null)
+  const replayRef = useRef<{ picks: DraftedEntry[]; revealed: number } | null>(null)
 
   // Board-entry lookups, so synced picks cross off the same row the user
   // would have clicked (PlayerTable keys rows by sleeper_id || player_name).
   // byEspnId is the primary match; byNamePos catches picks whose espn_id the
   // sheet row is missing but that the backend identified by name anyway.
-  const sheetIndex = useMemo(() => {
-    const byEspnId = new Map()
-    const byNamePos = new Map() // key → candidate entries; >1 means ambiguous
-    for (const players of Object.values(sheetData?.positions || {})) {
+  const sheetIndex = useMemo<SheetIndex>(() => {
+    const byEspnId = new Map<string, SheetEntry>()
+    const byNamePos = new Map<string, SheetEntry[]>() // key → candidates; >1 means ambiguous
+    for (const players of Object.values<PlayerRow[]>(sheetData?.positions || {})) {
       for (const p of players) {
-        const entry = {
+        const entry: SheetEntry = {
           id: p.sleeper_id || p.player_name,
           name: p.player_name,
           pos: p.pos,
@@ -108,9 +134,9 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   }, [])
 
   // poll and scheduleNext call each other; the ref breaks the definition cycle.
-  const pollRef = useRef(null)
+  const pollRef = useRef<() => void>(() => {})
 
-  const scheduleNext = useCallback((delay) => {
+  const scheduleNext = useCallback((delay: number) => {
     stopTimer()
     if (!settingsRef.current || stoppedRef.current) return
     // Never arm while hidden — the visibilitychange handler polls on return.
@@ -159,29 +185,27 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
           // FastAPI 422 validation errors put a list of objects in detail.
           if (typeof body?.detail === 'string') detail = body.detail
           else if (resp.status === 422) detail = 'Invalid league ID or season — check the connect form.'
-        } catch (_) {}
+        } catch { /* non-JSON error body — keep the default detail */ }
         // Auth/not-found/validation failures are permanent — retrying the
         // same payload won't fix them. A 401 specifically means stale/missing
         // cookies, which the user fixes by re-entering them, not by retrying.
         const permanent = [400, 401, 404, 422].includes(resp.status)
         throw Object.assign(new Error(detail), { permanent, auth: resp.status === 401 })
       }
-      const data = await resp.json()
+      const data = await resp.json() as DraftStatus
       // Abandon the response if disconnect()/connect() ran while in flight —
       // applying it would resurrect state the user just reset.
       if (settingsRef.current !== settings) return
 
-      const teamNames = new Map((data.teams || []).map(t => [t.team_id, t.name]))
-      const picks = (data.picks || []).map(pick => {
+      const teamNames = new Map((data.teams || []).map((t): [string, string] => [t.team_id, t.name]))
+      const picks: DraftedEntry[] = (data.picks || []).map(pick => {
         const { byEspnId, byNamePos } = sheetIndexRef.current
         const onSheet = byEspnId.get(pick.provider_player_id) ||
           matchByNamePos(byNamePos, pick)
         return {
           // Off-sheet picks get a synthetic id so they still show in the
           // drafted list without colliding with board keys.
-          id: onSheet?.id || (pick.sleeper_id || pick.player_name
-            ? (pick.sleeper_id || pick.player_name)
-            : `espn:${pick.provider_player_id}`),
+          id: onSheet?.id || pick.sleeper_id || pick.player_name || `espn:${pick.provider_player_id}`,
           name: onSheet?.name || pick.player_name || `ESPN pick #${pick.overall}`,
           pos: onSheet?.pos || pick.pos || '?',
           teamId: pick.team_id,
@@ -224,17 +248,18 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
       scheduleNext(POLL_MS)
     } catch (err) {
       if (settingsRef.current !== settings) return // abandoned mid-flight
+      const e = err as SyncError
       failuresRef.current += 1
-      if (err.permanent) {
+      if (e.permanent) {
         stoppedRef.current = true
         setStatus('error')
-        setError(err.message)
-        if (err.auth) setAuthExpired(true)
+        setError(e.message)
+        if (e.auth) setAuthExpired(true)
         return // no reschedule; user must fix the input and reconnect
       }
       if (failuresRef.current >= MAX_SOFT_FAILURES) {
         setStatus('error')
-        setError(err.message || 'Sync failed')
+        setError(e.message || 'Sync failed')
       }
       scheduleNext(Math.min(POLL_MS * 2 ** failuresRef.current, MAX_BACKOFF_MS))
     } finally {
@@ -248,7 +273,7 @@ export function useEspnDraftSync({ sheetData, applySyncedPicks }) {
   }, [scheduleNext, revealNext])
   pollRef.current = poll
 
-  const connect = useCallback((settings) => {
+  const connect = useCallback((settings: EspnSettings) => {
     // A fresh object per connect, so in-flight polls from a previous session
     // fail the identity check and abandon their responses.
     settingsRef.current = { ...settings }

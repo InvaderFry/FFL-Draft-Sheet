@@ -1,5 +1,8 @@
+import type { CSSProperties } from 'react'
 import PlayerTable from './PlayerTable'
 import { useTheme } from '../context/ThemeContext'
+import type { Positions } from '../types/domain'
+import type { TableViewProps } from '../types/components'
 import styles from './CombinedView.module.css'
 
 // Each entry is one grid column; 'split' columns stack their positions 50/50.
@@ -9,11 +12,15 @@ const COMBINED_COLUMNS = [
   { type: 'full',  positions: ['WR'] },
 ]
 
-const tableStyle = {
+const tableStyle: CSSProperties = {
   maxHeight: 'none',
   height: '100%',
   overflow: 'auto',
   flex: 1,
+}
+
+interface CombinedViewProps extends TableViewProps {
+  positions: Positions
 }
 
 export default function CombinedView({
@@ -35,7 +42,7 @@ export default function CombinedView({
   manualEdit = false,
   onToggleBoundary = () => {},
   thinMode = false,
-}) {
+}: CombinedViewProps) {
   const { posColors } = useTheme()
   return (
     <div className={styles.grid}>

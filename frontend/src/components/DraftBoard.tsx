@@ -23,14 +23,34 @@ import {
   rosterNeeds,
 } from '../utils/draftStrategy'
 import { recommendPicks } from '../utils/recommendations'
+import type { PlayerRow, SheetMetadata, SheetResponse, SourceFailure } from '../types/api'
+import type { DraftedEntry, LeagueConfig, ManualTiers, Positions } from '../types/domain'
+import type { EspnSyncApi, SleeperSyncApi, SyncApi, ToggleFn } from '../types/components'
 import styles from './DraftBoard.module.css'
 
 const TAB_ORDER = ['ALL', 'QB', 'RB', 'WR', 'TE', 'DST']
 
-function buildSourceDetails(metadata) {
+/** A source's contribution, normalized across the rich and legacy metadata shapes. */
+interface SourceEntry {
+  source: string
+  status: string
+  used: boolean
+  positions: string[]
+  positionCounts: Record<string, number>
+  reason: string | null
+  failures: SourceFailure[]
+}
+
+interface SourceDetails {
+  hasDetails: boolean
+  used: SourceEntry[]
+  unavailable: SourceEntry[]
+}
+
+function buildSourceDetails(metadata: SheetMetadata | undefined): SourceDetails {
   const richStatuses = Array.isArray(metadata?.source_statuses) ? metadata.source_statuses : []
   if (richStatuses.length > 0) {
-    const entries = richStatuses.map((entry) => ({
+    const entries: SourceEntry[] = richStatuses.map((entry) => ({
       source: entry.source,
       status: entry.status || (entry.used ? 'used' : 'unavailable'),
       used: entry.used || entry.status === 'used' || entry.status === 'partial',
@@ -47,7 +67,7 @@ function buildSourceDetails(metadata) {
     }
   }
 
-  const used = (metadata?.sources_used || []).map((source) => ({
+  const used: SourceEntry[] = (metadata?.sources_used || []).map((source) => ({
     source,
     status: 'used',
     used: true,
@@ -56,7 +76,7 @@ function buildSourceDetails(metadata) {
     reason: null,
     failures: [],
   }))
-  const unavailable = (metadata?.sources_dropped || []).map((source) => ({
+  const unavailable: SourceEntry[] = (metadata?.sources_dropped || []).map((source) => ({
     source,
     status: 'unavailable',
     used: false,
@@ -73,13 +93,13 @@ function buildSourceDetails(metadata) {
   }
 }
 
-function sourceCountLabel(count) {
+function sourceCountLabel(count: number): string {
   return `${count} source${count !== 1 ? 's' : ''}`
 }
 
 // "QB 60 · RB 120 · WR 140" when row counts are present, else the plain
 // position list ("QB, RB, WR"). Order follows the positions array.
-function formatPositions(entry) {
+function formatPositions(entry: SourceEntry): string {
   const counts = entry.positionCounts || {}
   if (entry.positions.length === 0) return ''
   const hasCounts = entry.positions.some((pos) => counts[pos] != null)
@@ -90,13 +110,39 @@ function formatPositions(entry) {
 }
 
 // A short note on ADP availability / prior-season fallback for the panel.
-function adpStatusNote(metadata) {
+function adpStatusNote(metadata: SheetMetadata | undefined): string | null {
   if (metadata?.adp_available === false) return 'ADP unavailable'
-  const { adp_season: adpSeason, season } = metadata || {}
+  const adpSeason = metadata?.adp_season
+  const season = metadata?.season
   if (adpSeason && season && adpSeason !== season) {
     return `ADP from ${adpSeason} — ${season} not yet published`
   }
   return null
+}
+
+interface DraftBoardProps {
+  sheetData: SheetResponse
+  config: LeagueConfig | null | undefined
+  onPrint: () => void
+  isDrafted: (id: string) => boolean
+  onToggle: ToggleFn
+  draftedCount?: number
+  onClearDrafted: () => void
+  onRemoveDrafted: (id: string) => void
+  draftedList?: DraftedEntry[]
+  espnSync?: EspnSyncApi | null
+  sleeperSync?: SleeperSyncApi | null
+  isWatched?: (id: string) => boolean
+  toggleWatch?: (id: string) => void
+  shadeBy?: string
+  setShadeBy?: (value: string) => void
+  linesBy?: string
+  setLinesBy?: (value: string) => void
+  manualTiers?: ManualTiers | null
+  hasManual?: boolean
+  onSeedManual?: (positions: Positions, method: string) => void
+  onToggleBoundary?: (pos: string, id: string) => void
+  onClearManual?: () => void
 }
 
 export default function DraftBoard({
@@ -121,7 +167,7 @@ export default function DraftBoard({
   hasManual = false,
   onSeedManual = () => {},
   onToggleBoundary = () => {},
-}) {
+}: DraftBoardProps) {
   const { posColors } = useTheme()
   const [activePos, setActivePos] = useState('ALL')
   const [sourceDetailsOpen, setSourceDetailsOpen] = useState(false)
@@ -141,7 +187,7 @@ export default function DraftBoard({
   // seeds from the active method); Jenks/None are always available; computed
   // methods (GMM, Boris Chen) only when the sheet carries their data.
   const availableMethods = useMemo(() => {
-    const map = {}
+    const map: Record<string, boolean> = {}
     for (const m of TIER_METHODS) {
       map[m.id] = m.id === 'manual' ? true : methodAvailable(positions, m.id, manualTiers)
     }
@@ -161,7 +207,7 @@ export default function DraftBoard({
 
   // Selecting Manual seeds boundaries from the other channel's method (or Jenks)
   // when none exist yet, so the user starts from a sensible tiering.
-  const selectMethod = (setter, value) => {
+  const selectMethod = (setter: (value: string) => void, value: string) => {
     if (value === 'manual' && !hasManual) {
       const seed = [shadeBy, linesBy].find(m => m && m !== 'manual' && m !== 'none') || 'jenks'
       onSeedManual(positions, seed)
@@ -170,15 +216,15 @@ export default function DraftBoard({
   }
 
   const players = positions[activePos] || []
-  const nTeams = config?.n_teams || 12
-  const auctionMode = config?.auction_mode || false
+  const nTeams = Number(config?.n_teams) || 12
+  const auctionMode = Boolean(config?.auction_mode)
   const sourceDetails = useMemo(() => buildSourceDetails(metadata), [metadata])
   const { minVal, maxVal } = useMemo(
     () => valRangeFromPositions(positions),
     [positions]
   )
   const playersById = useMemo(() => {
-    const lookup = new Map()
+    const lookup = new Map<string, PlayerRow>()
     for (const rows of Object.values(positions)) {
       for (const player of rows) {
         lookup.set(player.sleeper_id || player.player_name, player)
@@ -194,7 +240,7 @@ export default function DraftBoard({
   // not yet complete) to avoid showing confidently-wrong advice.
   // Whichever provider is connected drives the strategy gates; both share the
   // same DraftStatus semantics, so the logic below stays provider-blind.
-  const activeSync = espnSync?.status && espnSync.status !== 'disconnected'
+  const activeSync: SyncApi | null = espnSync?.status && espnSync.status !== 'disconnected'
     ? espnSync
     : (sleeperSync?.status && sleeperSync.status !== 'disconnected' ? sleeperSync : espnSync)
   const myTeamId = activeSync?.myTeamId || null
@@ -214,7 +260,7 @@ export default function DraftBoard({
       currentPick: snakeLive ? currentOverall(draftedList) : null,
       nextPick: snakeLive ? nextUserPickOverall(draftedList, myTeamId, nTeams) : null,
       runs: snakeLive ? positionRunsSinceLastPick(draftedList, myTeamId, nTeams) : null,
-      needs: rosterNeeds(myTeamPicks, config, id => playersById.get(id)?.bye_week),
+      needs: rosterNeeds(myTeamPicks, config, id => playersById.get(id)?.bye_week ?? null),
     }
   }, [rosterActive, snakeLive, draftedList, myTeamId, nTeams, myTeamPicks, playersById, config])
 
@@ -352,7 +398,7 @@ export default function DraftBoard({
                     </div>
                   )}
 
-                  {(adpStatusNote(metadata) || (metadata?.data_quality_warnings?.length > 0)) && (
+                  {(adpStatusNote(metadata) || ((metadata?.data_quality_warnings?.length ?? 0) > 0)) && (
                     <div className={styles.sourceSection}>
                       <div className={styles.sourceSectionTitle}>Diagnostics</div>
                       <ul className={styles.warningList}>

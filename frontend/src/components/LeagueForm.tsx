@@ -6,6 +6,8 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import type { SheetResponse } from '../types/api'
+import type { LeagueConfig } from '../types/domain'
 import styles from './LeagueForm.module.css'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -15,7 +17,42 @@ const API_URL = import.meta.env.VITE_API_URL || ''
 // settings blob — mirroring how DraftSync handles espn_s2/SWID.
 const FP_KEY_STORAGE = 'beersheet_fp_key'
 
-const DEFAULT_SETTINGS = {
+/**
+ * Form values. Numeric fields may hold either a number (defaults / select
+ * inputs) or a string (mid-edit text/number inputs), so reads coerce via
+ * toInt/toFloat. The index signature supports the dynamic field maps below.
+ */
+interface Settings {
+  n_teams: number | string
+  fantasy_weeks: number | string
+  QB: number | string
+  RB: number | string
+  WR: number | string
+  TE: number | string
+  DST: number | string
+  K: number | string
+  flex_slots: number | string
+  bench_spots: number | string
+  flex_rb: number | string
+  flex_wr: number | string
+  flex_te: number | string
+  flex_qb: number | string
+  ppr: string
+  pass_td: number | string
+  rush_td: number | string
+  rec_td: number | string
+  pass_yds: number | string
+  rush_yds: number | string
+  rec_yds: number | string
+  interception: number | string
+  fumble_lost: number | string
+  te_premium: number | string
+  auction_mode: boolean
+  auction_budget: number | string
+  [key: string]: number | string | boolean
+}
+
+const DEFAULT_SETTINGS: Settings = {
   n_teams: 12,
   fantasy_weeks: 14,
   QB: 1, RB: 2, WR: 3, TE: 1, DST: 1, K: 0,
@@ -31,32 +68,46 @@ const DEFAULT_SETTINGS = {
   auction_budget: 200,
 }
 
-function pprToRec(ppr) {
+type FieldValue = number | string | boolean
+
+const toInt = (v: FieldValue): number => parseInt(String(v), 10)
+const toFloat = (v: FieldValue): number => parseFloat(String(v))
+
+function pprToRec(ppr: string): number {
   const n = parseFloat(ppr)
   return isNaN(n) ? 0.5 : n
 }
 
-function loadSaved() {
+function loadSaved(): Settings {
   try {
     const raw = localStorage.getItem('beersheet_settings')
     if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }
-  } catch (_) {}
+  } catch { /* unreadable settings */ }
   return DEFAULT_SETTINGS
 }
 
-export default function LeagueForm({ onSheet, onLoading, onError, error }) {
+interface LeagueFormProps {
+  onSheet: (data: SheetResponse, config: LeagueConfig) => void
+  onLoading: (loading: boolean) => void
+  onError: (message: string) => void
+  error?: string | null
+}
+
+type ValidationErrors = Record<string, string | undefined>
+
+export default function LeagueForm({ onSheet, onLoading, onError, error }: LeagueFormProps) {
   const [settings, setSettings] = useState(loadSaved)
   const [loading, setLoading] = useState(false)
-  const [validationError, setValidationError] = useState({})
-  const [clearStatus, setClearStatus] = useState(null) // null | 'clearing' | 'cleared' | 'error'
+  const [validationError, setValidationError] = useState<ValidationErrors>({})
+  const [clearStatus, setClearStatus] = useState<'clearing' | 'cleared' | 'error' | null>(null)
   const [fpKey, setFpKey] = useState(() => {
-    try { return sessionStorage.getItem(FP_KEY_STORAGE) || '' } catch (_) { return '' }
+    try { return sessionStorage.getItem(FP_KEY_STORAGE) || '' } catch { return '' }
   })
-  const clearTimerRef = useRef(null)
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Persist settings
   useEffect(() => {
-    try { localStorage.setItem('beersheet_settings', JSON.stringify(settings)) } catch (_) {}
+    try { localStorage.setItem('beersheet_settings', JSON.stringify(settings)) } catch { /* ignore */ }
   }, [settings])
 
   // Persist the FantasyPros key to sessionStorage only (never localStorage).
@@ -64,7 +115,7 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
     try {
       if (fpKey) sessionStorage.setItem(FP_KEY_STORAGE, fpKey)
       else sessionStorage.removeItem(FP_KEY_STORAGE)
-    } catch (_) {}
+    } catch { /* ignore */ }
   }, [fpKey])
 
   // Cancel any pending clear-status reset on unmount to avoid setState on detached instance
@@ -72,32 +123,32 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
     return () => { if (clearTimerRef.current) clearTimeout(clearTimerRef.current) }
   }, [])
 
-  function update(field, value) {
+  function update(field: string, value: FieldValue) {
     setSettings(s => ({ ...s, [field]: value }))
     setValidationError(e => ({ ...e, [field]: undefined }))
   }
 
   // One-click FLEX-split presets. Superflex routes the flex slot to QB; standard
   // restores the RB/WR/TE split. Both sum to 1.0, clearing the flex error.
-  function applyFlexPreset(alloc) {
+  function applyFlexPreset(alloc: Record<string, number>) {
     setSettings(s => ({ ...s, ...alloc }))
     setValidationError(e => ({ ...e, flex: undefined }))
   }
 
-  function validate() {
-    const errs = {}
-    if (settings.n_teams < 8 || settings.n_teams > 16)
+  function validate(): ValidationErrors {
+    const errs: ValidationErrors = {}
+    if (toInt(settings.n_teams) < 8 || toInt(settings.n_teams) > 16)
       errs.n_teams = 'Teams must be 8–16'
-    if (settings.fantasy_weeks < 10 || settings.fantasy_weeks > 18)
+    if (toInt(settings.fantasy_weeks) < 10 || toInt(settings.fantasy_weeks) > 18)
       errs.fantasy_weeks = 'Weeks must be 10–18'
-    const benchSpots = parseInt(settings.bench_spots)
+    const benchSpots = toInt(settings.bench_spots)
     if (Number.isNaN(benchSpots) || benchSpots < 0 || benchSpots > 20)
       errs.bench_spots = 'Bench must be 0–20'
-    const flexSum = parseFloat(settings.flex_rb) + parseFloat(settings.flex_wr) + parseFloat(settings.flex_te) + parseFloat(settings.flex_qb)
+    const flexSum = toFloat(settings.flex_rb) + toFloat(settings.flex_wr) + toFloat(settings.flex_te) + toFloat(settings.flex_qb)
     if (Math.abs(flexSum - 1.0) > 0.01)
       errs.flex = `Flex allocations must sum to 1.0 (currently ${flexSum.toFixed(2)})`
     for (const f of ['pass_td','rush_td','rec_td','pass_yds','rush_yds','rec_yds','interception','fumble_lost','te_premium']) {
-      if (settings[f] === '' || isNaN(parseFloat(settings[f])))
+      if (settings[f] === '' || isNaN(toFloat(settings[f])))
         errs[f] = 'Required'
     }
     return errs
@@ -110,48 +161,48 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
       const res = await fetch(`${API_URL}/api/cache/clear`, { method: 'POST' })
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       setClearStatus('cleared')
-    } catch (_) {
+    } catch {
       setClearStatus('error')
     } finally {
       clearTimerRef.current = setTimeout(() => setClearStatus(null), 3000)
     }
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length) { setValidationError(errs); return }
 
     const rec = pprToRec(settings.ppr)
-    const payload = {
+    const payload: LeagueConfig = {
       season: 2026,
-      n_teams: parseInt(settings.n_teams),
-      fantasy_weeks: parseInt(settings.fantasy_weeks),
-      QB: parseInt(settings.QB),
-      RB: parseInt(settings.RB),
-      WR: parseInt(settings.WR),
-      TE: parseInt(settings.TE),
-      DST: parseInt(settings.DST),
-      K: parseInt(settings.K),
-      flex_slots: parseInt(settings.flex_slots),
-      bench_spots: parseInt(settings.bench_spots),
-      flex_rb: parseFloat(settings.flex_rb),
-      flex_wr: parseFloat(settings.flex_wr),
-      flex_te: parseFloat(settings.flex_te),
-      flex_qb: parseFloat(settings.flex_qb),
+      n_teams: toInt(settings.n_teams),
+      fantasy_weeks: toInt(settings.fantasy_weeks),
+      QB: toInt(settings.QB),
+      RB: toInt(settings.RB),
+      WR: toInt(settings.WR),
+      TE: toInt(settings.TE),
+      DST: toInt(settings.DST),
+      K: toInt(settings.K),
+      flex_slots: toInt(settings.flex_slots),
+      bench_spots: toInt(settings.bench_spots),
+      flex_rb: toFloat(settings.flex_rb),
+      flex_wr: toFloat(settings.flex_wr),
+      flex_te: toFloat(settings.flex_te),
+      flex_qb: toFloat(settings.flex_qb),
       auction_mode: settings.auction_mode,
-      auction_budget: parseInt(settings.auction_budget),
+      auction_budget: toInt(settings.auction_budget),
       scoring: {
         rec,
-        pass_td: parseFloat(settings.pass_td),
-        rush_td: parseFloat(settings.rush_td),
-        rec_td: parseFloat(settings.rec_td),
-        pass_yds: parseFloat(settings.pass_yds),
-        rush_yds: parseFloat(settings.rush_yds),
-        rec_yds: parseFloat(settings.rec_yds),
-        interception: parseFloat(settings.interception),
-        fumble_lost: parseFloat(settings.fumble_lost),
-        te_premium: parseFloat(settings.te_premium),
+        pass_td: toFloat(settings.pass_td),
+        rush_td: toFloat(settings.rush_td),
+        rec_td: toFloat(settings.rec_td),
+        pass_yds: toFloat(settings.pass_yds),
+        rush_yds: toFloat(settings.rush_yds),
+        rec_yds: toFloat(settings.rec_yds),
+        interception: toFloat(settings.interception),
+        fumble_lost: toFloat(settings.fumble_lost),
+        te_premium: toFloat(settings.te_premium),
       },
     }
 
@@ -169,19 +220,19 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
         body: JSON.stringify(body),
       })
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
+        const errBody = await res.json().catch(() => ({}))
         // detail may be a non-string (e.g. FastAPI 422 validation arrays) —
         // fall back to the status rather than rendering "[object Object]".
-        const detail = typeof body.detail === 'string' ? body.detail : null
+        const detail = typeof errBody.detail === 'string' ? errBody.detail : null
         throw new Error(detail || `Server error ${res.status}`)
       }
-      const data = await res.json()
+      const data = await res.json() as SheetResponse
       onSheet(data, payload)
     } catch (err) {
       // Surface the error to App, which keeps the form mounted so the message
       // is actually shown (and the user can retry) instead of hanging on the
       // loading spinner.
-      onError(err.message || 'Failed to generate sheet. Please try again.')
+      onError(err instanceof Error ? err.message : 'Failed to generate sheet. Please try again.')
     } finally {
       setLoading(false)
       onLoading(false)
@@ -288,7 +339,7 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
             <label key={field} className={styles.field}>
               <span>{label}</span>
               <input type="number" min={0} max={field === 'QB' ? 3 : 5}
-                value={settings[field]}
+                value={settings[field] as number | string}
                 onChange={e => update(field, e.target.value)} />
             </label>
           ))}
@@ -308,7 +359,7 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
         </section>
 
         {/* Flex breakdown */}
-        {parseInt(settings.flex_slots) > 0 && (
+        {toInt(settings.flex_slots) > 0 && (
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>FLEX split <span className={styles.hint}>(must sum to 1.0)</span></h3>
             <div className={styles.presetRow}>
@@ -326,7 +377,7 @@ export default function LeagueForm({ onSheet, onLoading, onError, error }) {
               <label key={field} className={styles.field}>
                 <span>{label}</span>
                 <input type="number" min={0} max={1} step={0.05}
-                  value={settings[field]}
+                  value={settings[field] as number | string}
                   onChange={e => update(field, e.target.value)} />
               </label>
             ))}

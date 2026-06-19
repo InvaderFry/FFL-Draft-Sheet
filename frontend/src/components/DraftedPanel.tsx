@@ -1,9 +1,18 @@
 import { STARTER_POS } from '../utils/draftStrategy'
+import type { DraftedEntry, RosterNeeds } from '../types/domain'
+import type { Recommendation } from '../utils/recommendations'
+import type { ToggleFn } from '../types/components'
 import styles from './DraftedPanel.module.css'
+
+interface StrategyBlockProps {
+  needs: RosterNeeds | null
+  runs: Record<string, number> | null
+  nextPick: number | null
+}
 
 // Compact roster-needs + run-alert block shown under MY TEAM during a live
 // draft. Renders nothing useful until there's strategy data to show.
-function StrategyBlock({ needs, runs, nextPick }) {
+function StrategyBlock({ needs, runs, nextPick }: StrategyBlockProps) {
   if (!needs && !runs && nextPick == null) return null
 
   const runEntries = runs
@@ -48,10 +57,15 @@ function StrategyBlock({ needs, runs, nextPick }) {
   )
 }
 
+interface RecommendedBlockProps {
+  recommendations: Recommendation[]
+  onToggle: ToggleFn
+}
+
 // Ranked best-pick shortlist shown at the top of the panel. Each row marks the
 // player drafted on click (same as a manual pick), with the full reasoning in
 // the tooltip. Renders nothing when there are no recommendations.
-function RecommendedBlock({ recommendations, onToggle }) {
+function RecommendedBlock({ recommendations, onToggle }: RecommendedBlockProps) {
   if (!recommendations || recommendations.length === 0) return null
   return (
     <>
@@ -79,7 +93,14 @@ function RecommendedBlock({ recommendations, onToggle }) {
   )
 }
 
-function PickItem({ pick, onToggle, onRemove, syncActive }) {
+interface PickItemProps {
+  pick: DraftedEntry
+  onToggle: ToggleFn
+  onRemove: (id: string) => void
+  syncActive: boolean
+}
+
+function PickItem({ pick, onToggle, onRemove, syncActive }: PickItemProps) {
   const { id, name, pos, source, teamName } = pick
   const synced = source === 'espn'
   // While sync is live, removing a synced pick is futile (it re-hydrates on
@@ -108,10 +129,22 @@ function PickItem({ pick, onToggle, onRemove, syncActive }) {
   )
 }
 
+interface DraftedPanelProps {
+  draftedList: DraftedEntry[]
+  onToggle: ToggleFn
+  onRemove?: (id: string) => void
+  myTeamId?: string | null
+  syncActive?: boolean
+  needs?: RosterNeeds | null
+  runs?: Record<string, number> | null
+  nextPick?: number | null
+  recommendations?: Recommendation[]
+}
+
 export default function DraftedPanel({
   draftedList, onToggle, onRemove = () => {}, myTeamId = null, syncActive = false,
   needs = null, runs = null, nextPick = null, recommendations = [],
-}) {
+}: DraftedPanelProps) {
   const myPicks = myTeamId
     ? draftedList
         .filter(p => p.teamId === myTeamId)

@@ -6,9 +6,17 @@
  * back-compat with older payloads that predate `tiers`.
  */
 
+import type { PlayerRow } from '../types/api'
+import type { ManualTiers, Positions } from '../types/domain'
+
+interface TierMethodOption {
+  id: string
+  label: string
+}
+
 // All selectable tier methods, in display order. `available` is resolved at
 // runtime from the loaded sheet (see methodAvailable).
-export const TIER_METHODS = [
+export const TIER_METHODS: TierMethodOption[] = [
   { id: 'jenks', label: 'Jenks' },
   { id: 'gmm', label: 'GMM' },
   { id: 'boris_chen', label: 'Boris Chen' },
@@ -19,7 +27,11 @@ export const TIER_METHODS = [
  * The tier number for a player under a given method, or null when absent.
  * Jenks falls back to the legacy flat `tier` field for older payloads.
  */
-export function tierFor(player, method, manualTiers = null) {
+export function tierFor(
+  player: PlayerRow | null | undefined,
+  method: string,
+  manualTiers: ManualTiers | null = null,
+): number | null {
   if (!player || !method || method === 'none') return null
   if (method === 'manual') {
     if (!manualTiers) return null
@@ -35,7 +47,7 @@ export function tierFor(player, method, manualTiers = null) {
  * Which method's tiers the far-left tier number should count: the Lines method
  * when one is selected, otherwise the Shade method.
  */
-export function tierNumberMethod(shadeBy, linesBy) {
+export function tierNumberMethod(shadeBy: string, linesBy: string): string {
   return linesBy && linesBy !== 'none' ? linesBy : shadeBy
 }
 
@@ -43,30 +55,38 @@ export function tierNumberMethod(shadeBy, linesBy) {
  * Whether a method has any data across the loaded positions. Jenks/none are
  * always available; manual is available once seeded (non-empty manualTiers).
  */
-export function methodAvailable(positions, method, manualTiers = null) {
+export function methodAvailable(
+  positions: Positions | null | undefined,
+  method: string,
+  manualTiers: ManualTiers | null = null,
+): boolean {
   if (method === 'none' || method === 'jenks') return true
   if (method === 'manual') return !!manualTiers && Object.keys(manualTiers).length > 0
   for (const pos of Object.keys(positions || {})) {
-    for (const p of positions[pos] || []) {
+    for (const p of positions?.[pos] || []) {
       if (p.tiers && p.tiers[method] != null) return true
     }
   }
   return false
 }
 
-const playerId = (p) => p.sleeper_id || p.player_name
+const playerId = (p: PlayerRow): string => p.sleeper_id || p.player_name
 
 /**
  * Boundary id sets per position for a given method: the ids of players that
  * *start* a tier (tier number differs from the previous player). Used to seed
  * Manual tiers from another method. Returns `{ [pos]: string[] }`.
  */
-export function computeBoundaries(positions, method, manualTiers = null) {
-  const result = {}
+export function computeBoundaries(
+  positions: Positions | null | undefined,
+  method: string,
+  manualTiers: ManualTiers | null = null,
+): Record<string, string[]> {
+  const result: Record<string, string[]> = {}
   for (const pos of Object.keys(positions || {})) {
-    const players = positions[pos] || []
-    const ids = []
-    let prevTier = null
+    const players = positions?.[pos] || []
+    const ids: string[] = []
+    let prevTier: number | null = null
     players.forEach((p, idx) => {
       const tier = tierFor(p, method, manualTiers)
       if (idx === 0 || (tier != null && tier !== prevTier)) ids.push(playerId(p))
@@ -82,13 +102,16 @@ export function computeBoundaries(positions, method, manualTiers = null) {
  * walk each position's full list, incrementing the tier at the first player and
  * at every boundary id. Tier numbers are contiguous within a position.
  */
-export function deriveManualTiers(positions, boundaries) {
-  const map = {}
+export function deriveManualTiers(
+  positions: Positions | null | undefined,
+  boundaries: Record<string, string[]> | null | undefined,
+): ManualTiers {
+  const map: ManualTiers = {}
   if (!boundaries) return map
   for (const pos of Object.keys(positions || {})) {
     const starts = new Set(boundaries[pos] || [])
     let tier = 0
-    ;(positions[pos] || []).forEach((p, idx) => {
+    ;(positions?.[pos] || []).forEach((p, idx) => {
       const id = playerId(p)
       if (idx === 0 || starts.has(id)) tier += 1
       map[id] = tier

@@ -1,4 +1,5 @@
-export const THEME_POS_COLORS = {
+/** Per-theme position accent colors, keyed by theme then position. */
+export const THEME_POS_COLORS: Record<string, Record<string, string>> = {
   mocha: {
     ALL: '#9399b2',
     QB:  '#f38ba8',
