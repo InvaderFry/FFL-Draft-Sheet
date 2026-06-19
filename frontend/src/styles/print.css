@@ -172,7 +172,7 @@
   }
 
   .tier-odd  { background: #ffffff !important; }
-  .tier-even { background: #e8e8e8 !important; }
+  .tier-even { background: #cfcfcf !important; }
 
   .tier-start td {
     border-top: 1pt solid #999 !important;
