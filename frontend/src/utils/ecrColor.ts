@@ -10,25 +10,27 @@
  *   otherwise                  → "none"
  */
 
+/** The three divergence states an ECR cell can take. */
+export type EcrColor = 'blue' | 'orange' | 'none'
+
 /**
- * @param {number|null} adpRank   - ADP pick number
- * @param {number|null} ecrRank   - ECR / rank pick number
- * @param {number}      nTeams    - league team count
- * @returns {'blue' | 'orange' | 'none'}
+ * @param adpRank  ADP pick number
+ * @param ecrRank  ECR / rank pick number
+ * @param nTeams   league team count
  */
-export function ecrColor(adpRank, ecrRank, nTeams) {
+export function ecrColor(
+  adpRank: number | null,
+  ecrRank: number | null,
+  nTeams: number,
+): EcrColor {
   if (adpRank == null || ecrRank == null) return 'none'
   if (adpRank <= ecrRank - nTeams) return 'blue'
   if (adpRank >= ecrRank + nTeams) return 'orange'
   return 'none'
 }
 
-/**
- * Returns the inline style color string for the ECR cell.
- * @param {'blue'|'orange'|'none'} color
- * @returns {string} CSS color value
- */
-export function ecrColorStyle(color) {
+/** Returns the inline style color string for the ECR cell. */
+export function ecrColorStyle(color: EcrColor): string {
   switch (color) {
     case 'blue':   return 'var(--c-ecr-blue)'
     case 'orange': return 'var(--c-ecr-orange)'

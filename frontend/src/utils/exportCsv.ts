@@ -1,4 +1,4 @@
-function escapeField(value) {
+function escapeField(value: unknown): string {
   if (value == null) return ''
 
   const text = String(value)
@@ -8,13 +8,13 @@ function escapeField(value) {
   return text
 }
 
-export function toCsv(headers, rows) {
+export function toCsv(headers: unknown[], rows: unknown[][]): string {
   return [headers, ...rows]
     .map(row => row.map(escapeField).join(','))
     .join('\n')
 }
 
-export function downloadCsv(filename, text) {
+export function downloadCsv(filename: string, text: string): void {
   const blob = new Blob([text], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
