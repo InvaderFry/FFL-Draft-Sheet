@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import { computeBoundaries } from '../utils/tierAccess'
+import type { LeagueConfig, Positions, TierBoundaries } from '../types/domain'
 
 const KEY_PREFIX = 'ffl_manual_tiers'
 
 // Manual tiers are per-league: a 0.5-PPR sheet and a PPR sheet of the same
 // season keep independent boundary sets.
-function storageKey(config) {
+function storageKey(config: LeagueConfig | null | undefined): string {
   const season = config?.season ?? 'na'
   const ppr = config?.scoring?.rec ?? 'na'
   return `${KEY_PREFIX}:${season}:${ppr}`
 }
 
-function load(key) {
+function load(key: string): TierBoundaries {
   try {
-    const parsed = JSON.parse(localStorage.getItem(key))
+    const parsed = JSON.parse(localStorage.getItem(key) ?? 'null')
     return parsed && typeof parsed === 'object' ? parsed : {}
   } catch {
     return {}
@@ -25,9 +26,9 @@ function load(key) {
  * Seeded from another method, then nudged by the user. Persisted per league.
  * Consumers derive the id→tier map via tierAccess.deriveManualTiers.
  */
-export function useManualTiers(config) {
+export function useManualTiers(config: LeagueConfig | null | undefined) {
   const key = storageKey(config)
-  const [boundaries, setBoundaries] = useState(() => load(key))
+  const [boundaries, setBoundaries] = useState<TierBoundaries>(() => load(key))
 
   // Reload when the league (season/scoring) changes.
   useEffect(() => {
@@ -38,11 +39,11 @@ export function useManualTiers(config) {
     try { localStorage.setItem(key, JSON.stringify(boundaries)) } catch { /* ignore */ }
   }, [key, boundaries])
 
-  const seedFromMethod = useCallback((positions, method) => {
+  const seedFromMethod = useCallback((positions: Positions, method: string) => {
     setBoundaries(computeBoundaries(positions, method))
   }, [])
 
-  const toggleBoundary = useCallback((pos, id) => {
+  const toggleBoundary = useCallback((pos: string, id: string) => {
     if (!pos || !id) return
     setBoundaries(prev => {
       const current = prev[pos] || []

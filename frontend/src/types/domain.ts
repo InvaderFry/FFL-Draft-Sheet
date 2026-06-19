@@ -42,8 +42,25 @@ export interface LeagueConfig {
   DST?: number
   flex_slots?: number
   flex_qb?: number
+  season?: number | string
+  scoring?: { rec?: number | string } | null
   [key: string]: unknown
 }
+
+/**
+ * A board-row lookup entry for draft-sync matching: the minimal sheet-row
+ * identity a synced pick must cross off (PlayerTable keys rows by
+ * sleeper_id || player_name, captured as `id`).
+ */
+export interface SheetEntry {
+  id: string
+  name: string
+  pos: string
+  team: string
+}
+
+/** Manual tier boundaries: per-position arrays of player ids that start a tier. */
+export type TierBoundaries = Record<string, string[]>
 
 /** Filled-vs-needed count for a single roster slot. */
 export interface SlotNeed {

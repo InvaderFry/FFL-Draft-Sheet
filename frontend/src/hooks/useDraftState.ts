@@ -19,14 +19,15 @@
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
+import type { DraftedEntry } from '../types/domain'
 
 const STORAGE_KEY = 'beersheet_draft_state'
 
-function loadPersisted() {
+function loadPersisted(): DraftedEntry[] {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY))
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null')
     return Array.isArray(parsed) ? parsed : []
-  } catch (_) {
+  } catch {
     return []
   }
 }
@@ -34,7 +35,7 @@ function loadPersisted() {
 export function useDraftState() {
   // Ordered array of {id, name, pos, source, teamId?, teamName?, overall?},
   // newest first. Lazily restored from localStorage on mount.
-  const [draftedList, setDraftedList] = useState(loadPersisted)
+  const [draftedList, setDraftedList] = useState<DraftedEntry[]>(loadPersisted)
 
   // Persist every change. Synced ('espn') picks are saved too: while live they
   // re-hydrate from polling anyway, and once polling has stopped they survive a
@@ -42,12 +43,12 @@ export function useDraftState() {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(draftedList))
-    } catch (_) { /* storage full or unavailable — marks stay in memory */ }
+    } catch { /* storage full or unavailable — marks stay in memory */ }
   }, [draftedList])
 
   const drafted = useMemo(() => new Set(draftedList.map(p => p.id)), [draftedList])
 
-  const toggle = useCallback((id, name, pos) => {
+  const toggle = useCallback((id: string, name: string, pos: string | null) => {
     if (!id) return
     setDraftedList(prev => {
       const existing = prev.find(p => p.id === id)
@@ -64,15 +65,15 @@ export function useDraftState() {
    * picks: [{id, name, pos, teamId, teamName, overall}], any order.
    * Manual entries that ESPN later confirms are promoted to source 'espn'.
    */
-  const applySyncedPicks = useCallback((picks) => {
+  const applySyncedPicks = useCallback((picks: DraftedEntry[]) => {
     setDraftedList(prev => {
-      const prevById = new Map(prev.map(p => [p.id, p]))
+      const prevById = new Map(prev.map((p): [string, DraftedEntry] => [p.id, p]))
       let changed = false
 
-      const synced = []
+      const synced: DraftedEntry[] = []
       for (const pick of picks) {
         if (!pick.id) continue
-        const entry = { ...pick, source: 'espn' }
+        const entry: DraftedEntry = { ...pick, source: 'espn' }
         const existing = prevById.get(pick.id)
         if (!existing) {
           changed = true
@@ -93,14 +94,14 @@ export function useDraftState() {
     })
   }, [])
 
-  const isDrafted = useCallback((id) => drafted.has(id), [drafted])
+  const isDrafted = useCallback((id: string) => drafted.has(id), [drafted])
 
   /** Unconditional removal, any source. */
-  const remove = useCallback((id) => {
+  const remove = useCallback((id: string) => {
     setDraftedList(prev => prev.filter(p => p.id !== id))
   }, [])
 
-  const clear = useCallback(({ keepSynced = false } = {}) => {
+  const clear = useCallback(({ keepSynced = false }: { keepSynced?: boolean } = {}) => {
     setDraftedList(prev => keepSynced ? prev.filter(p => p.source === 'espn') : [])
   }, [])
 

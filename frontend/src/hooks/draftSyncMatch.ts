@@ -8,16 +8,19 @@
  * picks whose id the sheet row is missing but that the backend named anyway.
  */
 
+import type { DraftPick, DraftTeam } from '../types/api'
+import type { SheetEntry } from '../types/domain'
+
 // Whether two team lists are value-equal, so the hook can skip a setState that
 // would re-render the board with identical data every poll.
-export function sameTeams(a, b) {
+export function sameTeams(a: DraftTeam[], b: DraftTeam[]): boolean {
   return a.length === b.length &&
     a.every((t, i) => t.team_id === b[i].team_id && t.name === b[i].name)
 }
 
 // Sources spell names differently ("D.J. Moore" vs "DJ Moore Jr."), so the
 // name-fallback index strips suffixes and punctuation before comparing.
-export function normName(name) {
+export function normName(name: string): string {
   return name.toLowerCase()
     .replace(/\b(jr|sr|ii|iii|iv|v)\.?$/, '')
     .replace(/[^a-z0-9]/g, '')
@@ -26,8 +29,8 @@ export function normName(name) {
 // Team codes are spelled differently across sources (sheet rows come from
 // scraped projections, pick teams from Sleeper/ESPN) — canonicalize the
 // known splits before comparing.
-const TEAM_ALIASES = { JAX: 'JAC', WSH: 'WAS', LAR: 'LA' }
-export function normTeam(team) {
+const TEAM_ALIASES: Record<string, string> = { JAX: 'JAC', WSH: 'WAS', LAR: 'LA' }
+export function normTeam(team: string | null | undefined): string {
   const t = (team || '').toUpperCase()
   return TEAM_ALIASES[t] || t
 }
@@ -37,7 +40,10 @@ export function normTeam(team) {
 // so only match when the candidate is unique — or when the pick's NFL team
 // singles one out. An ambiguous key stays unmatched: a correctly-named
 // off-sheet entry beats crossing off the wrong row.
-export function matchByNamePos(byNamePos, pick) {
+export function matchByNamePos(
+  byNamePos: Map<string, SheetEntry[]>,
+  pick: DraftPick,
+): SheetEntry | undefined {
   if (!pick.player_name || !pick.pos) return undefined
   const candidates = byNamePos.get(`${normName(pick.player_name)}|${pick.pos.toUpperCase()}`)
   if (!candidates) return undefined

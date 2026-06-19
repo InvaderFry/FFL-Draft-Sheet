@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 const SHADE_KEY = 'ffl_tier_shade'
 const LINES_KEY = 'ffl_tier_lines'
 
-function read(key, fallback) {
+function read(key: string, fallback: string): string {
   try {
     return localStorage.getItem(key) || fallback
   } catch {
