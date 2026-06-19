@@ -19,7 +19,9 @@
  */
 
 import { useState, useEffect } from 'react'
+import type { FormEvent } from 'react'
 import { testEspnConnection, testSleeperConnection } from '../api'
+import type { EspnSyncApi, SleeperSyncApi } from '../types/components'
 import styles from './DraftSync.module.css'
 
 const STORAGE_KEY = 'beersheet_espn_sync'
@@ -32,88 +34,125 @@ const CURRENT_SEASON = (() => {
   return now.getMonth() >= 2 ? now.getFullYear() : now.getFullYear() - 1
 })()
 
-function loadProvider() {
+type Provider = 'espn' | 'sleeper'
+
+interface EspnFormState {
+  leagueId: string
+  season: number | string
+  espn_s2: string
+  swid: string
+  mock: boolean
+  practice: boolean
+}
+
+interface SavedEspn {
+  leagueId?: string
+  season?: number | string
+  espn_s2?: string
+  swid?: string
+  mock?: boolean
+  practice?: boolean
+  myTeamId?: string | null
+}
+
+interface SavedSleeper {
+  draftId?: string
+  myTeamId?: string | null
+}
+
+interface TestState {
+  state: 'testing' | 'ok' | 'fail'
+  msg: string
+}
+
+function loadProvider(): Provider {
   try {
     const p = localStorage.getItem(PROVIDER_KEY)
     if (p === 'espn' || p === 'sleeper') return p
-  } catch (_) {}
+  } catch { /* localStorage unavailable */ }
   return 'espn'
 }
 
-function loadSaved() {
-  let settings = null
+function loadSaved(): SavedEspn | null {
+  let settings: SavedEspn | null = null
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) settings = JSON.parse(raw)
-  } catch (_) {}
+  } catch { /* unreadable settings */ }
   // Older versions persisted credentials to localStorage — scrub them.
   if (settings && (settings.espn_s2 || settings.swid)) {
     settings = { ...settings }
     delete settings.espn_s2
     delete settings.swid
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)) } catch (_) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)) } catch { /* ignore */ }
   }
   // Read credentials even when the settings entry is missing (e.g. its write
   // failed): otherwise saved creds would be invisible to the form and the
   // next persist() would wipe them.
-  let creds = null
+  let creds: { espn_s2?: string; swid?: string } | null = null
   try {
     const raw = sessionStorage.getItem(CRED_KEY)
     if (raw) creds = JSON.parse(raw)
-  } catch (_) {}
+  } catch { /* unreadable creds */ }
   if (!settings && !creds) return null
   return { ...settings, espn_s2: creds?.espn_s2 || '', swid: creds?.swid || '' }
 }
 
-function persist(settings) {
+function persist(settings: Record<string, unknown>): void {
   const { espn_s2, swid } = settings
   const rest = { ...settings }
   delete rest.espn_s2
   delete rest.swid
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rest)) } catch (_) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rest)) } catch { /* ignore */ }
   try {
     if (espn_s2 || swid) {
       sessionStorage.setItem(CRED_KEY, JSON.stringify({ espn_s2, swid }))
     } else {
       sessionStorage.removeItem(CRED_KEY)
     }
-  } catch (_) {}
+  } catch { /* ignore */ }
 }
 
-function forget() {
-  try { localStorage.removeItem(STORAGE_KEY) } catch (_) {}
-  try { sessionStorage.removeItem(CRED_KEY) } catch (_) {}
+function forget(): void {
+  try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+  try { sessionStorage.removeItem(CRED_KEY) } catch { /* ignore */ }
 }
 
-function sleeperLoadSaved() {
+function sleeperLoadSaved(): SavedSleeper | null {
   try {
     const raw = localStorage.getItem(SLEEPER_KEY)
     if (raw) return JSON.parse(raw)
-  } catch (_) {}
+  } catch { /* unreadable settings */ }
   return null
 }
 
-function sleeperPersist(settings) {
-  try { localStorage.setItem(SLEEPER_KEY, JSON.stringify(settings)) } catch (_) {}
+function sleeperPersist(settings: Record<string, unknown>): void {
+  try { localStorage.setItem(SLEEPER_KEY, JSON.stringify(settings)) } catch { /* ignore */ }
 }
 
-function sleeperForget() {
-  try { localStorage.removeItem(SLEEPER_KEY) } catch (_) {}
+function sleeperForget(): void {
+  try { localStorage.removeItem(SLEEPER_KEY) } catch { /* ignore */ }
 }
 
-function agoLabel(ts, now) {
+function agoLabel(ts: number | null, now: number): string {
   if (!ts) return '—'
   const s = Math.max(0, Math.round((now - ts) / 1000))
   return s < 60 ? `${s}s ago` : `${Math.floor(s / 60)}m ago`
 }
 
-export default function DraftSync({ espnSync, sleeperSync, defaultSeason = null }) {
+interface DraftSyncProps {
+  espnSync: EspnSyncApi
+  sleeperSync: SleeperSyncApi
+  defaultSeason?: number | null
+}
+
+export default function DraftSync({ espnSync, sleeperSync, defaultSeason = null }: DraftSyncProps) {
   // When disconnected the selected tab drives the form; once a provider is
   // connected, that one is active regardless of the tab.
   const espnConnected = espnSync.status !== 'disconnected'
   const sleeperConnected = sleeperSync.status !== 'disconnected'
   const [provider, setProvider] = useState(loadProvider)
-  const activeProvider = espnConnected ? 'espn' : sleeperConnected ? 'sleeper' : provider
+  const activeProvider: Provider = espnConnected ? 'espn' : sleeperConnected ? 'sleeper' : provider
   const activeSync = activeProvider === 'sleeper' ? sleeperSync : espnSync
 
   const {
@@ -124,8 +163,8 @@ export default function DraftSync({ espnSync, sleeperSync, defaultSeason = null 
   const [open, setOpen] = useState(false)
   const [showPrivate, setShowPrivate] = useState(false)
   // Pre-flight result: null | { state: 'testing'|'ok'|'fail', msg }
-  const [test, setTest] = useState(null)
-  const [form, setForm] = useState(() => {
+  const [test, setTest] = useState<TestState | null>(null)
+  const [form, setForm] = useState<EspnFormState>(() => {
     const saved = loadSaved()
     return {
       leagueId: saved?.leagueId || '',
@@ -173,21 +212,21 @@ export default function DraftSync({ espnSync, sleeperSync, defaultSeason = null 
     if (form.mock) setShowPrivate(false)
   }, [form.mock])
 
-  const update = (field, value) => {
+  const update = <K extends keyof EspnFormState>(field: K, value: EspnFormState[K]) => {
     setForm(f => ({ ...f, [field]: value }))
     // A stale pass/fail must not linger once the inputs it judged have changed.
     setTest(null)
   }
 
-  const updateSleeper = (field, value) => {
+  const updateSleeper = (field: 'draftId', value: string) => {
     setSleeperForm(f => ({ ...f, [field]: value }))
     setTest(null)
   }
 
-  const pickProvider = (p) => {
+  const pickProvider = (p: Provider) => {
     setProvider(p)
     setTest(null)
-    try { localStorage.setItem(PROVIDER_KEY, p) } catch (_) {}
+    try { localStorage.setItem(PROVIDER_KEY, p) } catch { /* ignore */ }
   }
 
   // Pre-flight: validate league access (and cookies, for private leagues)
@@ -230,7 +269,7 @@ export default function DraftSync({ espnSync, sleeperSync, defaultSeason = null 
     disconnect()
   }
 
-  const handleConnect = (e) => {
+  const handleConnect = (e: FormEvent) => {
     e.preventDefault()
     if (!form.leagueId || !form.season) return
     const saved = loadSaved()
@@ -245,7 +284,7 @@ export default function DraftSync({ espnSync, sleeperSync, defaultSeason = null 
     espnSync.connect(connectSettings)
   }
 
-  const handleSleeperConnect = (e) => {
+  const handleSleeperConnect = (e: FormEvent) => {
     e.preventDefault()
     if (!sleeperForm.draftId) return
     const saved = sleeperLoadSaved()
@@ -256,7 +295,7 @@ export default function DraftSync({ espnSync, sleeperSync, defaultSeason = null 
     sleeperSync.connect(connectSettings)
   }
 
-  const handlePickTeam = (teamId) => {
+  const handlePickTeam = (teamId: string) => {
     setMyTeamId(teamId || null)
     if (activeProvider === 'sleeper') {
       sleeperPersist({ ...sleeperForm, myTeamId: teamId || null })

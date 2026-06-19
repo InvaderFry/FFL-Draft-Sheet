@@ -1,21 +1,28 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { THEME_POS_COLORS } from '../utils/posColors'
 
-const ThemeContext = createContext(null)
+interface ThemeContextValue {
+  theme: string
+  setTheme: (value: string) => void
+  posColors: Record<string, string>
+}
+
+const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 const STORAGE_KEY = 'ffl_theme'
 const VALID_THEMES = ['mocha', 'latte']
 
-function readSavedTheme() {
+function readSavedTheme(): string {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    return VALID_THEMES.includes(saved) ? saved : 'mocha'
+    return saved && VALID_THEMES.includes(saved) ? saved : 'mocha'
   } catch {
     return 'mocha'
   }
 }
 
-export function ThemeProvider({ children }) {
+export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState(readSavedTheme)
 
   useEffect(() => {
@@ -27,7 +34,7 @@ export function ThemeProvider({ children }) {
     }
   }, [theme])
 
-  function setTheme(value) {
+  function setTheme(value: string) {
     if (VALID_THEMES.includes(value)) setThemeState(value)
   }
 
@@ -39,6 +46,7 @@ export function ThemeProvider({ children }) {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export function useTheme() {
-  return useContext(ThemeContext)
+export function useTheme(): ThemeContextValue {
+  // Always rendered within ThemeProvider; cast keeps consumers null-free.
+  return useContext(ThemeContext) as ThemeContextValue
 }

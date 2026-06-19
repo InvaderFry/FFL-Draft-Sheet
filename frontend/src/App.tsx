@@ -23,6 +23,8 @@ import { useTierDisplay } from './hooks/useTierDisplay'
 import { useManualTiers } from './hooks/useManualTiers'
 import { deriveManualTiers } from './utils/tierAccess'
 import { useTheme } from './context/ThemeContext'
+import type { SheetResponse } from './types/api'
+import type { LeagueConfig } from './types/domain'
 import styles from './App.module.css'
 
 const THEMES = [
@@ -30,12 +32,14 @@ const THEMES = [
   { id: 'latte', label: 'Latte' },
 ]
 
+type Phase = 'idle' | 'loading' | 'ready'
+
 export default function App() {
   const { theme, setTheme } = useTheme()
-  const [phase, setPhase] = useState('idle')  // 'idle' | 'loading' | 'ready'
-  const [sheetData, setSheetData] = useState(null)
-  const [config, setConfig] = useState(null)
-  const [error, setError] = useState(null)
+  const [phase, setPhase] = useState<Phase>('idle')
+  const [sheetData, setSheetData] = useState<SheetResponse | null>(null)
+  const [config, setConfig] = useState<LeagueConfig | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const { isDrafted, toggle, applySyncedPicks, count: draftedCount, clear: clearDrafted, remove: removeDrafted, draftedList } = useDraftState()
   const { isWatched, toggle: toggleWatch } = useWatchlist()
   const { shadeBy, setShadeBy, linesBy, setLinesBy } = useTierDisplay()
@@ -62,21 +66,21 @@ export default function App() {
     clearDrafted({ keepSynced: synced })
   }, [clearDrafted, synced])
 
-  const handleSheet = useCallback((data, cfg) => {
+  const handleSheet = useCallback((data: SheetResponse, cfg: LeagueConfig) => {
     setSheetData(data)
     setConfig(cfg)
     setError(null)
     setPhase('ready')
   }, [])
 
-  const handleLoading = useCallback((isLoading) => {
+  const handleLoading = useCallback((isLoading: boolean) => {
     if (isLoading) {
       setError(null)
       setPhase('loading')
     }
   }, [])
 
-  const handleError = useCallback((message) => {
+  const handleError = useCallback((message: string) => {
     setError(message || 'Failed to generate sheet. Please try again.')
     setPhase('idle')
   }, [])

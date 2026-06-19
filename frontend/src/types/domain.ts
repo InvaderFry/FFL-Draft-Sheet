@@ -34,6 +34,21 @@ export interface DraftedEntry {
  * fields are read by the draft-strategy helpers; the index signature keeps the
  * many other passthrough fields (season, ppr, n_teams, …) accessible.
  */
+/** Per-category scoring settings. Values may be strings while typed in a form. */
+export interface ScoringConfig {
+  rec?: number | string
+  pass_td?: number | string
+  pass_yds?: number | string
+  rush_td?: number | string
+  rush_yds?: number | string
+  rec_td?: number | string
+  rec_yds?: number | string
+  interception?: number | string
+  fumble_lost?: number | string
+  te_premium?: number | string
+  [key: string]: number | string | undefined
+}
+
 export interface LeagueConfig {
   QB?: number
   RB?: number
@@ -43,7 +58,7 @@ export interface LeagueConfig {
   flex_slots?: number
   flex_qb?: number
   season?: number | string
-  scoring?: { rec?: number | string } | null
+  scoring?: ScoringConfig | null
   [key: string]: unknown
 }
 

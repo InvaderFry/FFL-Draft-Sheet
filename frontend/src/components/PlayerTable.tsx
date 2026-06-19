@@ -6,18 +6,25 @@
  * ECR column coloring applied via ecrColor utility.
  */
 
+import type { CSSProperties } from 'react'
 import { ecrColor, ecrColorStyle } from '../utils/ecrColor'
 import { fmtVal, fmtInt, fmtPct } from '../utils/formatters'
 import { valBgStyle, psPctBgStyle } from '../utils/valGradient'
 import { survivalStatus } from '../utils/draftStrategy'
 import { tierFor, tierNumberMethod } from '../utils/tierAccess'
 import { useTheme } from '../context/ThemeContext'
+import type { PlayerRow } from '../types/api'
+import type { TableViewProps } from '../types/components'
 import styles from './PlayerTable.module.css'
 
 // Tooltip + dot class for the "survives to your next pick?" marker. Both
 // 'gone' (already past ADP — a falling player still on the board) and 'risky'
 // (likely drafted before your next pick) share the urgent amber dot.
-function survivalMarker(adpRank, currentPick, nextPick) {
+function survivalMarker(
+  adpRank: number | null,
+  currentPick: number | null,
+  nextPick: number | null,
+): { cls: string; title: string } | null {
   const status = survivalStatus(adpRank, currentPick, nextPick)
   if (status === 'gone') {
     return { cls: styles.survRisky, title: `ADP ${adpRank} · already past ADP — likely gone any pick now` }
@@ -31,7 +38,14 @@ function survivalMarker(adpRank, currentPick, nextPick) {
   return null
 }
 
-const COLUMNS = [
+interface Column {
+  key: string
+  label: string
+  align: CSSProperties['textAlign']
+  width: string
+}
+
+const COLUMNS: Column[] = [
   { key: 'player_name', label: 'NAME',   align: 'left',   width: '130px' },
   { key: 'tm_bw',       label: 'TM/BW',  align: 'left',   width: '64px'  },
   { key: 'ecr_fmt',     label: 'ECR',    align: 'center', width: '52px'  },
@@ -40,6 +54,13 @@ const COLUMNS = [
   { key: 'ceil',        label: 'C',      align: 'right',  width: '44px'  },
   { key: 'ps_pct',      label: 'PS%',    align: 'right',  width: '44px'  },
 ]
+
+const AUCTION_COLUMN: Column = { key: 'auction_price', label: '$', align: 'right', width: '42px' }
+
+interface PlayerTableProps extends TableViewProps {
+  players: PlayerRow[]
+  wrapStyle?: CSSProperties
+}
 
 export default function PlayerTable({
   players,
@@ -61,14 +82,12 @@ export default function PlayerTable({
   manualEdit = false,
   onToggleBoundary = () => {},
   thinMode = false,
-}) {
+}: PlayerTableProps) {
   const { theme } = useTheme()
   // Thin mode hides the lowest-value, widest columns: Team/Bye and Floor.
   // Floor is symmetric with Ceiling around VAL, so the range stays inferable.
-  const hidden = thinMode ? new Set(['tm_bw', 'floor']) : new Set()
-  const allCols = auctionMode
-    ? [...COLUMNS, { key: 'auction_price', label: '$', align: 'right', width: '42px' }]
-    : COLUMNS
+  const hidden: Set<string> = thinMode ? new Set(['tm_bw', 'floor']) : new Set()
+  const allCols = auctionMode ? [...COLUMNS, AUCTION_COLUMN] : COLUMNS
   const cols = allCols.filter(col => !hidden.has(col.key))
 
   const searchTerm = search.trim().toLowerCase()
@@ -106,7 +125,7 @@ export default function PlayerTable({
             // consecutive tiers are visually distinct and a given tier is consistent.
             const lineTier = tierFor(player, linesBy, manualTiers)
             const isLineStart = idx > 0 && lineTier != null && tierFor(previous, linesBy, manualTiers) !== lineTier
-            const lineColorClass = isLineStart ? styles[`tierLine${((lineTier - 1) % 4) + 1}`] : ''
+            const lineColorClass = isLineStart ? styles[`tierLine${(((lineTier ?? 0) - 1) % 4) + 1}`] : ''
             // Far-left tier number, straddling the line at the start of each tier
             // band. Counts the Lines method (or Shade when Lines = None) and shows
             // the true tier number. Includes idx 0 so the top tier in view is
@@ -138,7 +157,7 @@ export default function PlayerTable({
                 <td className={styles.nameCell}>
                   {isNumberStart && (
                     <span
-                      className={`${styles.tierNum} ${styles[`tierNum${((numTier - 1) % 4) + 1}`]}`}
+                      className={`${styles.tierNum} ${styles[`tierNum${(((numTier ?? 0) - 1) % 4) + 1}`]}`}
                       aria-hidden="true"
                     >{numTier}</span>
                   )}
